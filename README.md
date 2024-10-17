@@ -22,6 +22,7 @@ Welcome to the reproducible benchmark recipes repository for GPUs! This reposito
 | ---------------- | ---------------- | --------- | ------------------- | ------------ | ------------------ |
 | **GPT3-175B**       | [A3 Mega (NVIDIA H100)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-mega-vms)    | NeMo  | Pre-training   | GKE          | [Link](./training/a3mega/GPT3-175B/nemo-pretraining-gke/README.md)              |
 | **Llama-3-70B**     | [A3 Mega (NVIDIA H100)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-mega-vms)    | NeMo  | Pre-training   | GKE          | [Link](./training/a3mega/llama-3-70b/nemo-pretraining-gke/README.md)            |
+| **Mixtral-8-7B**     | [A3 Mega (NVIDIA H100)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-mega-vms)    | NeMo  | Pre-training   | GKE          | [Link](./training/a3mega/Mixtral-8x7B/nemo-pretraining-gke/README.md)            |
 
 ## Repository structure
 
