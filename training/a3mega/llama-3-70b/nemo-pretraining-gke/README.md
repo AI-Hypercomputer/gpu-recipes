@@ -1,6 +1,6 @@
-# Pretrain GPT3-175B workloads on A3 Mega GKE Node pools
+# Pretrain Llama-3-70B workloads on A3 Mega GKE Node pools
 
-This recipe outlines the steps for running a GPT-3 175B pretraining workload on
+This recipe outlines the steps for running a Llama-3-70B pretraining workload on
 [A3 Mega GKE Node pools](https://cloud.google.com/kubernetes-engine) by using the
 [NVIDIA NeMo framework](https://github.com/NVIDIA/nemo).
 
@@ -21,25 +21,23 @@ For this recipe, the following setup is used:
 
 This recipe has been optimized for and tested with the following configuration:
 
-- A cluster with 32 [a3-megagpu-8g](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-mega-vms) machines
+- A cluster with 16 and 64 nodes [a3-megagpu-8g](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-mega-vms) machines
 - Machine placement in the cluster is configured using a [compact placement policy](https://cloud.google.com/kubernetes-engine/docs/how-to/compact-placement)
 - [GPUDirect-TCPXO](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx#required-features-capabilities)
    component versions:
     - NCCL Plugin: v1.0.3
     - RxDM sidecar: v1.0.9
 - [NVIDIA NeMo NGC container image](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/nemo/tags): 24.07
-- FP8 precision training
-- Uses a mock pretraining dataset provided by the NeMo framework. By default, the job
-  is configured to execute 50 training steps. If you want to change the number of training steps,
+- FP8 and BF16 precision training
+- Uses a  Wikipedia pretraining tokenized dataset that can be found here: `gs://nemo-megatron-demo/training-data/tokenized/bpe2gpt/wikipedia/`. By default, the job is configured to execute 50 training steps. If you want to change the number of training steps,
   see [Configure and submit a pretraining job](#configure-and-submit-a-pretraining-job).
-
 
 ## Prerequisites
 
 Before running this recipe, ensure your environment is configured as follows:
 
 - A GKE cluster with the following setup:
-    - An A3 Mega node pool (32 nodes, 256 GPUs)
+    - An A3 Mega node pool (minimum of 16 nodes, 128 GPUs)
     - Topology-aware scheduling enabled
 - An Artifact Registry repository to store the Docker image.
 - A Google Cloud Storage (GCS) bucket to store results.
@@ -71,6 +69,7 @@ From your client, complete the following steps:
   ```bash
   export PROJECT_ID=<PROJECT_ID>
   export REGION=<CLUSTER_REGION>
+  export CLUSTER_REGION=<CLUSTER_REGION>
   export CLUSTER_NAME=<CLUSTER_NAME>
   export GCS_BUCKET=<GCS_BUCKET>
   export ARTIFACT_REGISTRY=<ARTIFACT_REGISTRY>
@@ -78,6 +77,7 @@ From your client, complete the following steps:
   Replace the following values:
 
   - `<PROJECT_ID>`: your Google Cloud project ID
+  - `<REGION>`: The region where you want to run the Cloud Build
   - `<CLUSTER_REGION>`: the region where your cluster is located
   - `<CLUSTER_NAME>`: the name of your GKE cluster
   - `<GCS_BUCKET>`: the name of your Cloud Storage bucket. Do not include the `gs://` prefix
@@ -98,12 +98,12 @@ From your client, clone the `gpu-recipes` repository and set a reference to the 
 git clone https://github.com/ai-hypercomputer/gpu-recipes.git
 cd gpu-recipes
 export REPO_ROOT=`git rev-parse --show-toplevel`
-export RECIPE_ROOT=$REPO_ROOT/training/a3mega/GPT3-175B/nemo-pretraining-gke
+export RECIPE_ROOT=$REPO_ROOT/training/a3mega/llama-3-70b/nemo-pretraining-gke
 ```
 
 ### Get cluster credentials
 
-From your client, get the cerdentials for your cluster.
+From your client, get the credentials for your cluster.
 
 ```
 gcloud container clusters get-credentials $CLUSTER_NAME --region $CLUSTER_REGION
@@ -147,40 +147,66 @@ default settings, run the following command from your client:
 ```bash
 cd $RECIPE_ROOT
 helm install -f values.yaml \
-    --set-file nemo_config=$REPO_ROOT/src/frameworks/nemo-configs/gpt3-175b-256gpus-fp8.yaml \
+    --set-file nemo_config=$REPO_ROOT/src/frameworks/nemo-configs/llama3-70b-fp8.yaml \
     --set workload.image=${ARTIFACT_REGISTRY}/nemo_workload:24.07 \
     --set workload.gcsBucketForDataCataPath=${GCS_BUCKET} \
-    $USER-gpt3-175b-nemo \
+    $USER-llama-3-70b-128-nemo \
+    $REPO_ROOT/src/helm-charts/nemo-training
+```
+
+To run on 512 GPUs, use the `--set workload.gpus=512`.
+
+```bash
+cd $RECIPE_ROOT
+helm install -f values.yaml \
+    --set-file nemo_config=$REPO_ROOT/src/frameworks/nemo-configs/llama3-70b-fp8.yaml \
+    --set workload.image=${ARTIFACT_REGISTRY}/nemo_workload:24.07 \
+    --set workload.gcsBucketForDataCataPath=${GCS_BUCKET} \
+    --set workload.gpus=512 \
+    $USER-llama-3-70b-512-nemo \
     $REPO_ROOT/src/helm-charts/nemo-training
 ```
 
 #### Configure job settings
 
 You can overwrite any of the default
-[NeMo configurations](../../../../src/frameworks/nemo-configs/gpt3-175b-256gpus-fp8.yaml)
+[NeMo configurations](../../../../src/frameworks/nemo-configs/llama3-70b-fp8.yaml)
 for this job. To do this, we can set the new arguments using `--set workload.arguments`.
 
 **Examples**
 
 - To set the number of training steps to 100, run the following command from your client:
 
-  ```bash
-  cd $RECIPE_ROOT
-  helm install -f values.yaml \
-      --set-file nemo_config=$REPO_ROOT/src/frameworks/nemo-configs/gpt3-175b-256gpus-fp8.yaml \
-      --set workload.image=${ARTIFACT_REGISTRY}/nemo_workload:24.07 \
-      --set workload.gcsBucketForDataCataPath=${GCS_BUCKET} \
-      --set workload.arguments="{trainer.max_steps=100}" \
-      $USER-gpt3-175b-nemo \
-      $REPO_ROOT/src/helm-charts/nemo-training
-  ```
+    ```bash
+    cd $RECIPE_ROOT
+    helm install -f values.yaml \
+        --set-file nemo_config=$REPO_ROOT/src/frameworks/nemo-configs/llama3-70b-fp8.yaml \
+        --set workload.image=${ARTIFACT_REGISTRY}/nemo_workload:24.07 \
+        --set workload.gcsBucketForDataCataPath=${GCS_BUCKET} \
+        --set workload.arguments="{trainer.max_steps=100}" \
+        $USER-llama-3-70b-128-nemo \
+        $REPO_ROOT/src/helm-charts/nemo-training
+    ```
+
+- To run the training job using bf16 precision:
+
+    ```bash
+    cd $RECIPE_ROOT
+    helm install -f values.yaml \
+        --set-file nemo_config=$REPO_ROOT/src/frameworks/nemo-configs/llama3-70b-fp8.yaml \
+        --set workload.image=${ARTIFACT_REGISTRY}/nemo_workload:24.07 \
+        --set workload.gcsBucketForDataCataPath=${GCS_BUCKET} \
+        --set workload.arguments="{model.fp8=false,model.fp8_hybrid=false}" \
+        $USER-llama-3-70b-128-bf16-nemo \
+        $REPO_ROOT/src/helm-charts/nemo-training
+    ```
 
 ### Monitor the job
 
 To check the status of pods in the indexed job, run the following command from your client:
 
 ```
-kubectl get pods | grep $USER-gpt3-175b-nemo
+kubectl get pods | grep $USER-llama-3-70b-128-nemo
 ```
 
 To get the logs for one of the pods, run the following command from your client:
@@ -192,7 +218,7 @@ kubectl logs "<pod_name>"
 ### Analyze results
 
 When completed, the job creates several artifacts, including logs and traces, and places them
-in the configured Google Cloud Storage bucker as follows:
+in the configured Google Cloud Storage bucket as follows:
 
 ```
 gs://${GCP_BUCKET}/nemo-experiments/<JOB_ID>
@@ -207,7 +233,7 @@ gs://${GCP_BUCKET}/nemo-experiments/<JOB_ID>
 ```
 
 - `hparams.yaml`: the NeMo configuration used by the pretraining script. This includes
-   the combined [configuration file](../../../../src/frameworks/nemo-configs/gpt3-175b-256gpus-fp8.yaml)
+   the combined [configuration file](../../../../src/frameworks/nemo-configs/llama3-70b-fp8.yaml)
    and the command line overrides
 - `lightning_logs.txt`: the log files generated by PyTorch Lightning, which is used by NeMo
 - `nemo_error_logs.txt`: the warning and error logs generated by NeMo
@@ -220,19 +246,18 @@ Here is an example of an entry in the DLLogger log:
 
 ```json
 DLLL {
-  "timestamp": "1727463426.984522",
-  "datetime": "2024-09-27 18:57:06.984522",
-  "elapsedtime": "1645.119157",
+  "timestamp": "1728595441.952723",
+  "datetime": "2024-10-10 21:24:01.952723",
+  "elapsedtime": "2087.21432",
   "type": "LOG",
-  "step": 47,
+  "step": 36,
   "data": {
-    "reduced_train_loss": 7.890198707580566,
-    "lr": 0.000036782606912311167,
-    "global_step": 47,
-    "consumed_samples": 98304,
-    "train_backward_timing in s": 0.00004844665454584174,
-    "grad_norm": 8.800999641418457,
-    "train_step_timing in s": 25.115550994873047,
+    "reduced_train_loss": 7.976484775543213,
+    "lr": 0.000008490565960528329,
+    "global_step": 36,
+    "consumed_samples": 37888,
+    "train_backward_timing in s": 0.00005416870044427924,
+    "train_step_timing in s": 45.81364059448242,
     "epoch": 0
   }
 }
@@ -272,17 +297,20 @@ following steps command from your client:
    script
 
    ```bash
-   cd $REPO_ROOT/src/utils/training_metrics
-   python3 process_training_results.py --file /path/to/your/local/dllogger.json \
-   --batch_size 2048 \
-   --num_accelerators 256 \
-   --precision fp8 \
-   --model_type gpt3-175b \
-   --accelerator_type h100
-   ```
+    cd $REPO_ROOT/src/utils/training_metrics
+    python3 process_training_results.py --file /path/to/your/local/dllogger.json \
+    --batch_size 1024 \
+    --num_accelerators 128 \
+    --model_type llama3-70b \
+    --accelerator_type h100 \
+    --precision fp8 \
+    --start_step=15 \
+    --end_step=40
+    ```
 **Note:** The `batch_size`, `num_accelerators`, `precision`, `model_type` and `accelerator_type` are the
-specific values for this recipe running the default configuration. Average step time
-is computed by default using the steps 10 to 30.
+specific values for this recipe running the default configuration. Average step time is computed
+between the step 15 and 40. Modify the `--num_accelerators=512` in case you run on 512 GPUs and
+`--precision=bf16` in case you run your training session using bf16 precision.
 
 For more detailed information and advanced usage instructions of this tool,
 see the [full documentation](../../../../src/utils/training_metrics/README.md)
@@ -293,6 +321,6 @@ You can delete the job and other resources created by the Helm chart.
 To uninstall Helm, run the following command from your client:
 
 ```bash
-helm uninstall $USER-gpt3-175b-nemo
+helm uninstall $USER-llama-3-70b-128-nemo
 ```
 

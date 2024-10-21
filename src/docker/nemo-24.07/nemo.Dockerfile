@@ -14,6 +14,7 @@
 
 FROM nvcr.io/nvidia/nemo:24.07
 WORKDIR /workspace
+COPY requirements.txt /workspace/requirements.txt
 
 # GCSfuse components (used to provide shared storage, not intended for high performance)
 RUN apt-get update && apt-get install --yes --no-install-recommends \
@@ -31,4 +32,4 @@ RUN apt-get update && apt-get install --yes --no-install-recommends \
   && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
   && mkdir /gcs
 
-RUN pip install git+https://github.com/NVIDIA/dllogger#egg=dllogger
+RUN pip install --require-hashes -r requirements.txt

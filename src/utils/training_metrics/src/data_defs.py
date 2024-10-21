@@ -14,11 +14,23 @@
 
 """ Accelerators and models definitions"""
 
+ACCELERATORS = ["h100", "a100", "v5e", "v5p"]
+
 MAX_TFLOPS = {
-    "h100": 989,  # https://resources.nvidia.com/en-us-tensor-core page39 - bf16
-    "v5e": 197,  # https://cloud.google.com/tpu/docs/v5e
-    "v5p": 459,  # https://cloud.google.com/tpu/docs/v5p
-    "a100": 312,  # https://resources.nvidia.com/en-us-tensor-core page39 - bf16
+    (
+        "h100",
+        "bf16",
+    ): 989,  # https://resources.nvidia.com/en-us-tensor-core page39 - bf16
+    (
+        "h100",
+        "fp8",
+    ): 1978,  # https://resources.nvidia.com/en-us-tensor-core page39 - fp8
+    ("v5e", "bf16"): 197,  # https://cloud.google.com/tpu/docs/v5e
+    ("v5p", "bf16"): 459,  # https://cloud.google.com/tpu/docs/v5p
+    (
+        "a100",
+        "bf16",
+    ): 312,  # https://resources.nvidia.com/en-us-tensor-core page39 - bf16
 }
 
 MODEL_FLOPS_PER_SAMPLE = {

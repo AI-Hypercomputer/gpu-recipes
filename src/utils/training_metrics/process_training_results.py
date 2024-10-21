@@ -17,7 +17,7 @@
 import argparse
 import json
 
-from src.data_defs import MODEL_FLOPS_PER_SAMPLE, MAX_TFLOPS
+from src.data_defs import MODEL_FLOPS_PER_SAMPLE, MAX_TFLOPS, ACCELERATORS
 
 
 def parse_args():
@@ -56,8 +56,15 @@ def parse_args():
     parser.add_argument(
         "--accelerator_type",
         type=str,
-        choices=list(MAX_TFLOPS.keys()),
+        choices=ACCELERATORS,
         help="Number of GPUs used for training",
+    )
+    parser.add_argument(
+        "--precision",
+        type=str,
+        choices=["bf16", "fp8"],
+        default="bf16",
+        help="Precision using during training",
     )
     parser.add_argument(
         "--start_step",
@@ -101,9 +108,9 @@ def compute_mfu(
     )
     mfu = tflops_per_accelerator / max_tflops
 
-    print(f"Average step time: {step_time:.6f}")
-    print(f"TFLOPS/Accelerator {tflops_per_accelerator:.4f}")
-    print(f"MFU:{mfu:.4f}")
+    print(f"Average step time: {step_time:.8f}")
+    print(f"TFLOPS/Accelerator {tflops_per_accelerator:.8f}")
+    print(f"MFU:{mfu:.8f}")
     return mfu
 
 
@@ -151,7 +158,11 @@ def main(args):
         if args.model_flops
         else MODEL_FLOPS_PER_SAMPLE[args.model_type]
     )
-    max_tflops = args.max_flops if args.max_flops else MAX_TFLOPS[args.accelerator_type]
+    max_tflops = (
+        args.max_flops
+        if args.max_flops
+        else MAX_TFLOPS[(args.accelerator_type, args.precision)]
+    )
     average_step_time = get_average_step_time(
         args.file, start_step=args.start_step, end_step=args.end_step
     )

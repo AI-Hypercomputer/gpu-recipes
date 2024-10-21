@@ -18,9 +18,13 @@ volumes:
   # The VM host path for SSDs is assumed at /mnt/stateful_partition/kube-ephemeral-ssd
   ssdMountPath: "/ssd"
 
+gcsDownload: # downloads or synchronizes contents of a GCS bucket folder on initialization
+  source: "gs://nemo-megatron-demo/training-data/tokenized/bpe2gpt/wikipedia/" 
+  target: "/ssd/.cache/"
+
 workload:
   torchDistributedTarget: "/opt/NeMo/examples/nlp/language_modeling/megatron_gpt_pretraining.py"
-  gpus: 256
+  gpus: 128 # This should be one of: [128, 256]
 
 network:
   stack: "tcpxo"
@@ -36,3 +40,4 @@ network:
   # The following NCCL settings are recommended for TCPxo only (but tunable):
   - name: NCCL_MIN_NCHANNELS
     value: "4"
+ 
