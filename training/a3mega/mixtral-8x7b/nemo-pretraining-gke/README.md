@@ -100,7 +100,7 @@ From your client, clone the `gpu-recipes` repository and set a reference to the 
 git clone https://github.com/ai-hypercomputer/gpu-recipes.git
 cd gpu-recipes
 export REPO_ROOT=`git rev-parse --show-toplevel`
-export RECIPE_ROOT=$REPO_ROOT/training/a3mega/Mixtral-8x7B/nemo-pretraining-gke
+export RECIPE_ROOT=$REPO_ROOT/training/a3mega/mixtral-8x7b/nemo-pretraining-gke
 ```
 
 ### Get cluster credentials

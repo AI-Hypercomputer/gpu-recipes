@@ -98,12 +98,12 @@ From your client, clone the `gpu-recipes` repository and set a reference to the 
 git clone https://github.com/ai-hypercomputer/gpu-recipes.git
 cd gpu-recipes
 export REPO_ROOT=`git rev-parse --show-toplevel`
-export RECIPE_ROOT=$REPO_ROOT/training/a3mega/GPT3-175B/nemo-pretraining-gke
+export RECIPE_ROOT=$REPO_ROOT/training/a3mega/gpt3-175b/nemo-pretraining-gke
 ```
 
 ### Get cluster credentials
 
-From your client, get the cerdentials for your cluster.
+From your client, get the credentials for your cluster.
 
 ```
 gcloud container clusters get-credentials $CLUSTER_NAME --region $CLUSTER_REGION
