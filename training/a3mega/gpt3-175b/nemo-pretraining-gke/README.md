@@ -195,7 +195,7 @@ When completed, the job creates several artifacts, including logs and traces, an
 in the configured Google Cloud Storage bucker as follows:
 
 ```
-gs://${GCP_BUCKET}/nemo-experiments/<JOB_ID>
+gs://${GCS_BUCKET}/nemo-experiments/<JOB_ID>
 ├── hparams.yaml
 ├── lightning_logs.txt
 ├── nemo_error_logs.txt
