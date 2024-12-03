@@ -109,8 +109,8 @@ def compute_mfu(
     mfu = tflops_per_accelerator / max_tflops
 
     print(f"Average step time: {step_time:.8f}")
-    print(f"TFLOPS/Accelerator {tflops_per_accelerator:.8f}")
-    print(f"MFU:{mfu:.8f}")
+    print(f"TFLOPS/Accelerator: {tflops_per_accelerator:.8f}")
+    print(f"MFU: {mfu:.8f}")
     return mfu
 
 
