@@ -1,0 +1,24 @@
+steps:
+- name: 'gcr.io/cloud-builders/git'
+  args: ['clone', 'https://github.com/AI-Hypercomputer/maxtext.git']
+- name: 'docker'
+  args: ['build',
+         '--network', 'host',
+         '--build-arg', 'MODE=${_MODE}',
+         '--build-arg', 'JAX_VERSION=${_JAX_VERSION}',
+         '--build-arg', 'DEVICE=${_DEVICE}',
+         '--build-arg', 'BASEIMAGE=${_BASEIMAGE}',
+         '-f', './maxtext_gpu_dependencies.Dockerfile',
+         '-t', '${_ARTIFACT_REGISTRY}/maxtext-nightly',
+         '.'
+        ]
+  dir: 'maxtext' # Set the working directory to 'maxtext'
+options:
+  substitution_option: 'ALLOW_LOOSE'
+substitutions:
+  _MODE: 'nightly'
+  _JAX_VERSION: '0.4.36.dev20241202'
+  _DEVICE: 'gpu'
+  _BASEIMAGE: 'ghcr.io/nvidia/jax:jax-2024-12-04'
+images:
+- '${_ARTIFACT_REGISTRY}/maxtext-nightly'

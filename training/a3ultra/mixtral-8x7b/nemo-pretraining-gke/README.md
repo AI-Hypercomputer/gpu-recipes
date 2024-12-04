@@ -20,7 +20,7 @@ For this recipe, the following setup is used:
 
 This recipe has been optimized for and tested with the following configuration:
 
-- A cluster with 32 [a3-ultragpu-8g](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a2-ultra-vms) machines
+- A cluster with 32 [a3-ultragpu-8g](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) machines
 - Machine placement in the cluster is configured using a [compact placement policy](https://cloud.google.com/kubernetes-engine/docs/how-to/compact-placement)
 - [NVIDIA NeMo NGC container image](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/nemo/tags): 24.07
 - BF16 precision training
