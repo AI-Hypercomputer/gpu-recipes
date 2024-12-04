@@ -433,7 +433,7 @@ spec:
         # Show the extra workload arguments:
         echo "Detected the following additional workload arguments:"
         {{- range $root.Values.workload.arguments }}
-        echo "{{ . }}" 
+        echo "{{ . }}"
         {{- end }}
 
         sleep 10 # <- Hack to allow some time for service to boot
@@ -469,7 +469,7 @@ spec:
         +exp_manager.version="$JOB_IDENTIFIER" \
         +exp_manager.dllogger_logger_kwargs.json_file="/gcs/nemo-experiments/$JOB_IDENTIFIER/dllogger/rank-$NODE_RANK/dllogger.json" \
         {{- range $root.Values.workload.arguments }}
-        {{ . }} \ 
+        {{ . }} \
         {{- end }}
 
         echo "Copying log files"

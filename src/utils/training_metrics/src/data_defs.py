@@ -14,7 +14,7 @@
 
 """ Accelerators and models definitions"""
 
-ACCELERATORS = ["h100", "a100", "v5e", "v5p"]
+ACCELERATORS = ["h100", "h200", "a100", "v5e", "v5p"]
 
 MAX_TFLOPS = {
     (
@@ -31,6 +31,10 @@ MAX_TFLOPS = {
         "a100",
         "bf16",
     ): 312,  # https://resources.nvidia.com/en-us-tensor-core page39 - bf16
+    (
+        "h200",
+        "bf16",
+    ): 989,
 }
 
 MODEL_FLOPS_PER_SAMPLE = {
