@@ -18,6 +18,7 @@
 
 {{ $nodes := div .Values.workload.gpus 8 | max 1 }}
 {{ $gpusPerNode := min .Values.workload.gpus 8 }}
+{{ $aotc := default 0 .Values.workload.aotc }}
 
 {{- $root := . -}}
 
@@ -152,6 +153,11 @@ spec:
         - name: SSD_MOUNT_PATH
           value: "{{ $root.Values.volumes.ssdMountPath }}"
 
+        {{- if $aotc }}
+        - name: AOTC
+          value: "{{ $aotc }}"
+        {{- end }}
+
         # The following settings are specific to the Torch distributed launcher:
         {{- range $gcs := $root.Values.volumes.gcsMounts }}
         - name: GCS_FUSE_BUCKET
@@ -253,9 +259,10 @@ spec:
           cat /etc/workload-configuration/nemo-configuration.yaml | sed 's/^/| /'
           echo ""
 
+          touch /workspace/workload_arguments.txt
           echo "Detected the following additional workload arguments:"
           {{- range $root.Values.workload.arguments }}
-          echo "{{ . }}"
+          echo "{{ . }}" | tee -a /workspace/workload_arguments.txt
           {{- end }}
 
 
@@ -275,22 +282,31 @@ spec:
             nvidia-smi dmon -d 20 -s pum &
           fi
 
-          OMP_NUM_THREADS=12 torchrun \
-          --nproc-per-node="$GPUS_PER_NODE" \
-          --nnodes="$NNODES" \
-          --node_rank="$NODE_RANK" \
-          --rdzv_id="$JOB_IDENTIFIER" \
-          --master_addr="$MASTER_ADDR" \
-          --master_port="$MASTER_PORT" \
-          ${TORCH_DISTRIBUTED_TARGET} \
-          --config-path="/etc/workload-configuration" \
-          --config-name="nemo-configuration.yaml" \
-          +trainer.num_nodes="$NNODES" \
-          +exp_manager.version="$JOB_IDENTIFIER" \
-          +exp_manager.dllogger_logger_kwargs.json_file="/gcs/nemo-experiments/$JOB_IDENTIFIER/dllogger/rank-$NODE_RANK/dllogger.json" \
-          {{- range $root.Values.workload.arguments }}
-          {{ . }} \
-          {{- end }}
+          if [[ "{{ $aotc }}" == "0" ]]; then
+            OMP_NUM_THREADS=12 torchrun \
+            --nproc-per-node="$GPUS_PER_NODE" \
+            --nnodes="$NNODES" \
+            --node_rank="$NODE_RANK" \
+            --rdzv_id="$JOB_IDENTIFIER" \
+            --master_addr="$MASTER_ADDR" \
+            --master_port="$MASTER_PORT" \
+            ${TORCH_DISTRIBUTED_TARGET} \
+            --config-path="/etc/workload-configuration" \
+            --config-name="nemo-configuration.yaml" \
+            +trainer.num_nodes="$NNODES" \
+            +exp_manager.version="$JOB_IDENTIFIER" \
+            +exp_manager.dllogger_logger_kwargs.json_file="/gcs/nemo-experiments/$JOB_IDENTIFIER/dllogger/rank-$NODE_RANK/dllogger.json" \
+            {{- range $root.Values.workload.arguments }}
+            {{ . }} \
+            {{- end }}
+
+          else
+            echo "Using AOTC"
+            export ENV_FILE=/workspace/env_vars.txt
+            env > /workspace/env_vars.txt
+            python -m aotc.executor
+
+          fi
 
           echo "Copying log files"
           cp -r /workspace/nemo_experiments/megatron_gpt/$JOB_IDENTIFIER/* /gcs/nemo-experiments/$JOB_IDENTIFIER/

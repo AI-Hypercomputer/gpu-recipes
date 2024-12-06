@@ -108,6 +108,8 @@ gcloud container clusters get-credentials $CLUSTER_NAME --region $CLUSTER_REGION
 
 ### Build and push a docker container image to Artifact Registry
 
+Note:If you'd like to use AotC-based [library](https://github.com/AI-Hypercomputer/aotc) image, you may skip this step.
+
 To build the container, complete the following steps from your client:
 
 1. Use Cloud Build to build and push the container image.
@@ -169,7 +171,21 @@ for this job. To do this, we can set the new arguments using `--set workload.arg
       --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
       --set workload.arguments="{trainer.max_steps=100}" \
       $USER-llama-3-1-70b-nemo-fp8 \
-      $REPO_ROOT/src/helm-charts/a3mega/nemo-training
+      $REPO_ROOT/src/helm-charts/a3ultra/nemo-training
+  ```
+
+- To use the AotC-based image, run the following command from your client:
+
+  ```bash
+  cd $RECIPE_ROOT
+  export IMAGE=us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-nemo@sha256:7a84264e71f82f225be639dd20fcf9104c80936c0f4f38f94b88dfb60303c70e
+  helm install -f values.yaml \
+      --set-file nemo_config=$REPO_ROOT/src/frameworks/a3ultra/nemo-configs/llama-3.1-70b-256gpus-a3ultra-fp8.yaml \
+      --set workload.image=${IMAGE} \
+      --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+      --set-string workload.aotc=true \
+      $USER-llama-3-1-70b-nemo-fp8 \
+      $REPO_ROOT/src/helm-charts/a3ultra/nemo-training
   ```
 
 ### Monitor the job

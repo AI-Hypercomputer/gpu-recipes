@@ -25,6 +25,7 @@ volumes:
 workload:
   torchDistributedTarget: "/opt/NeMo/examples/nlp/language_modeling/megatron_gpt_pretraining.py"
   gpus: 256 # This should be one of: {<= 8,  multiple of 8}
+  aotc: false
 
 network:
   ncclSettings:
