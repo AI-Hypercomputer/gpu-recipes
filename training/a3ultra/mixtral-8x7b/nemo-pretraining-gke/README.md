@@ -169,7 +169,7 @@ for this job. To do this, we can set the new arguments using `--set workload.arg
       --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
       --set workload.arguments="{trainer.max_steps=100}" \
       $USER-mixtral-8x7b-nemo \
-      $REPO_ROOT/src/helm-charts/nemo-training
+      $REPO_ROOT/src/helm-charts/a3mega/nemo-training
   ```
 
 ### Monitor the job
