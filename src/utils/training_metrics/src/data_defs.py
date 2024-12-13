@@ -35,6 +35,10 @@ MAX_TFLOPS = {
         "h200",
         "bf16",
     ): 989,
+    (
+        "h200",
+        "fp8",
+    ): 1978,
 }
 
 MODEL_FLOPS_PER_SAMPLE = {

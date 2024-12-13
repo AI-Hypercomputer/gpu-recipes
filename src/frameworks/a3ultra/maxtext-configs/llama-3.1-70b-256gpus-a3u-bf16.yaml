@@ -8,7 +8,7 @@ learning_rate: 0.001
 model_name: llama3.1-70b
 enable_checkpointing: false
 attention: cudnn_flash_te
-remat_policy: save_dot_except_mlp
+remat_policy: save_dot_with_context_except_mlp
 use_iota_embed: true
 scan_layers: true
 dataset_type: synthetic
