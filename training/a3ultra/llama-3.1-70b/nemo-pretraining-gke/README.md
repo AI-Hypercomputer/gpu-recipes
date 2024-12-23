@@ -188,6 +188,9 @@ for this job. To do this, we can set the new arguments using `--set workload.arg
       $REPO_ROOT/src/helm-charts/a3ultra/nemo-training
   ```
 
+To build the AotC-based image yourself, please use the script defined in `$REPO_ROOT/src/docker/nemo-aotc-24.07`
+
+
 ### Monitor the job
 
 To check the status of pods in the indexed job, run the following command from your client:
@@ -233,19 +236,19 @@ Here is an example of an entry in the DLLogger log:
 
 ```json
 DLLL{
-  "timestamp": "1734117227.896116", 
-  "datetime": "2024-12-13 19:13:47.896116", 
+  "timestamp": "1734117227.896116",
+  "datetime": "2024-12-13 19:13:47.896116",
   "elapsedtime": "489.15554",
-  "type": "LOG", 
-  "step": 15, 
+  "type": "LOG",
+  "step": 15,
   "data": {
-    "reduced_train_loss": 1.865377426147461, 
-    "lr": 1.1250000397922122e-06, 
-    "global_step": 15.0, 
-    "consumed_samples": 16384.0, 
-    "train_backward_timing in s": 4.5490265620173886e-05, 
-    "grad_norm": 19.41560935974121, 
-    "train_step_timing in s": 20.021318435668945, 
+    "reduced_train_loss": 1.865377426147461,
+    "lr": 1.1250000397922122e-06,
+    "global_step": 15.0,
+    "consumed_samples": 16384.0,
+    "train_backward_timing in s": 4.5490265620173886e-05,
+    "grad_norm": 19.41560935974121,
+    "train_step_timing in s": 20.021318435668945,
     "epoch": 0
     }
 }
