@@ -144,8 +144,9 @@ default settings, run the following command from your client:
 cd $RECIPE_ROOT
 helm install -f values.yaml \
     --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/mixtral-8x7b-256gpus-a3u-bf16.yaml \
-    --set workload.image=${ARTIFACT_REGISTRY}/maxtext-nightly \
+    --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
     --set workload.run_name=$USER-mixtral-8x7b-maxtext \
+    --set clusterName=$CLUSTER_NAME \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     $USER-mixtral-8x7b-maxtext \
     $REPO_ROOT/src/helm-charts/a3ultra/maxtext-training
@@ -160,9 +161,10 @@ helm install -f values.yaml \
 ```bash
 cd $RECIPE_ROOT
 helm install -f values.yaml \
-    --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs mixtral-8x7b-256gpus-a3u-bf16.yaml \
-    --set workload.image=${ARTIFACT_REGISTRY}/maxtext-nightly \
+    --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/mixtral-8x7b-256gpus-a3u-bf16.yaml \
+    --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
     --set workload.run_name=$USER-mixtral-8x7b-maxtext \
+   --set clusterName=$CLUSTER_NAME \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     --set workload.steps=100 \
     $USER-mixtral-8x7b-maxtext \
@@ -231,3 +233,38 @@ To uninstall Helm, run the following command from your client:
 ```bash
 helm uninstall $USER-mixtral-8x7b-maxtext
 ```
+
+### Running the recipe on a cluster that does not use the default configuration.
+
+If you created your cluster using the [GKE environment setup guide](../../../../docs/configuring-environment-gke-a3-ultra.md), it is configured with default settings that include the names for networks and subnetworks used for communication between:
+
+- The host to  external services.
+- GPU-to GPU communication.
+
+For clusters with this default configuration, the Helm chart can automatically generate the [required networking annotations in a Pod's metadata](https://cloud.google.com/ai-hypercomputer/docs/create/gke-ai-hypercompute-custom#configure-pod-manifests-rdma). Therefore, you can use the streamlined command to install the chart, as described in the the [Configure and submit a pretraining job](#configure-and-submit-a-pretraining-job) section.
+
+To configure the correct networking annotations for a cluster that uses non-default names for GKE Network resources, you must provide the names of the GKE Network resources in you cluster  when installing the chart. Use the following example command, remembering to replace the example values with the actual names of your cluster's GKE Network resources:
+
+```bash
+cd $RECIPE_ROOT
+helm install -f values.yaml \
+    --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/mixtral-8x7b-256gpus-a3u-bf16.yaml \
+    --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
+    --set workload.run_name=$USER-mixtral-8x7b-maxtext \
+    --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+    --set network.subnetworks[0]=default \
+    --set network.subnetworks[1]=gvnic-1 \
+    --set network.subnetworks[2]=rdma-0 \
+    --set network.subnetworks[3]=rdma-1 \
+    --set network.subnetworks[4]=rdma-2 \
+    --set network.subnetworks[5]=rdma-3 \
+    --set network.subnetworks[6]=rdma-4 \
+    --set network.subnetworks[7]=rdma-5 \
+    --set network.subnetworks[8]=rdma-6 \
+    --set network.subnetworks[9]=rdma-7 \
+     $USER-mixtral-8x7b-maxtext \
+    $REPO_ROOT/src/helm-charts/a3ultra/maxtext-training
+```
+
+
+

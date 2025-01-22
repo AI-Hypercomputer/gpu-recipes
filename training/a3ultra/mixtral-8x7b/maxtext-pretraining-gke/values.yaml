@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-targetPlatform: "gke"
+clusterName:
 
 volumes:
   # The VM host path for SSDs is assumed at /mnt/stateful_partition/kube-ephemeral-ssd
@@ -27,6 +27,7 @@ workload:
   steps: 50
 
 network:
+  subnetworks[]:
   ncclSettings:
   - name: NCCL_DEBUG
     value: "VERSION"

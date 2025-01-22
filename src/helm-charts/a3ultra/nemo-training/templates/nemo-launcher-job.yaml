@@ -18,7 +18,6 @@
 
 {{ $nodes := div .Values.workload.gpus 8 | max 1 }}
 {{ $gpusPerNode := min .Values.workload.gpus 8 }}
-{{ $aotc := default 0 .Values.workload.aotc }}
 
 {{- $root := . -}}
 
@@ -49,12 +48,33 @@ spec:
         gke-gcsfuse/cpu-limit: "0"
         gke-gcsfuse/memory-limit: "0"
         gke-gcsfuse/ephemeral-storage-limit: "0"
-        {{- end}}
+        {{- end }}
+        {{- if not $root.Values.network.hostNetwork }}
+        networking.gke.io/default-interface: "eth0"
+        networking.gke.io/interfaces: |
+        {{- if $root.Values.network.subnetworks }}
+          [
+            {{- range $i, $subnetwork := $root.Values.network.subnetworks }}
+            {"interfaceName":"eth{{ $i }}","network":"{{ $subnetwork }}"}{{ eq $i 9 | ternary "" ","}}
+            {{- end }}
+          ]
+        {{- else }}
+          [
+            {"interfaceName":"eth0","network":"default"},
+            {"interfaceName":"eth1","network":"{{ $root.Values.clusterName }}-sub-1"},
+            {{- range  $i := until 8 }}
+            {"interfaceName":"eth{{ add 2 $i }}","network":"{{ $root.Values.clusterName }}-rdma-sub-{{ $i }}"}{{ eq $i 7 | ternary "" ","}}
+            {{- end }}
+          ]
+        {{- end }}
+        {{- end }}
     spec:
       schedulingGates:
       - name: "gke.io/topology-aware-auto-scheduling"
+      {{- if $root.Values.network.hostNetwork }}
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
+      {{- end }}
       subdomain: "{{.Release.Name}}"
       restartPolicy: Never
       {{ if $root.Values.targetNodes }}
@@ -85,8 +105,6 @@ spec:
       - name: workload-configuration
         configMap:
           name: "{{.Release.Name}}"
-      - name: workload-terminated-volume
-        emptyDir: {}
       - name: local-ssd
         hostPath:
           path: /mnt/stateful_partition/kube-ephemeral-ssd
@@ -138,8 +156,10 @@ spec:
       - name: megatron
         image: "{{ $root.Values.workload.image }}"
         imagePullPolicy: Always
+        {{- if $root.Values.network.hostNetwork }}
         securityContext:
           privileged: true
+        {{- end }}
         env:
         - name: JOB_IDENTIFIER
           value: "{{ .Release.Name }}-{{ $timestamp }}-{{ $jobSuffix }}"
@@ -149,20 +169,10 @@ spec:
           value: "{{ $jobuuid }}"
         - name: JOB_ORCHESTRATOR
           value: "gke"
-
         - name: SSD_MOUNT_PATH
           value: "{{ $root.Values.volumes.ssdMountPath }}"
 
-        {{- if $aotc }}
-        - name: AOTC
-          value: "{{ $aotc }}"
-        {{- end }}
-
         # The following settings are specific to the Torch distributed launcher:
-        {{- range $gcs := $root.Values.volumes.gcsMounts }}
-        - name: GCS_FUSE_BUCKET
-          value: "{{ $gcs.bucketName }}"
-        {{- end }}
         - name: TORCH_DISTRIBUTED_TARGET
           value: "{{ $root.Values.workload.torchDistributedTarget }}"
         - name: TORCH_DISTRIBUTED_TRACING
@@ -188,19 +198,28 @@ spec:
         - name: NVTE_BWD_LAYERNORM_SM_MARGIN
           value: "8"
 
+        # Additional NCCL settings
         {{- range $environment_variable := $root.Values.network.ncclSettings }}
         - name: {{ $environment_variable.name }}
           value: "{{ $environment_variable.value }}"
         {{- end }}
 
+        # GCS mount points
+        {{- range $index, $gcs := $root.Values.volumes.gcsMounts }}
+        - name: "GCS_MOUNT_PATH_{{ $index }}"
+          value: "{{ $gcs.mountPath }}"
+        {{- end }}
+
+        # NeMo Experiment Manager settings
+        - name: EXPERIMENT_NAME
+          value: "{{ $root.Values.workload.experiment_name }}"
+        - name: EXPERIMENT_DIR
+          value: "{{ $root.Values.workload.experiment_dir }}"
+
         command:
         - bash
         - -c
         - |
-          function on_script_completion {
-            touch /semaphore/workload_terminated
-          }
-          trap on_script_completion EXIT
           echo "Pod on $(hostname --fqdn) is running"
           echo "Pod is assigned job index of $JOB_COMPLETION_INDEX"
           echo "Job ID is $JOB_IDENTIFIER"
@@ -208,14 +227,10 @@ spec:
           echo "Running nvidia-smi"
           nvidia-smi
 
-          mkdir -p /gcs/index_mapping_dir
-
-          echo "Warning: Set LD_LIBRARY_PATH=$LD_LIBRARY_PATH to override the NCCL library"
           ldconfig $LD_LIBRARY_PATH
           echo "Added $LD_LIBRARY_PATH to ldconfig:"
           ldconfig -p | grep libcuda | sed 's/^/  /'
 
-          touch $SSD_MOUNT_PATH/hello-from-$HOSTNAME.txt
           echo "Local SSD contents (path $SSD_MOUNT_PATH):"; ls $SSD_MOUNT_PATH | sed 's/^/  /'
 
           echo "Setting NCCL environment variables"
@@ -236,51 +251,33 @@ spec:
           echo "{{ . }}" | tee -a /workspace/workload_arguments.txt
           {{- end }}
 
-
-          sleep 10 # <- Hack to allow some time for service to boot
-
-          echo "Checking for presence of nsys:"
-          which nsys
-
-          echo "Job logs will go to /gcs/nemo-experiments/$JOB_IDENTIFIER/."
-          mkdir -p /gcs/nemo-experiments/$JOB_IDENTIFIER/
-
           export NODE_RANK=$JOB_COMPLETION_INDEX
           echo "Launching Torch distributed as node rank $NODE_RANK out of $NNODES nodes"
+          echo "Job logs will go to ${EXPERIMENT_DIR}/${EXPERIMENT_NAME}/$JOB_IDENTIFIER/."
 
-          if [ "$NODE_RANK" -eq "1" ]; then
-            echo "Launching nvidia-smi in daemon mode with (20 sec delay)"
-            nvidia-smi dmon -d 20 -s pum &
-          fi
+          mkdir -p "${GCS_MOUNT_PATH_0}/index_mapping_dir"
 
-          if [[ "{{ $aotc }}" == "0" ]]; then
-            OMP_NUM_THREADS=12 torchrun \
-            --nproc-per-node="$GPUS_PER_NODE" \
-            --nnodes="$NNODES" \
-            --node_rank="$NODE_RANK" \
-            --rdzv_id="$JOB_IDENTIFIER" \
-            --master_addr="$MASTER_ADDR" \
-            --master_port="$MASTER_PORT" \
-            ${TORCH_DISTRIBUTED_TARGET} \
-            --config-path="/etc/workload-configuration" \
-            --config-name="nemo-configuration.yaml" \
-            +trainer.num_nodes="$NNODES" \
-            +exp_manager.version="$JOB_IDENTIFIER" \
-            +exp_manager.dllogger_logger_kwargs.json_file="/gcs/nemo-experiments/$JOB_IDENTIFIER/dllogger/rank-$NODE_RANK/dllogger.json" \
-            {{- range $root.Values.workload.arguments }}
-            {{ . }} \
-            {{- end }}
+          sleep 10 # <- Allow some time for service to boot
 
-          else
-            echo "Using AOTC"
-            export ENV_FILE=/workspace/env_vars.txt
-            env > /workspace/env_vars.txt
-            python -m aotc.executor
+          OMP_NUM_THREADS=12 torchrun \
+          --nproc-per-node="$GPUS_PER_NODE" \
+          --nnodes="$NNODES" \
+          --node_rank="$NODE_RANK" \
+          --rdzv_id="$JOB_IDENTIFIER" \
+          --master_addr="$MASTER_ADDR" \
+          --master_port="$MASTER_PORT" \
+          ${TORCH_DISTRIBUTED_TARGET} \
+          --config-path="/etc/workload-configuration" \
+          --config-name="nemo-configuration.yaml" \
+          +trainer.num_nodes="$NNODES" \
+          ++exp_manager.name="$EXPERIMENT_NAME" \
+          +exp_manager.version="$JOB_IDENTIFIER" \
+          +exp_manager.exp_dir="$EXPERIMENT_DIR" \
+          +exp_manager.dllogger_logger_kwargs.json_file="${EXPERIMENT_DIR}/${EXPERIMENT_NAME}/$JOB_IDENTIFIER/dllogger/rank-$NODE_RANK/dllogger.json" \
+          {{- range $root.Values.workload.arguments }}
+          {{ . }} \
+          {{- end }}
 
-          fi
-
-          echo "Copying log files"
-          cp -r /workspace/nemo_experiments/megatron_gpt/$JOB_IDENTIFIER/* /gcs/nemo-experiments/$JOB_IDENTIFIER/
           echo "Pod on $(hostname --fqdn) is exiting"
 
         volumeMounts:
@@ -288,8 +285,6 @@ spec:
             mountPath: /usr/local/nvidia
           - name: gib
             mountPath: /usr/local/gib
-          - name: workload-terminated-volume
-            mountPath: /semaphore
           - name: workload-configuration
             mountPath: /etc/workload-configuration
           - name: shared-memory

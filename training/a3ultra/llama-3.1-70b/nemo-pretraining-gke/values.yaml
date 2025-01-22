@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-targetPlatform: "gke"
+clusterName:
 
 volumes:
   # The VM host path for SSDs is assumed at /mnt/stateful_partition/kube-ephemeral-ssd
@@ -25,9 +25,11 @@ volumes:
 workload:
   torchDistributedTarget: "/opt/NeMo/examples/nlp/language_modeling/megatron_gpt_pretraining.py"
   gpus: 256 # This should be one of: {<= 8,  multiple of 8}
-  aotc: false
+  experiment_dir: /gcs/nemo-experiments
+  experiment_name: "megatron_gpt"
 
 network:
+  subnetworks[]:
   ncclSettings:
   - name: NCCL_DEBUG
     value: "VERSION"

@@ -108,8 +108,6 @@ gcloud container clusters get-credentials $CLUSTER_NAME --region $CLUSTER_REGION
 
 ### Build and push a docker container image to Artifact Registry
 
-Note:If you'd like to use AotC-based [library](https://github.com/AI-Hypercomputer/aotc) image, you may skip this step.
-
 To build the container, complete the following steps from your client:
 
 1. Use Cloud Build to build and push the container image.
@@ -148,6 +146,7 @@ cd $RECIPE_ROOT
 helm  install -f values.yaml \
     --set-file nemo_config=$REPO_ROOT/src/frameworks/a3ultra/nemo-configs/llama-3.1-70b-256gpus-a3ultra-fp8.yaml \
     --set workload.image=${ARTIFACT_REGISTRY}/nemo_workload:24.07 \
+    --set clusterName=$CLUSTER_NAME \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     $USER-llama-3-1-70b-nemo-fp8 \
     $REPO_ROOT/src/helm-charts/a3ultra/nemo-training
@@ -169,26 +168,11 @@ for this job. To do this, we can set the new arguments using `--set workload.arg
       --set-file nemo_config=$REPO_ROOT/src/frameworks/a3ultra/nemo-configs/llama-3.1-70b-256gpus-a3ultra-fp8.yaml \
       --set workload.image=${ARTIFACT_REGISTRY}/nemo_workload:24.07 \
       --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+      --set clusterName=$CLUSTER_NAME \
       --set workload.arguments="{trainer.max_steps=100}" \
       $USER-llama-3-1-70b-nemo-fp8 \
       $REPO_ROOT/src/helm-charts/a3ultra/nemo-training
   ```
-
-- To use the AotC-based image, run the following command from your client:
-
-  ```bash
-  cd $RECIPE_ROOT
-  export IMAGE=us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-nemo@sha256:7a84264e71f82f225be639dd20fcf9104c80936c0f4f38f94b88dfb60303c70e
-  helm install -f values.yaml \
-      --set-file nemo_config=$REPO_ROOT/src/frameworks/a3ultra/nemo-configs/llama-3.1-70b-256gpus-a3ultra-fp8.yaml \
-      --set workload.image=${IMAGE} \
-      --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
-      --set-string workload.aotc=true \
-      $USER-llama-3-1-70b-nemo-fp8 \
-      $REPO_ROOT/src/helm-charts/a3ultra/nemo-training
-  ```
-
-To build the AotC-based image yourself, please use the script defined in `$REPO_ROOT/src/docker/nemo-aotc-24.07`
 
 
 ### Monitor the job
@@ -312,4 +296,35 @@ To uninstall Helm, run the following command from your client:
 
 ```bash
 helm uninstall $USER-llama-3-1-70b-nemo-fp8
+```
+
+### Running the recipe on a cluster that does not use the default configuration.
+
+If you created your cluster using the [GKE environment setup guide](../../../../docs/configuring-environment-gke-a3-ultra.md), it is configured with default settings that include the names for networks and subnetworks used for communication between:
+
+- The host to  external services.
+- GPU-to GPU communication.
+
+For clusters with this default configuration, the Helm chart can automatically generate the [required networking annotations in a Pod's metadata](https://cloud.google.com/ai-hypercomputer/docs/create/gke-ai-hypercompute-custom#configure-pod-manifests-rdma). Therefore, you can use the streamlined command to install the chart, as described in the the [Configure and submit a pretraining job](#configure-and-submit-a-pretraining-job) section.
+
+To configure the correct networking annotations for a cluster that uses non-default names for GKE Network resources, you must provide the names of the GKE Network resources in you cluster  when installing the chart. Use the following example command, remembering to replace the example values with the actual names of your cluster's GKE Network resources:
+
+```bash
+cd $RECIPE_ROOT
+helm  install -f values.yaml \
+    --set-file nemo_config=$REPO_ROOT/src/frameworks/a3ultra/nemo-configs/llama-3.1-70b-256gpus-a3ultra-fp8.yaml \
+    --set workload.image=${ARTIFACT_REGISTRY}/nemo_workload:24.07 \
+    --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+    --set network.subnetworks[0]=default \
+    --set network.subnetworks[1]=gvnic-1 \
+    --set network.subnetworks[2]=rdma-0 \
+    --set network.subnetworks[3]=rdma-1 \
+    --set network.subnetworks[4]=rdma-2 \
+    --set network.subnetworks[5]=rdma-3 \
+    --set network.subnetworks[6]=rdma-4 \
+    --set network.subnetworks[7]=rdma-5 \
+    --set network.subnetworks[8]=rdma-6 \
+    --set network.subnetworks[9]=rdma-7 \
+    $USER-llama-3-1-70b-nemo-fp8 \
+    $REPO_ROOT/src/helm-charts/a3ultra/nemo-training
 ```
