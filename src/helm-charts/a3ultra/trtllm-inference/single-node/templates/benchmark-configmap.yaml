@@ -1,0 +1,65 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-benchmark-script
+data:
+  run_trtllm_bench.sh: |-
+    #!/bin/bash
+
+    # Function to run benchmarks
+    run_benchmark() {
+        local model_name=$1
+        local isl=$2
+        local osl=$3
+        local num_requests=$4
+        local tp_size=$5
+
+        echo "Running benchmark for $model_name with ISL=$isl, OSL=$osl, TP=$tp_size"
+
+        dataset_file="/ssd/token-norm-dist_${model_name##*/}_${isl}_${osl}_tp${tp_size}.json"
+        output_file="/ssd/output_${model_name##*/}_isl${isl}_osl${osl}_tp${tp_size}.txt"
+
+        python3 /workspace/tensorrtllm_backend/tensorrt_llm/benchmarks/cpp/prepare_dataset.py --tokenizer=$model_name --stdout token-norm-dist \
+          --num-requests=$num_requests --input-mean=$isl --output-mean=$osl \
+          --input-stdev=0 --output-stdev=0 > $dataset_file
+
+        pp_size=1
+
+        trtllm-bench --model $model_name --model_path /ssd/${model_name} --workspace /ssd build \
+          --tp_size $tp_size --quantization FP8 --dataset $dataset_file
+
+        engine_dir="/ssd/${model_name}/tp_${tp_size}_pp_${pp_size}"
+
+        # Save throughput output to a file
+        trtllm-bench --model $model_name --model_path /ssd/${model_name} throughput \
+          --dataset $dataset_file --engine_dir $engine_dir \
+          --kv_cache_free_gpu_mem_fraction 0.95 > $output_file
+
+        cat $output_file
+        gsutil cp $output_file /gcs/benchmark_logs/
+
+        rm -rf $engine_dir
+        rm -f $dataset_file
+    }
+
+    # Generated benchmark executions
+    model_name="{{ .Values.model.name }}"
+    tp_size={{ .Values.model.tp_size }}
+
+    {{- range .Values.benchmarks.experiments }}
+    run_benchmark "$model_name" {{ .isl }} {{ .osl }} {{ .num_requests }} $tp_size
+    {{- end }}
