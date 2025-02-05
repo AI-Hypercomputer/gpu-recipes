@@ -48,5 +48,6 @@ MODEL_FLOPS_PER_SAMPLE = {
     "llama2-70b": 1.82e15,
     "llama3-70b": 3.94e15,
     "llama3.1-70b": 3.9129e15,
+    "llama3.1-405b": 2.16533e16,
     "mixtral-7b": 3.4e14,
 }

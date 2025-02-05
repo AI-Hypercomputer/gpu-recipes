@@ -20,7 +20,7 @@ Before you begin, ensure you have completed the following:
 
 3. Requested enough GPU quotas. Each `a3-ultragpu-8g` machine has 8 H200 GPUs attached.
   1. To view quotas, see [View the quotas for your project](/docs/quotas/view-manage).
-     In the Filter field, select **Dimensions(e.g location)** and 
+     In the Filter field, select **Dimensions(e.g location)** and
      specify [`gpu_family:NVIDIA_H200`](https://cloud.google.com/compute/resource-usage#gpu_quota).
   1. If you don't have enough quota, [request a higher quota](https://cloud.google.com/docs/quotas/view-manage#requesting_higher_quota).
 
@@ -29,7 +29,7 @@ Before you begin, ensure you have completed the following:
 The environment comprises of the following components:
 
 - Client workstation: this is used to prepare, submit, and monitor ML workloads.
-- [Google Cloud Storage (GCS) Bucket](https://cloud.google.com/storage/docs): used for storing 
+- [Google Cloud Storage (GCS) Bucket](https://cloud.google.com/storage/docs): used for storing
   datasets and logs.
 - [Artifact Registry](https://cloud.google.com/artifact-registry/docs/overview): serves as a
   private container registry for storing and managing Docker images used in the deployment.
@@ -48,9 +48,9 @@ comes with all necessary components pre-installed.
 
 ### Local client
 If you prefer to use your local machine, ensure your local machine has the following
-components installed. 
+components installed.
 
-1. Google Cloud SDK. To install, see 
+1. Google Cloud SDK. To install, see
    [Install the gcloud CLI](https://cloud.google.com/sdk/docs/install).
 2. kubectl. To install, see the
    [kuberenetes documentation](https://kubernetes.io/docs/tasks/tools/#kubectl).
@@ -71,6 +71,19 @@ Replace the following:
 - `BUCKET_LOCATION`: the location of your bucket. The bucket must be located in
    the same region as the GKE cluster.
 
+Add IAM binding to allow workloads authenticated via a workload identity (with the default service account) to access Cloud Storage objects.
+
+    ```bash
+   PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
+   gcloud storage buckets add-iam-policy-binding gs://<BUCKET_NAME> \
+      --role=roles/storage.objectUser \
+      --member=principal://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$PROJECT_ID.svc.id.goog/subject/ns/default/sa/default \
+      --condition=None
+   ```
+Replace the following:
+
+- `BUCKET_NAME`: the name of your bucket created in the previous step
+
 ## Set up an Artifact Registry
 
 - If you use Cloud KMS for repository encryption, create your artifact registry by using the
@@ -84,19 +97,19 @@ Replace the following:
         --description="<DESCRIPTION>" \
   ```
   Replace the following:
-  
+
   - `REPOSITORY`: the name of the repository. For each repository location in a project,
      repository names must be unique.
   - `LOCATION`: the regional or multi-regional location for the repository. You can omit this
-     flag if you set a default region. 
+     flag if you set a default region.
   - `DESCRIPTION`: a description of the repository. Don't include sensitive data because
      repository descriptions are not encrypted.
 
 
 ## Create a GKE Cluster with A3 Ultra Node Pools
 
-Follow [this guide](https://cloud.google.com/ai-hypercomputer/docs/create/gke-ai-hypercompute) for 
-detailed instructions to create a GKE cluster with A3 Ultra node pools, GPUDirect-RDMA and required GPU driver versions. 
+Follow [this guide](https://cloud.google.com/ai-hypercomputer/docs/create/gke-ai-hypercompute) for
+detailed instructions to create a GKE cluster with A3 Ultra node pools, GPUDirect-RDMA and required GPU driver versions.
 
 The documentation uses [ Cluster Toolkit](https://cloud.google.com/cluster-toolkit/docs/overview) to create your GKE cluster quickly while incorporating best practices:
 
@@ -108,11 +121,11 @@ The documentation uses [ Cluster Toolkit](https://cloud.google.com/cluster-toolk
 ## What's next
 
 Once you have set up your GKE cluster with A3 Ultra node pools, you can proceed to deploy and
-run your [benchmark recipes](../README.md#benchmarks-support-matrix). 
+run your [benchmark recipes](../README.md#benchmarks-support-matrix).
 
 ## Get Help
 
-If you encounter any issues or have questions about this setup, use one of the following 
+If you encounter any issues or have questions about this setup, use one of the following
 resources:
 
 - Consult the [official GKE documentation](https://cloud.google.com/kubernetes-engine/docs).
