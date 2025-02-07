@@ -42,6 +42,9 @@ spec:
   template:
     metadata:
       annotations:
+        {{- if $root.Values.queue }}
+        kueue.x-k8s.io/podset-preferred-topology: {{ $root.Values.podsetPreferredTopology }}
+        {{- end}}
         kubectl.kubernetes.io/default-container: workload
         {{- if $root.Values.volumes.gcsMounts }}
         gke-gcsfuse/volumes: "true"
@@ -69,8 +72,6 @@ spec:
         {{- end }}
         {{- end }}
     spec:
-      schedulingGates:
-      - name: "gke.io/topology-aware-auto-scheduling"
       {{- if $root.Values.network.hostNetwork }}
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
@@ -96,12 +97,18 @@ spec:
       - operator: "Exists"
         key: cloud.google.com/impending-node-termination
       volumes:
+      {{if not $root.Values.network.gibVersion }}
       - name: library-dir-host
         hostPath:
           path: /home/kubernetes/bin/nvidia
+      {{ end }}
       - name: gib
+      {{ if $root.Values.network.gibVersion }}
+        emptyDir: {}
+      {{ else }}
         hostPath:
           path: /home/kubernetes/bin/gib
+      {{ end }}
       - name: workload-configuration
         configMap:
           name: "{{.Release.Name}}"
@@ -129,6 +136,25 @@ spec:
 
 
       initContainers:
+      {{ if $root.Values.network.gibVersion }}
+      - name: nccl-plugin-installer
+        image: {{ $root.Values.network.gibVersion }}
+        imagePullPolicy: Always
+        args:
+        - |
+          set -ex
+          /scripts/container_entry.sh install --install-nccl
+          cp -R /var/lib/gib/lib64/. /target/usr/local/gib/lib64
+          cp -R /var/lib/gib/. /target/usr/local/gib
+        command:
+        - /bin/sh
+        - -c
+
+        volumeMounts:
+        - mountPath: /target/usr/local/gib
+          name: gib
+
+      {{ end}}
       {{ if $root.Values.gcsDownload }}
       - name: training-data-downloader
         image: gcr.io/google.com/cloudsdktool/google-cloud-cli
@@ -194,7 +220,7 @@ spec:
         - name: TF_CPP_MAX_LOG_LEVEL
           value: "100"
         - name: XLA_PYTHON_CLIENT_MEM_FRACTION
-          value: "0.9"
+          value: "0.92"
         - name: CUDA_DEVICE_MAX_CONNECTIONS
           value: "1"
         - name: NVTE_FUSED_ATTN
@@ -213,7 +239,11 @@ spec:
         - name: GLOO_SOCKET_IFNAME
           value: "eth0"
         - name: LD_LIBRARY_PATH
+          {{ if $root.Values.network.gibVersion }}
+          value: /usr/local/gib/lib64
+          {{ else }}
           value: /usr/local/nvidia/lib64
+          {{ end }}
 
         # XLA Flags
         - name: XLA_FLAGS
@@ -223,7 +253,7 @@ spec:
               key: xla-flags
 
 
-        {{- range $environment_variable := $root.Values.network.ncclSettings }}
+        {{- range $environment_variable := $root.Values.network.otherSettings }}
         - name: {{ $environment_variable.name }}
           value: "{{ $environment_variable.value }}"
         {{- end }}
@@ -292,8 +322,10 @@ spec:
           echo "Pod on $(hostname --fqdn) is exiting"
 
         volumeMounts:
+          {{ if not $root.Values.network.gibVersion }}
           - name: library-dir-host
             mountPath: /usr/local/nvidia
+          {{ end }}
           - name: gib
             mountPath: /usr/local/gib
           - name: workload-configuration

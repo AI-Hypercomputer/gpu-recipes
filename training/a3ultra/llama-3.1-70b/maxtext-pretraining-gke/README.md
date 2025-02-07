@@ -19,7 +19,7 @@ For this recipe, the following setup is used:
 
 This recipe has been optimized for and tested with the following configuration:
 
-- A cluster with 32 [a3-ultragpu-8g](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) machines.
+- A cluster with 32 or 64 [a3-ultragpu-8g](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) machines.
 - Machine placement in the cluster is configured using a [compact placement policy](https://cloud.google.com/kubernetes-engine/docs/how-to/compact-placement)
 - MaxText docker container
 - BF16 and FP8 precision training
@@ -32,7 +32,7 @@ This recipe has been optimized for and tested with the following configuration:
 Before running this recipe, ensure your environment is configured as follows:
 
 - A GKE cluster with the following setup:
-    - An A3 Ultra node pool (32 nodes, 256 GPUs)
+    - An A3 Ultra node pool (32 nodes - 256 GPUs or 64 nodes - 512 GPUs)
     - Topology-aware scheduling enabled
 - An Artifact Registry repository to store the Docker image.
 - A Google Cloud Storage (GCS) bucket to store results.
@@ -68,6 +68,7 @@ From your client, complete the following steps:
   export CLUSTER_NAME=<CLUSTER_NAME>
   export GCS_BUCKET=<GCS_BUCKET>
   export ARTIFACT_REGISTRY=<ARTIFACT_REGISTRY>
+  export KUEUE_NAME=<KUEUE_NAME>
   ```
 
   Replace the following values:
@@ -79,7 +80,7 @@ From your client, complete the following steps:
   - `<GCS_BUCKET>`: the name of your Cloud Storage bucket. Do not include the `gs://` prefix
   - `<ARTIFACT_REGISTRY>`: the full name of your Artifact
     Registry in the following format: *LOCATION*-docker.pkg.dev/*PROJECT_ID*/*REPOSITORY*
-
+  - `<KUEUE_NAME>`: the name of the Kueue queue configured for TAS. The default queue created by the cluster toolkit is `a3-ultra`. Please verify the name of your local queue by running `kubectl get queues` and modify it as needed.
 1. Set the default project:
 
   ```bash
@@ -139,6 +140,8 @@ To build the container, complete the following steps from your client:
 
 ### Configure and submit a pretraining job
 
+#### Using 32 nodes (256 GPUs)
+
 The default job setting is 50 training steps and bf16 precision. To execute the job with the
 default settings, run the following command from your client:
 
@@ -148,7 +151,9 @@ helm install -f values.yaml \
     --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/llama-3.1-70b-256gpus-a3u-bf16.yaml \
     --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
     --set workload.run_name=$USER-llama-3-1-70b-maxtext \
+    --set workload.gpus=256 \
     --set clusterName=$CLUSTER_NAME \
+    --set queue=$KUEUE_NAME \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     $USER-llama-3-1-70b-maxtext \
     $REPO_ROOT/src/helm-charts/a3ultra/maxtext-training
@@ -161,13 +166,47 @@ helm install -f values.yaml \
     --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/llama-3.1-70b-256gpus-a3u-fp8.yaml \
     --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
     --set workload.run_name=$USER-llama-3-1-70b-maxtext-fp8 \
+    --set workload.gpus=256 \
     --set clusterName=$CLUSTER_NAME \
+    --set queue=$KUEUE_NAME \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     $USER-llama-3-1-70b-maxtext-fp8 \
     $REPO_ROOT/src/helm-charts/a3ultra/maxtext-training
 ```
 
+#### Using 64 nodes (512 GPUs)
 
+The default job setting is 50 training steps and bf16 precision. To execute the job with the
+default settings, run the following command from your client:
+
+```bash
+cd $RECIPE_ROOT
+helm install -f values.yaml \
+    --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/llama-3.1-70b-512gpus-a3u-bf16.yaml \
+    --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
+    --set workload.run_name=$USER-llama-3-1-70b-maxtext-64nodes \
+    --set workload.gpus=512 \
+    --set clusterName=$CLUSTER_NAME \
+    --set queue=$KUEUE_NAME \
+    --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+    $USER-llama-3-1-70b-maxtext-64nodes \
+    $REPO_ROOT/src/helm-charts/a3ultra/maxtext-training
+```
+
+To run the recipe on `fp8` precision, run the following command from your client:
+```bash
+cd $RECIPE_ROOT
+helm install -f values.yaml \
+    --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/llama-3.1-70b-512gpus-a3u-fp8.yaml \
+    --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
+    --set workload.run_name=$USER-llama-3-1-70b-maxtext-fp8-64nodes \
+    --set workload.gpus=512 \
+    --set clusterName=$CLUSTER_NAME \
+    --set queue=$KUEUE_NAME \
+    --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+    $USER-llama-3-1-70b-maxtext-fp8-64nodes \
+    $REPO_ROOT/src/helm-charts/a3ultra/maxtext-training
+```
 
 #### Configure job settings
 
@@ -182,11 +221,13 @@ helm install -f values.yaml \
     --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
     --set workload.run_name=$USER-llama-3-1-70b-maxtext \
     --set clusterName=$CLUSTER_NAME \
+    --set queue=$KUEUE_NAME \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     --set workload.steps=100 \
     $USER-llama-3-1-70b-maxtext \
     $REPO_ROOT/src/helm-charts/a3ultra/maxtext-training
 ```
+
 ### Monitor the job
 
 To check the status of pods in the indexed job, run the following command from your client:
@@ -249,12 +290,14 @@ To uninstall Helm, run the following command from your client:
 
 ```bash
 helm uninstall $USER-llama-3-1-70b-maxtext
+helm uninstall $USER-llama-3-1-70b-maxtext-64nodes
 ```
 
 or for fp8:
 
 ```bash
 helm uninstall $USER-llama-3-1-70b-maxtext-fp8
+helm uninstall $USER-llama-3-1-70b-maxtext-fp8-64nodes
 ```
 
 ### Running the recipe on a cluster that does not use the default configuration.
@@ -275,6 +318,7 @@ helm install -f values.yaml \
     --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
     --set workload.run_name=$USER-llama-3-1-70b-maxtext \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+    --set queue=$KUEUE_NAME \
     --set network.subnetworks[0]=default \
     --set network.subnetworks[1]=gvnic-1 \
     --set network.subnetworks[2]=rdma-0 \

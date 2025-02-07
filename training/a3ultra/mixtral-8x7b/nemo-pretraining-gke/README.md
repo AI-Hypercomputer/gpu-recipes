@@ -69,6 +69,7 @@ From your client, complete the following steps:
   export CLUSTER_NAME=<CLUSTER_NAME>
   export GCS_BUCKET=<GCS_BUCKET>
   export ARTIFACT_REGISTRY=<ARTIFACT_REGISTRY>
+  export KUEUE_NAME=<KUEUE_NAME>
   ```
 
   Replace the following values:
@@ -80,6 +81,7 @@ From your client, complete the following steps:
   - `<GCS_BUCKET>`: the name of your Cloud Storage bucket. Do not include the `gs://` prefix
   - `<ARTIFACT_REGISTRY>`: the full name of your Artifact
     Registry in the following format: *LOCATION*-docker.pkg.dev/*PROJECT_ID*/*REPOSITORY*
+  - `<KUEUE_NAME>`: the name of the Kueue queue configured for TAS. The default queue created by the cluster toolkit is `a3-ultra`. Please verify the name of your local queue by running `kubectl get queues` and modify it as needed.
 
 1. Set the default project:
 
@@ -106,35 +108,11 @@ From your client, get the credentials for your cluster.
 gcloud container clusters get-credentials $CLUSTER_NAME --region $CLUSTER_REGION
 ```
 
-### Build and push a docker container image to Artifact Registry
+### Docker container
 
-To build the container, complete the following steps from your client:
+This recipe uses the following docker image: `us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-nemo-nccl:nemo24.07-gib1.0.3-A3U`.
 
-1. Use Cloud Build to build and push the container image.
-
-    ```bash
-    cd $REPO_ROOT/src/docker/nemo-24.07
-    gcloud builds submit --region=${REGION} \
-        --config cloudbuild.yml \
-        --substitutions _ARTIFACT_REGISTRY=$ARTIFACT_REGISTRY \
-        --timeout "2h" \
-        --machine-type=e2-highcpu-32 \
-        --quiet \
-        --async
-    ```
-
-  This command outputs the `build ID`.
-
-1. You can monitor the build progress by streaming the logs for the `build ID`.
-   To do this, run the following command.
-
-   Replace `<BUILD_ID>` with your build ID.
-
-   ```bash
-   BUILD_ID=<BUILD_ID>
-
-   gcloud beta builds log $BUILD_ID --region=$REGION
-   ```
+This image is based on NVIDIA NeMo 24.07 and contains the NCCL gIB plugin v1.0.3, bundling all NCCL binaries validated for use with A3 Ultra GPUs.
 
 ### Configure and submit a pretraining job
 
@@ -145,8 +123,9 @@ default settings, run the following command from your client:
 cd $RECIPE_ROOT
 helm  install -f values.yaml \
     --set-file nemo_config=$REPO_ROOT/src/frameworks/a3ultra/nemo-configs/mixtral-8x7b-256gpus-a3u-bf16.yaml \
-    --set workload.image=${ARTIFACT_REGISTRY}/nemo_workload:24.07 \
+    --set workload.image=us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-nemo-nccl:nemo24.07-gib1.0.3-A3U \
     --set clusterName=$CLUSTER_NAME \
+    --set queue=${KUEUE_NAME} \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     $USER-mixtral-8x7b-nemo \
     $REPO_ROOT/src/helm-charts/a3ultra/nemo-training
@@ -167,7 +146,7 @@ for this job. To do this, we can set the new arguments using `--set workload.arg
     cd $RECIPE_ROOT
     helm install -f values.yaml \
         --set-file nemo_config=$REPO_ROOT/src/frameworks/a3ultra/nemo-configs/mixtral-8x7b-256gpus-a3u-bf16.yaml \
-        --set workload.image=${ARTIFACT_REGISTRY}/nemo_workload:24.07 \
+        --set workload.image=us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-nemo-nccl:nemo24.07-gib1.0.3-A3U \
         --set clusterName=$CLUSTER_NAME \
         --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
         --set workload.arguments="{trainer.max_steps=100}" \
@@ -311,7 +290,7 @@ To configure the correct networking annotations for a cluster that uses non-defa
 cd $RECIPE_ROOT
 helm  install -f values.yaml \
     --set-file nemo_config=$REPO_ROOT/src/frameworks/a3ultra/nemo-configs/mixtral-8x7b-256gpus-a3u-bf16.yaml \
-    --set workload.image=${ARTIFACT_REGISTRY}/nemo_workload:24.07 \
+    --set workload.image=us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-nemo-nccl:nemo24.07-gib1.0.3-A3U \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     --set network.subnetworks[0]=default \
     --set network.subnetworks[1]=gvnic-1 \

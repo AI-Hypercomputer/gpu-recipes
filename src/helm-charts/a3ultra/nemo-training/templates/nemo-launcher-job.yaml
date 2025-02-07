@@ -97,18 +97,11 @@ spec:
       - operator: "Exists"
         key: cloud.google.com/impending-node-termination
       volumes:
-      {{if not $root.Values.network.gibVersion }}
-      - name: library-dir-host
-        hostPath:
-          path: /home/kubernetes/bin/nvidia
-      {{ end }}
-      - name: gib
       {{ if $root.Values.network.gibVersion }}
+      - name: gib
         emptyDir: {}
-      {{ else }}
-        hostPath:
-          path: /home/kubernetes/bin/gib
       {{ end }}
+
       - name: workload-configuration
         configMap:
           name: "{{.Release.Name}}"
@@ -215,12 +208,7 @@ spec:
         - name: GLOO_SOCKET_IFNAME
           value: "eth0"
         - name: LD_LIBRARY_PATH
-          {{ if $root.Values.network.gibVersion }}
           value: /usr/local/gib/lib64
-          {{ else }}
-          value: /usr/local/nvidia/lib64
-          {{ end }}
-
 
         # The following is needed to prevent send-receive stalling execution
         - name: NVTE_FWD_LAYERNORM_SM_MARGIN
@@ -263,9 +251,11 @@ spec:
 
           echo "Local SSD contents (path $SSD_MOUNT_PATH):"; ls $SSD_MOUNT_PATH | sed 's/^/  /'
 
+          {{ if $root.Values.network.gibVersion }}
           echo "Setting NCCL environment variables"
           cat /usr/local/gib/scripts/set_nccl_env.sh
           source /usr/local/gib/scripts/set_nccl_env.sh
+          {{ end }}
 
           echo "Downloading GPT vocabulary files"
           wget https://s3.amazonaws.com/models.huggingface.co/bert/gpt2-vocab.json &&\
@@ -311,12 +301,10 @@ spec:
           echo "Pod on $(hostname --fqdn) is exiting"
 
         volumeMounts:
-          {{ if not $root.Values.network.gibVersion }}
-          - name: library-dir-host
-            mountPath: /usr/local/nvidia
-          {{ end }}
+          {{ if $root.Values.network.gibVersion }}
           - name: gib
             mountPath: /usr/local/gib
+          {{ end }}
           - name: workload-configuration
             mountPath: /etc/workload-configuration
           - name: shared-memory
