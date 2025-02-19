@@ -1,5 +1,5 @@
 run:
-  name: llama-3.1-405b-a3u-fp8
+  name: llama-3.1-405b-a3u-bf16
   time_limit: 0-02:30:00
   dependency: singleton
 trainer:
@@ -124,7 +124,7 @@ model:
   deterministic_mode: false
   transformer_engine: true
   fp8: false
-  ub_tp_comm_overlap: false
+  ub_tp_comm_overlap: true
   use_flash_attention: true
   fsdp: false
   fsdp_sharding_strategy: full

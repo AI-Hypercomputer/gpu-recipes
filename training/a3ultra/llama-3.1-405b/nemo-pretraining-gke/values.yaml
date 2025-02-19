@@ -41,3 +41,5 @@ network:
     value: "VERSION"
   - name: NCCL_WORK_FIFO_DEPTH 
     value: "4194304"
+  - name: NVTE_UB_SOCKET_IFNAME
+    value: "eth1"
