@@ -171,7 +171,7 @@ When completed, the job creates several artifacts, including logs and traces, an
 in the configured Google Cloud Storage bucket as follows:
 
 ```
-gs://${GCS_BUCKET}/nemo-experiments/<JOB_ID>
+gs://${GCS_BUCKET}/nemo-experiments/megatron_gpt/<JOB_ID>
 ├── hparams.yaml
 ├── lightning_logs.txt
 ├── nemo_error_logs.txt
@@ -240,7 +240,7 @@ following steps command from your client:
     training session.
 
     ```bash
-    gcloud storage cp gs://${GCS_BUCKET}/nemo-experiments/<JOB_ID>/dllogger/rank-0/dllogger.json \
+    gcloud storage cp gs://${GCS_BUCKET}/nemo-experiments/megatron_gpt/<JOB_ID>/dllogger/rank-0/dllogger.json \
         $RECIPE_ROOT/dllogger.json
     ```
 

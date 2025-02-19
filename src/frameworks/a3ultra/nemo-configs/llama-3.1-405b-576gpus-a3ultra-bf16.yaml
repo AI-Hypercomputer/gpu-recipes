@@ -10,7 +10,7 @@ trainer:
   enable_checkpointing: false
   use_distributed_sampler: false
   max_epochs: null
-  max_steps: 20
+  max_steps: 15
   max_time: 05:23:30:00
   log_every_n_steps: 1
   val_check_interval: null
@@ -44,6 +44,7 @@ exp_manager:
   seconds_to_sleep: 60
   explicit_log_dir: null
 model:
+  tp_only_amax_red: false
   mcore_gpt: true
   micro_batch_size: 1
   global_batch_size: 2016
@@ -123,12 +124,6 @@ model:
   deterministic_mode: false
   transformer_engine: true
   fp8: false
-  fp8_e4m3: false
-  fp8_hybrid: false
-  fp8_margin: 0
-  fp8_interval: 1
-  fp8_amax_history_len: 1024
-  fp8_amax_compute_algo: max
   ub_tp_comm_overlap: false
   use_flash_attention: true
   fsdp: false

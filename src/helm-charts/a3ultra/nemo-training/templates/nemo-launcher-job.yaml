@@ -42,9 +42,9 @@ spec:
   template:
     metadata:
       annotations:
-        {{- if $root.Values.queue }}
-        kueue.x-k8s.io/podset-preferred-topology: {{ $root.Values.podsetPreferredTopology }}
-        {{- end}}
+        {{- if and (eq $root.Values.tasSettings.useLegacyTAS false)  $root.Values.queue $root.Values.tasSettings.topologyRequest }}
+          {{- toYaml .Values.tasSettings.topologyRequest | nindent 8 }}
+        {{- end }}
         kubectl.kubernetes.io/default-container: megatron
         {{- if $root.Values.volumes.gcsMounts }}
         gke-gcsfuse/volumes: "true"
@@ -72,6 +72,10 @@ spec:
         {{- end }}
         {{- end }}
     spec:
+      {{- if $root.Values.tasSettings.useLegacyTAS }}
+      schedulingGates:
+      - name: "gke.io/topology-aware-auto-scheduling"
+      {{- end }}
       {{- if $root.Values.network.hostNetwork }}
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet

@@ -14,7 +14,10 @@
 
 clusterName:
 queue:
-podsetPreferredTopology: "kubernetes.io/hostname"
+tasSettings:
+  useLegacyTAS: false
+  topologyRequest:
+    kueue.x-k8s.io/podset-preferred-topology: "kubernetes.io/hostname"
 
 volumes:
   # The VM host path for SSDs is assumed at /mnt/stateful_partition/kube-ephemeral-ssd

@@ -17,7 +17,7 @@ queue:
 tasSettings:
   useLegacyTAS: false
   topologyRequest:
-    kueue.x-k8s.io/podset-preferred-topology: "kubernetes.io/hostname"
+    kueue.x-k8s.io/podset-preferred-topology: "cloud.google.com/gce-topology-block"
 
 volumes:
   # The VM host path for SSDs is assumed at /mnt/stateful_partition/kube-ephemeral-ssd
@@ -29,12 +29,15 @@ volumes:
 
 workload:
   torchDistributedTarget: "/opt/NeMo/examples/nlp/language_modeling/megatron_gpt_pretraining.py"
-  gpus: 256 # This should be one of: {<= 8,  multiple of 8}
+  gpus: 576 # This should be one of: {<= 8,  multiple of 8}
   experiment_dir: /gcs/nemo-experiments
   experiment_name: "megatron_gpt"
 
 network:
   subnetworks[]:
+  gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:v1.0.3
   ncclSettings:
   - name: NCCL_DEBUG
     value: "VERSION"
+  - name: NCCL_WORK_FIFO_DEPTH 
+    value: "4194304"
