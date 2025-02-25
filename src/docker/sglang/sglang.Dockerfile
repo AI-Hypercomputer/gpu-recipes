@@ -23,6 +23,7 @@ RUN apt update && apt install --yes --no-install-recommends \
     curl \
     gnupg \
     cmake \
+    dnsutils \
   && echo "deb https://packages.cloud.google.com/apt gcsfuse-buster main" \
     | tee /etc/apt/sources.list.d/gcsfuse.list \
   && echo "deb https://packages.cloud.google.com/apt cloud-sdk main" \

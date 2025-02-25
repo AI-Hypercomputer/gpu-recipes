@@ -73,13 +73,14 @@ Replace the following:
 
 Add IAM binding to allow workloads authenticated via a workload identity (with the default service account) to access Cloud Storage objects.
 
-    ```bash
+   ```bash
    PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
    gcloud storage buckets add-iam-policy-binding gs://<BUCKET_NAME> \
-      --role=roles/storage.objectUser \
-      --member=principal://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$PROJECT_ID.svc.id.goog/subject/ns/default/sa/default \
-      --condition=None
+   --role=roles/storage.objectUser \
+   --member=principal://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$PROJECT_ID.svc.id.goog/subject/ns/default/sa/default \
+   --condition=None
    ```
+
 Replace the following:
 
 - `BUCKET_NAME`: the name of your bucket created in the previous step
