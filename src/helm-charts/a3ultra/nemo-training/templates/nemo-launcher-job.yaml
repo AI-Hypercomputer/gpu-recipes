@@ -280,10 +280,16 @@ spec:
           echo "Job logs will go to ${EXPERIMENT_DIR}/${EXPERIMENT_NAME}/$JOB_IDENTIFIER/."
 
           mkdir -p "${GCS_MOUNT_PATH_0}/index_mapping_dir"
+          mkdir -p ${EXPERIMENT_DIR}/${EXPERIMENT_NAME}/$JOB_IDENTIFIER
 
           sleep 10 # <- Allow some time for service to boot
 
-          OMP_NUM_THREADS=12 torchrun \
+          OMP_NUM_THREADS=12 NSYS_CONFIG_DIRECTIVES="AgentLaunchTimeoutSec=240;AppLaunchTimeoutSec=240" TORCH_NCCL_ENABLE_MONITORING=0 \
+          /usr/local/bin/nsys profile -s none -t nvtx,cuda --capture-range=cudaProfilerApi --capture-range-end=stop \
+          -o ${EXPERIMENT_DIR}/${EXPERIMENT_NAME}/$JOB_IDENTIFIER/noderank-$NODE_RANK \
+          --session-new "nemo-rank$NODE_RANK"-$RANDOM \
+          --wait all \
+          torchrun \
           --nproc-per-node="$GPUS_PER_NODE" \
           --nnodes="$NNODES" \
           --node_rank="$NODE_RANK" \
