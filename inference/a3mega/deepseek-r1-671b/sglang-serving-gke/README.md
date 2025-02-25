@@ -2,16 +2,16 @@
 
 This recipe outlines the steps to benchmark inference of a DeepSeek R1 671B model using [SGLang](https://github.com/sgl-project/sglang/tree/main) on an [A3 Mega GKE Node pool](https://cloud.google.com/kubernetes-engine) with multiple nodes.
 
-In order to run this recipe, we use the [LeaderWorkerSet API](https://github.com/kubernetes-sigs/lws) in Kubernetes to spin up multiple nodes and handle distributed inference.
+The recipe uses [LeaderWorkerSet API](https://github.com/kubernetes-sigs/lws) in Kubernetes to spin up multiple nodes and handle distributed inference workload. LWS enables treating multiple Pods as a group, simplifying the management of distributed model serving.
 
 ## Orchestration and deployment tools
 
 For this recipe, the following setup is used:
 
 - Orchestration - [Google Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine)
-- Job configuration and deployment - Helm chart is used to configure and deploy the
-  [Kubernetes Index Job](https://kubernetes.io/blog/2021/04/19/introducing-indexed-jobs).
-  This job encapsulates inference of DeepSeek R1 671B model using SGLang. The chart generates the manifest, adhering to best practices for using GPUDirect-TCPXO with Google Kubernetes Engine (GKE), which includes setting optimal values for NVIDIA NCCL and the TCPXO NCCL plugin.
+- LeaderWorkerSet Deployment - Helm chart is used to configure and deploy multi-node inference
+  using the [LeaderWorkerSet API](https://github.com/kubernetes-sigs/lws) provisioning leader
+  and worker pods for distributed inference of the DeepSeek R1 671B model using SGLang. The chart generates the manifest, adhering to best practices for using GPUDirect-TCPXO with Google Kubernetes Engine (GKE), which includes setting optimal values for NVIDIA NCCL and the TCPXO NCCL plugin.
 
 ## Prerequisites
 
@@ -19,7 +19,6 @@ Before running this recipe, ensure your environment is configured as follows:
 
 - A GKE cluster with the following setup:
     - An A3 Mega node pool (2 nodes, 16 GPUs)
-    - Topology-aware scheduling enabled
 - An Artifact Registry repository to store the Docker image.
 - A Google Cloud Storage (GCS) bucket to store results.
   *Important: This bucket must be in the same region as the GKE cluster*.
@@ -74,7 +73,7 @@ From your client, complete the following steps:
   - `<ARTIFACT_REGISTRY>`: the full name of your Artifact
     Registry in the following format: *LOCATION*-docker.pkg.dev/*PROJECT_ID*/*REPOSITORY*
   - `<SGLANG_IMAGE>`: the name of the SGLang image
-  - `<SGLANG_VERSION>`: the version of the SGLang image
+  - `<SGLANG_VERSION>`: the version of the SGLang image. We recommended running the recipe with SGLang v0.4.3.post2-cu125-srt.
 
 1. Set the default project:
 
@@ -155,13 +154,29 @@ The recipe uses the helm chart to run the above steps.
     --dry-run=client -o yaml | kubectl apply -f -
     ```
 
-2. Install the LeaderWorkerSet API (LWS). Please follow the instructions [here](https://github.com/kubernetes-sigs/lws/blob/main/docs/setup/install.md#install-a-released-version) to install LWS.
+2. Install the LeaderWorkerSet API (LWS). Please follow the instructions [here](https://github.com/kubernetes-sigs/lws/blob/main/docs/setup/install.md#install-a-released-version) to install a specific version of LWS API.
+
+    ```bash
+    kubectl apply --server-side -f https://github.com/kubernetes-sigs/lws/releases/latest/download/manifests.yaml
+    ```
+
+    Validate that the LeaderWorkerSet controller is running in the lws-system namespace, using the following command:
+
+    ```bash
+    kubectl get pod -n lws-system
+    ```
+
+    The output is similar to the following:
+    ```bash
+    NAME                                      READY   STATUS    RESTARTS   AGE
+    lws-controller-manager-56956867cb-4km9g   1/1     Running   0          24h
+    ```
 
 3. Install the helm chart to prepare the model.
 
     ```bash
     cd $RECIPE_ROOT
-    /usr/local/bin/helm/helm install -f values.yaml \
+    helm install -f values.yaml \
     --set job.image.repository=${ARTIFACT_REGISTRY}/${SGLANG_IMAGE} \
     --set clusterName=${CLUSTER_NAME} \
     --set job.image.tag=${SGLANG_VERSION} \
@@ -201,6 +216,7 @@ The recipe uses the helm chart to run the above steps.
     ```bash
     kubectl port-forward svc/$USER-serving-deepseek-r1-model-svc 30000:30000
     ```
+
 8. Make the API requests to the service.
 
     ```bash
@@ -306,7 +322,7 @@ To clean up the resources created by this recipe, complete the following steps:
 1. Uninstall the helm chart.
 
     ```bash
-    /usr/local/bin/helm/helm uninstall $USER-serving-deepseek-r1-model
+    helm uninstall $USER-serving-deepseek-r1-model
     ```
 
 2. Delete the Kubernetes Secret.
@@ -317,12 +333,12 @@ To clean up the resources created by this recipe, complete the following steps:
 
 ### Running the recipe on a cluster that does not use the default configuration.
 
-If you created your cluster using the [GKE environment setup guide](../../../../docs/configuring-environment-gke-a3-ultra.md), it is configured with default settings that include the names for networks and subnetworks used for communication between:
+If you created your cluster using the [GKE environment setup guide](../../../../docs/configuring-environment-gke-a3-mega.md), it is configured with default settings that include the names for networks and subnetworks used for communication between:
 
-- The host to  external services.
+- The host to external services.
 - GPU-to GPU communication.
 
-For clusters with this default configuration, the Helm chart can automatically generate the [required networking annotations in a Pod's metadata](https://cloud.google.com/ai-hypercomputer/docs/create/gke-ai-hypercompute-custom#configure-pod-manifests-rdma). Therefore, you can use the streamlined command to install the chart, as described in the the [Single A3 Ultra Node Benchmarking using FP8 Quantization](#single-a3-ultra-node-benchmarking-using-fp8-quantization) section.
+For clusters with this default configuration, the Helm chart can automatically generate the [required networking annotations in a Pod's metadata](https://cloud.google.com/ai-hypercomputer/docs/create/gke-ai-hypercompute-custom#configure-pod-manifests-rdma). Therefore, you can use the streamlined command to install the chart, as described in the the [Multi node inference benchmark of DeepSeek R1 671B with SGLang on A3 Mega GKE Node Pool](#multi-node-inference-benchmark-of-deepseek-r1-671b-with-sglang-on-a3-mega-gke-node-pool) section.
 
 To configure the correct networking annotations for a cluster that uses non-default names for GKE Network resources, you must provide the names of the GKE Network resources in you cluster  when installing the chart. Use the following example command, remembering to replace the example values with the actual names of your cluster's GKE Network resources:
 
