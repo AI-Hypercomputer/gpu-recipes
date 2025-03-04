@@ -1,0 +1,279 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+{{ $gcsBucket := .Values.testSettings.gcsBucket | required ".Values.testSettings.gcsBucket is required" }}
+{{ $logsFolder := .Values.testSettings.logsFolder | required ".Values.testSettings.logsFolder is required" }}
+{{ $timestamp := now | unixEpoch }}
+{{ $jobSuffix := randAlphaNum 4 | lower }}
+{{ $jobuuid := uuidv4 }}
+{{ $nodes :=  .Values.testSettings.nodes }}
+{{ $gpusPerNode :=  8 }}
+{{- $root := . -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "{{ .Release.Name }}"
+  namespace: default
+  labels:
+  {{- if $root.Values.queue }}
+    kueue.x-k8s.io/queue-name: "{{ $root.Values.queue }}"
+  {{- end }}
+spec:
+  {{- if $root.Values.queue }}
+  suspend: true
+  {{- end }}
+  parallelism: {{ $nodes }}
+  completions: {{ $nodes }}
+  backoffLimit: 0
+  completionMode: Indexed
+  ttlSecondsAfterFinished: 43200
+  template:
+    metadata:
+      annotations:
+        gke-gcsfuse/volumes: "true"
+        gke-gcsfuse/cpu-limit: "0"
+        gke-gcsfuse/memory-limit: "0"
+        gke-gcsfuse/ephemeral-storage-limit: "0"
+        devices.gke.io/container.tcpxo-daemon: |+
+          - path: /dev/nvidia0
+          - path: /dev/nvidia1
+          - path: /dev/nvidia2
+          - path: /dev/nvidia3
+          - path: /dev/nvidia4
+          - path: /dev/nvidia5
+          - path: /dev/nvidia6
+          - path: /dev/nvidia7
+          - path: /dev/nvidiactl
+          - path: /dev/nvidia-uvm
+          - path: /dev/dmabuf_import_helper
+        networking.gke.io/default-interface: "eth0"
+        networking.gke.io/interfaces: |
+        {{- if $root.Values.network.subnetworks }}
+          [
+            {{- range $i, $subnetwork := $root.Values.network.subnetworks }}
+            {"interfaceName":"eth{{ $i }}","network":"{{ $subnetwork }}"}{{ eq $i 8 | ternary "" ","}}
+            {{- end }}
+          ]
+        {{- else }}
+          [
+            {"interfaceName":"eth0","network":"default"},
+            {{- range  $i := until 8 }}
+            {"interfaceName":"eth{{ add 1 $i }}","network":"{{ $root.Values.clusterName }}-gpunet-{{ $i }}-subnet"}{{ eq $i 7 | ternary "" ","}}
+            {{- end }}
+          ]
+        {{- end}}
+        {{- if and (eq $root.Values.tasSettings.useLegacyTAS false)  $root.Values.queue $root.Values.tasSettings.topologyRequest }}
+          {{- toYaml .Values.tasSettings.topologyRequest | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- if $root.Values.tasSettings.useLegacyTAS }}
+      schedulingGates:
+      - name: "gke.io/topology-aware-auto-scheduling"
+      {{- end }}
+      subdomain: "{{.Release.Name}}"
+      restartPolicy: Never
+      {{ if $root.Values.targetNodes }}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                {{- range $hostname := $root.Values.targetNodes }}
+                - {{ $hostname }}
+                {{- end }}
+      {{ end }}
+      tolerations:
+      - operator: "Exists"
+        key: nvidia.com/gpu
+      - operator: "Exists"
+        key: cloud.google.com/impending-node-termination
+
+      volumes:
+      - name: gcs-volume
+        csi:
+          driver: gcsfuse.csi.storage.gke.io
+          volumeAttributes:
+            bucketName: {{ $gcsBucket }}
+      - name: shared-memory
+        emptyDir:
+          medium: "Memory"
+          sizeLimit: 250Gi
+      - name: test-script
+        configMap:
+          name: {{.Release.Name}}
+      - name: nvidia-dir-host
+        hostPath:
+          path: /home/kubernetes/bin/nvidia
+      {{- if not $root.Values.gpuPlatformSettings.useHostPlugin }}
+      - name: nccl-plugin-volume
+        emptyDir: {}
+      {{- end }}
+      - name: sys
+        hostPath:
+          path: /sys
+      - name: proc-sys
+        hostPath:
+           path: /proc/sys
+      - name: aperture-devices
+        hostPath:
+          path: /dev/aperture_devices
+
+      initContainers:
+      {{- if not $root.Values.gpuPlatformSettings.useHostPlugin }}
+      - name: nccl-plugin-installer
+        image: "{{ $root.Values.gpuPlatformSettings.ncclPluginImage }}"
+        imagePullPolicy: Always
+        volumeMounts:
+          - name: nccl-plugin-volume
+            mountPath: /usr/local/nccl-plugin
+        env:
+        - name: BUILD_TYPE
+          value: "{{ $root.Values.gpuPlatformSettings.ncclBuildType }}"
+        command:
+        - bash
+        - -c
+        - |
+          set -ex
+          chmod 755 /scripts/container_entry.sh
+          /scripts/container_entry.sh install --install-nccl --nccl-buildtype ${BUILD_TYPE}
+          cp -r /var/lib/tcpxo/* /usr/local/nccl-plugin/
+
+      {{- end }}
+      - name: tcpxo-daemon
+        image: {{ $root.Values.gpuPlatformSettings.rxdmImage }}
+        imagePullPolicy: Always
+        restartPolicy: Always
+        securityContext:
+          capabilities:
+            add:
+              - NET_ADMIN
+              - NET_BIND_SERVICE
+        volumeMounts:
+        - name: nvidia-dir-host
+          mountPath: /usr/local/nvidia
+        - name: sys
+          mountPath: /hostsysfs
+        - name: proc-sys
+          mountPath: /hostprocsysfs
+        env:
+        - name: LD_LIBRARY_PATH
+          value: /usr/local/nvidia/lib64
+        command:
+        - bash
+        - -c
+        - |
+          cleanup() {
+            echo "Received SIGTERM, exiting RxDM"
+            if [ -n "$child_pid" ]; then
+              echo "Sending SIGTERM to child process"
+              kill -TERM "$child_pid"
+            fi
+            exit 0
+          }
+          trap cleanup SIGTERM
+
+          chmod 755 /fts/entrypoint_rxdm_container.sh
+          /fts/entrypoint_rxdm_container.sh --num_hops=2 --num_nics=8  --uid= --alsologtostderr & child_pid=$!
+
+          wait "$child_pid"
+
+      containers:
+      - name: nccl-test
+        image: "{{ $root.Values.gpuPlatformSettings.ncclPluginImage }}"
+        imagePullPolicy: Always
+        env:
+        - name: JOB_IDENTIFIER
+          value: "{{ .Release.Name }}-{{ $timestamp }}"
+        - name: JOB_TIMESTAMP
+          value: "{{ $timestamp }}"
+        - name: JOB_UUID
+          value: "{{ $jobuuid }}"
+        - name: RANK_0_FQDN
+          value: "{{.Release.Name}}-0.{{.Release.Name}}.default.svc.cluster.local"
+        - name: HOSTNAME_PREFIX
+          value: "{{.Release.Name}}-"
+        - name: DOMAIN_NAME
+          value: "{{.Release.Name}}.default.svc.cluster.local"
+        - name: NNODES
+          value: "{{ $nodes }}"
+        - name: GPUS_PER_NODE
+          value: "{{ $gpusPerNode }}"
+        - name: GCS_LOG_DIR
+          value: "gs://{{ $gcsBucket }}/{{ $root.Values.testSettings.logsFolder }}"
+        - name: LOG_DIR
+          value: "{{ $root.Values.testSettings.gcsMountPath }}/{{ $root.Values.testSettings.logsFolder }}"
+
+        # Additional NCCL settings
+        {{- range $environment_variable := $root.Values.network.ncclSettings }}
+        - name: {{ $environment_variable.name }}
+          value: "{{ $environment_variable.value }}"
+        {{- end }}
+
+        #  Test settings
+        - name: BENCHMARK
+          value: "{{ default "all_gather" .Values.testSettings.benchmark }}"
+        - name: MASK
+          value: "{{ default "0x0" .Values.testSettings.mask }}"
+        - name: BEGIN_MESSAGE_SIZE
+          value: "{{ default "1K" .Values.testSettings.beginMessageSize }}"
+        - name: END_MESSAGE_SIZE
+          value: "{{ default "16G" .Values.testSettings.endMessageSize }}"
+        - name: WARMUP_ITERATIONS
+          value: "{{ default "50" .Values.testSettings.warmupIterations }}"
+        - name: RUN_ITERATIONS
+          value: "{{ default "100" .Values.testSettings.runIterations }}"
+        - name: FACTOR
+          value: "{{ default "2" .Values.testSettings.factor }}"
+
+        {{- if  $root.Values.gpuPlatformSettings.useHostPlugin }}
+        - name: LD_LIBRARY_PATH
+          value: /usr/local/nvidia/lib64
+        - name: NCCL_LIB_DIR
+          value: /usr/local/nvidia/lib64
+        {{- else }}
+        - name: LD_LIBRARY_PATH
+          value: /usr/local/nccl-plugin/lib64:/usr/local/nvidia/lib64
+        - name: NCCL_LIB_DIR
+          value: /usr/local/nccl-plugin/lib64
+        {{- end }}
+        - name: NCCL_FASTRAK_LLCM_DEVICE_DIRECTORY
+          value: /dev/aperture_devices
+
+        volumeMounts:
+        - name: gcs-volume
+          mountPath: {{ $root.Values.testSettings.gcsMountPath }}
+        - name: nvidia-dir-host
+          mountPath: /usr/local/nvidia
+        - name: shared-memory
+          mountPath: /dev/shm
+        - name: test-script
+          mountPath: /test-scripts/run_test.sh
+          subPath: run_test.sh
+        - name: aperture-devices
+          mountPath: /dev/aperture_devices
+        {{- if not $root.Values.gpuPlatformSettings.useHostPlugin }}
+        - name: nccl-plugin-volume
+          mountPath: /usr/local/nccl-plugin
+        {{- end }}
+
+        command:
+        - bash
+        - /test-scripts/run_test.sh
+
+        resources:
+          limits:
+            nvidia.com/gpu: {{ $gpusPerNode }}
