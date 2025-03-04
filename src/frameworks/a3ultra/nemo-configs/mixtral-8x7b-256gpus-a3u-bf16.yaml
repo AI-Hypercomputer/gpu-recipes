@@ -13,9 +13,9 @@ trainer:
   max_steps: 30
   max_time: 05:23:30:00
   log_every_n_steps: 1
-  val_check_interval: 50
-  limit_val_batches: 32
-  limit_test_batches: 50
+  val_check_interval: 32
+  limit_val_batches: 0
+  limit_test_batches: 5
   accumulate_grad_batches: 1
   gradient_clip_val: 1.0
   enable_model_summary: false

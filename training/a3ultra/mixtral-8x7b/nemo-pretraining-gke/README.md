@@ -20,7 +20,7 @@ For this recipe, the following setup is used:
 
 This recipe has been optimized for and tested with the following configuration:
 
-- A cluster with 32 [a3-ultragpu-8g](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) machines
+- A cluster with 32 or 64 [a3-ultragpu-8g](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) machines
 - Machine placement in the cluster is configured using a [compact placement policy](https://cloud.google.com/kubernetes-engine/docs/how-to/compact-placement)
 - [NVIDIA NeMo NGC container image](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/nemo/tags): 24.07
 - BF16 precision training
@@ -33,7 +33,7 @@ This recipe has been optimized for and tested with the following configuration:
 Before running this recipe, ensure your environment is configured as follows:
 
 - A GKE cluster with the following setup:
-    - An A3 Ultra node pool (32 nodes, 256 GPUs)
+    - An A3 Ultra node pool (32 nodes - 256 GPUs or 64 nodes - 512 GPUs)
     - Topology-aware scheduling enabled
 - A Google Cloud Storage (GCS) bucket to store results.
   *Important: This bucket must be in the same region as the GKE cluster*.
@@ -112,6 +112,8 @@ This image is based on NVIDIA NeMo 24.07 and contains the NCCL gIB plugin v1.0.3
 
 ### Configure and submit a pretraining job
 
+#### Using 32 nodes (256 GPUs)
+
 The default job setting is 30 training steps and bf16 precision. To execute the job with the
 default settings, run the following command from your client:
 
@@ -124,6 +126,24 @@ helm  install -f values.yaml \
     --set queue=${KUEUE_NAME} \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     $USER-mixtral-8x7b-nemo \
+    $REPO_ROOT/src/helm-charts/a3ultra/nemo-training
+```
+
+#### Using 64 nodes (512 GPUs)
+
+The default job setting is 30 training steps and bf16 precision. To execute the job with the
+default settings, run the following command from your client:
+
+```bash
+cd $RECIPE_ROOT
+helm  install -f values.yaml \
+    --set-file nemo_config=$REPO_ROOT/src/frameworks/a3ultra/nemo-configs/mixtral-8x7b-256gpus-a3u-bf16.yaml \
+    --set workload.image=us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-nemo-nccl:nemo24.07-gib1.0.3-A3U \
+    --set clusterName=$CLUSTER_NAME \
+    --set queue=${KUEUE_NAME} \
+    --set workload.gpus=512 \
+    --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+    $USER-mixtral-8x7b-nemo-512 \
     $REPO_ROOT/src/helm-charts/a3ultra/nemo-training
 ```
 
@@ -157,6 +177,8 @@ To check the status of pods in the indexed job, run the following command from y
 
 ```
 kubectl get pods | grep $USER-mixtral-8x7b-nemo
+kubectl get pods | grep $USER-mixtral-8x7b-nemo-512
+
 ```
 
 To get the logs for one of the pods, run the following command from your client:
@@ -257,7 +279,7 @@ following steps command from your client:
    ```
 
 **Note:** The `batch_size`, `num_accelerators`, `precision`, `model_type` and `accelerator_type` are the
-specific values for this recipe running the default configuration. Average step time
+specific values for this recipe running the default configuration with 32 nodes. Average step time
 is computed by default using the steps 10 to 30.
 
 For more detailed information and advanced usage instructions of this tool,
@@ -270,6 +292,7 @@ To uninstall Helm, run the following command from your client:
 
 ```bash
 helm uninstall $USER-mixtral-8x7b-nemo
+helm uninstall $USER-mixtral-8x7b-nemo-512
 ```
 
 ### Running the recipe on a cluster that does not use the default configuration.
