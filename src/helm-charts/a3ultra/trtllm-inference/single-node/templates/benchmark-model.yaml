@@ -53,9 +53,9 @@ spec:
         {{- else }}
           [
             {"interfaceName":"eth0","network":"default"},
-            {"interfaceName":"eth1","network":"{{ $root.Values.clusterName }}-sub-1"},
+            {"interfaceName":"eth1","network":"gvnic-1"},
             {{- range  $i := until 8 }}
-            {"interfaceName":"eth{{ add 2 $i }}","network":"{{ $root.Values.clusterName }}-rdma-sub-{{ $i }}"}{{ eq $i 7 | ternary "" ","}}
+            {"interfaceName":"eth{{ add 2 $i }}","network":"rdma-{{ $i }}"}{{ eq $i 7 | ternary "" ","}}
             {{- end }}
           ]
         {{- end }}

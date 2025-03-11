@@ -120,7 +120,6 @@ cd $RECIPE_ROOT
 helm  install -f values.yaml \
     --set-file nemo_config=$REPO_ROOT/src/frameworks/a3ultra/nemo-configs/llama-3.1-70b-256gpus-a3ultra-fp8.yaml \
     --set workload.image=us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-nemo-nccl:nemo24.07-gib1.0.3-A3U \
-    --set clusterName=$CLUSTER_NAME \
     --set queue=${KUEUE_NAME} \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     $USER-llama-3-1-70b-nemo-fp8 \
@@ -143,7 +142,6 @@ for this job. To do this, we can set the new arguments using `--set workload.arg
       --set-file nemo_config=$REPO_ROOT/src/frameworks/a3ultra/nemo-configs/llama-3.1-70b-256gpus-a3ultra-fp8.yaml \
       --set workload.image=us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-nemo-nccl:nemo24.07-gib1.0.3-A3U \
       --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
-      --set clusterName=$CLUSTER_NAME \
       --set queue=${KUEUE_NAME} \
       --set workload.arguments="{trainer.max_steps=100}" \
       $USER-llama-3-1-70b-nemo-fp8 \

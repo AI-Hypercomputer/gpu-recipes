@@ -170,7 +170,6 @@ The recipe uses the helm chart to run the above steps.
     cd $RECIPE_ROOT
     helm install -f values.yaml \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
-    --set clusterName=$CLUSTER_NAME \
     --set job.image.repository=${ARTIFACT_REGISTRY}/${TRT_LLM_IMAGE} \
     --set job.image.tag=${TRT_LLM_VERSION} \
     $USER-benchmark-llama-model \

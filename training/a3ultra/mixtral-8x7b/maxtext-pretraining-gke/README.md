@@ -68,6 +68,7 @@ From your client, complete the following steps:
   export CLUSTER_NAME=<CLUSTER_NAME>
   export GCS_BUCKET=<GCS_BUCKET>
   export ARTIFACT_REGISTRY=<ARTIFACT_REGISTRY>
+  export KUEUE_NAME=<KUEUE_NAME>
   ```
 
   Replace the following values:
@@ -79,6 +80,7 @@ From your client, complete the following steps:
   - `<GCS_BUCKET>`: the name of your Cloud Storage bucket. Do not include the `gs://` prefix
   - `<ARTIFACT_REGISTRY>`: the full name of your Artifact
     Registry in the following format: *LOCATION*-docker.pkg.dev/*PROJECT_ID*/*REPOSITORY*
+  - `<KUEUE_NAME>`: the name of the Kueue queue configured for TAS. The default queue created by the cluster toolkit is `a3-ultra`. Please verify the name of your local queue by running `kubectl get queues` and modify it as needed.
 
 1. Set the default project:
 
@@ -146,7 +148,7 @@ helm install -f values.yaml \
     --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/mixtral-8x7b-256gpus-a3u-bf16.yaml \
     --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
     --set workload.run_name=$USER-mixtral-8x7b-maxtext \
-    --set clusterName=$CLUSTER_NAME \
+    --set queue=${KUEUE_NAME} \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     $USER-mixtral-8x7b-maxtext \
     $REPO_ROOT/src/helm-charts/a3ultra/maxtext-training
@@ -164,7 +166,7 @@ helm install -f values.yaml \
     --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/mixtral-8x7b-256gpus-a3u-bf16.yaml \
     --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
     --set workload.run_name=$USER-mixtral-8x7b-maxtext \
-   --set clusterName=$CLUSTER_NAME \
+    --set queue=${KUEUE_NAME} \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     --set workload.steps=100 \
     $USER-mixtral-8x7b-maxtext \

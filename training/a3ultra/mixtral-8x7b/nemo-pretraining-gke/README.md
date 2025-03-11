@@ -122,7 +122,6 @@ cd $RECIPE_ROOT
 helm  install -f values.yaml \
     --set-file nemo_config=$REPO_ROOT/src/frameworks/a3ultra/nemo-configs/mixtral-8x7b-256gpus-a3u-bf16.yaml \
     --set workload.image=us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-nemo-nccl:nemo24.07-gib1.0.3-A3U \
-    --set clusterName=$CLUSTER_NAME \
     --set queue=${KUEUE_NAME} \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     $USER-mixtral-8x7b-nemo \
@@ -139,7 +138,6 @@ cd $RECIPE_ROOT
 helm  install -f values.yaml \
     --set-file nemo_config=$REPO_ROOT/src/frameworks/a3ultra/nemo-configs/mixtral-8x7b-256gpus-a3u-bf16.yaml \
     --set workload.image=us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-nemo-nccl:nemo24.07-gib1.0.3-A3U \
-    --set clusterName=$CLUSTER_NAME \
     --set queue=${KUEUE_NAME} \
     --set workload.gpus=512 \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
@@ -163,7 +161,6 @@ for this job. To do this, we can set the new arguments using `--set workload.arg
     helm install -f values.yaml \
         --set-file nemo_config=$REPO_ROOT/src/frameworks/a3ultra/nemo-configs/mixtral-8x7b-256gpus-a3u-bf16.yaml \
         --set workload.image=us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-nemo-nccl:nemo24.07-gib1.0.3-A3U \
-        --set clusterName=$CLUSTER_NAME \
         --set queue=${KUEUE_NAME} \
         --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
         --set workload.arguments="{trainer.max_steps=100}" \

@@ -152,7 +152,6 @@ helm install -f values.yaml \
     --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
     --set workload.run_name=$USER-llama-3-1-405b-maxtext-fp8 \
     --set workload.gpus=512 \
-    --set clusterName=$CLUSTER_NAME \
     --set queue=$KUEUE_NAME \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     $USER-llama-3-1-405b-maxtext-fp8 \
@@ -171,7 +170,6 @@ helm install -f values.yaml \
     --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
     --set workload.run_name=$USER-llama-3-1-405b-maxtext-fp8 \
     --set workload.gpus=768 \
-    --set clusterName=$CLUSTER_NAME \
     --set queue=$KUEUE_NAME \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     $USER-llama-3-1-405b-maxtext-fp8 \
@@ -189,7 +187,6 @@ helm install -f values.yaml \
     --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
     --set workload.run_name=$USER-llama-3-1-405b-maxtext-fp8 \
     --set workload.gpus=1024 \
-    --set clusterName=$CLUSTER_NAME \
     --set queue=$KUEUE_NAME \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     $USER-llama-3-1-405b-maxtext-fp8 \
@@ -210,7 +207,6 @@ helm install -f values.yaml \
     --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
     --set workload.run_name=$USER-llama-3-1-405b-maxtext-fp8 \
     --set workload.gpus=512 \
-    --set clusterName=$CLUSTER_NAME \
     --set queue=$KUEUE_NAME \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     --set workload.steps=100 \
