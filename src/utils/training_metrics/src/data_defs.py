@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Accelerators and models definitions"""
+"""Accelerators and models definitions"""
 
-ACCELERATORS = ["h100", "h200", "a100", "v5e", "v5p"]
+ACCELERATORS = ["b200", "h100", "h200", "a100", "v5e", "v5p"]
 
 MAX_TFLOPS = {
     (
@@ -39,6 +39,8 @@ MAX_TFLOPS = {
         "h200",
         "fp8",
     ): 1978,
+    ("b200", "bf16"): 2250,  # https://www.nvidia.com/en-us/data-center/hgx/
+    ("b200", "fp8"): 4500,
 }
 
 MODEL_FLOPS_PER_SAMPLE = {
