@@ -220,7 +220,7 @@ spec:
         - name: TF_CPP_MAX_LOG_LEVEL
           value: "100"
         - name: XLA_PYTHON_CLIENT_MEM_FRACTION
-          value: "0.92"
+          value: "0.98"
         - name: CUDA_DEVICE_MAX_CONNECTIONS
           value: "1"
         - name: NVTE_FUSED_ATTN

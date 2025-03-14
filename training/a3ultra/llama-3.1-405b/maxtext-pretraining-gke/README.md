@@ -19,7 +19,7 @@ For this recipe, the following setup is used:
 
 This recipe has been optimized for and tested with the following configuration:
 
-- A cluster with 64, 96 or 128 [a3-ultragpu-8g](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) machines.
+- A cluster with 32, 64, 96 or 128 [a3-ultragpu-8g](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) machines.
 - Machine placement in the cluster is configured using a [compact placement policy](https://cloud.google.com/kubernetes-engine/docs/how-to/compact-placement)
 - MaxText docker container
 - FP8 precision training
@@ -32,7 +32,7 @@ This recipe has been optimized for and tested with the following configuration:
 Before running this recipe, ensure your environment is configured as follows:
 
 - A GKE cluster with the following setup:
-    - An A3 Ultra node pool (64 nodes - 512 GPUs, 96 nodes - 768 GPUs or 128 nodes - 1024 GPUs)
+    - An A3 Ultra node pool (32 nodes - 256 GPUS, 64 nodes - 512 GPUs, 96 nodes - 768 GPUs or 128 nodes - 1024 GPUs)
     - Topology-aware scheduling enabled
 - An Artifact Registry repository to store the Docker image.
 - A Google Cloud Storage (GCS) bucket to store results.
@@ -139,6 +139,24 @@ To build the container, complete the following steps from your client:
 
 
 ### Configure and submit a pretraining job
+
+#### Using 32 nodes (256 GPUs)
+
+The default job setting is 15 training steps and fp8 precision. To execute the job with the
+default settings, run the following command from your client:
+
+```bash
+cd $RECIPE_ROOT
+helm install -f values.yaml \
+    --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/llama-3.1-405b-256gpus-a3u-fp8.yaml \
+    --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
+    --set workload.run_name=$USER-llama-3-1-405b-maxtext-fp8 \
+    --set workload.gpus=256 \
+    --set queue=$KUEUE_NAME \
+    --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+    $USER-llama-3-1-405b-maxtext-fp8 \
+    $REPO_ROOT/src/helm-charts/a3ultra/maxtext-training
+```
 
 #### Using 64 nodes (512 GPUs)
 

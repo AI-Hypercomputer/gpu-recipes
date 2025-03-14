@@ -28,6 +28,7 @@ workload:
   steps: 50
 
 network:
+  gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:v1.0.3
   subnetworks[]:
   ncclSettings:
   - name: NCCL_DEBUG

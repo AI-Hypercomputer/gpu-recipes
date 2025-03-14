@@ -204,6 +204,42 @@ helm install -f values.yaml \
     $REPO_ROOT/src/helm-charts/a3ultra/maxtext-training
 ```
 
+#### 64 nodes (512 GPUs) global batch size 2048
+
+The default job setting is 50 training steps and fp8 precision. To execute the job with the
+default settings, run the following command from your client:
+
+```bash
+cd $RECIPE_ROOT
+helm install -f values.yaml \
+    --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/llama-3.1-70b-512gpus-a3u-fp8-gbs2048.yaml \
+    --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
+    --set workload.run_name=$USER-llama-3-1-70b-maxtext-fp8-64nodes-2048 \
+    --set workload.gpus=512 \
+    --set queue=$KUEUE_NAME \
+    --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+    $USER-llama-3-1-70b-maxtext-fp8-64nodes-2048 \
+    $REPO_ROOT/src/helm-charts/a3ultra/maxtext-training
+```
+
+#### 128 nodes (1024 GPUs) global batch size 2048
+
+The default job setting is 50 training steps and fp8 precision. To execute the job with the
+default settings, run the following command from your client:
+
+```bash
+cd $RECIPE_ROOT
+helm install -f values.yaml \
+    --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/llama-3.1-70b-1024gpus-a3u-fp8-gbs2048.yaml \
+    --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
+    --set workload.run_name=$USER-llama-3-1-70b-maxtext-fp8-128nodes-2048 \
+    --set workload.gpus=1024 \
+    --set queue=$KUEUE_NAME \
+    --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+    $USER-llama-3-1-70b-maxtext-fp8-128nodes-2048 \
+    $REPO_ROOT/src/helm-charts/a3ultra/maxtext-training
+```
+
 #### Configure job settings
 
 **Examples**
