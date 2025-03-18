@@ -113,7 +113,7 @@ default settings, run the following command from your client:
 cd $RECIPE_ROOT
 helm install -f values.yaml \
     --set-file maxtext_config=$REPO_ROOT/src/frameworks/a4high/maxtext-configs/llama-3.1-405b-256gpus-a4h-fp8.yaml \
-    --set workload.image=us-central1-docker.pkg.dev/deeplearning-images/reproducibility/jax-maxtext-gpu:jax0.5.1-cuda_dl25.02-rev1-maxtext-20150313  \
+    --set workload.image=us-central1-docker.pkg.dev/deeplearning-images/reproducibility/jax-maxtext-gpu:jax0.5.1-cuda_dl25.02-rev1-maxtext-20150317  \
     --set workload.run_name=$USER-llama-3-1-405b-maxtext-fp8 \
     --set workload.gpus=256 \
     --set queue=$KUEUE_NAME \
@@ -132,7 +132,7 @@ helm install -f values.yaml \
 cd $RECIPE_ROOT
 helm install -f values.yaml \
     --set-file maxtext_config=$REPO_ROOT/src/frameworks/a4high/maxtext-configs/llama-3.1-405b-256gpus-a4h-fp8.yaml \
-    --set workload.image=us-central1-docker.pkg.dev/deeplearning-images/reproducibility/jax-maxtext-gpu:jax0.5.1-cuda_dl25.02-rev1-maxtext-20150313  \
+    --set workload.image=us-central1-docker.pkg.dev/deeplearning-images/reproducibility/jax-maxtext-gpu:jax0.5.1-cuda_dl25.02-rev1-maxtext-20150317  \
     --set workload.run_name=$USER-llama-3-1-405b-maxtext-fp8 \
     --set workload.gpus=256 \
     --set queue=$KUEUE_NAME \
