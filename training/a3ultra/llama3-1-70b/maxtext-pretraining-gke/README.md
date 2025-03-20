@@ -1,6 +1,6 @@
-# Pretrain Llama-3.1-405B workloads on A3 Ultra GKE Node pools using MaxText
+# Pretrain Llama-3.1-70B workloads on A3 Ultra GKE Node pools using MaxText
 
-This recipe outlines the steps for running a Llama-3.1-405B pretraining workload on
+This recipe outlines the steps for running a Llama-3.1-70B pretraining workload on
 [A3 Ultra GKE Node pools](https://cloud.google.com/kubernetes-engine) by using the
 [MaxText framework](https://github.com/AI-Hypercomputer/maxtext).
 
@@ -19,10 +19,10 @@ For this recipe, the following setup is used:
 
 This recipe has been optimized for and tested with the following configuration:
 
-- A cluster with 32, 64, 96 or 128 [a3-ultragpu-8g](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) machines.
+- A cluster with 32 or 64 [a3-ultragpu-8g](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) machines.
 - Machine placement in the cluster is configured using a [compact placement policy](https://cloud.google.com/kubernetes-engine/docs/how-to/compact-placement)
 - MaxText docker container
-- FP8 precision training
+- BF16 and FP8 precision training
 - Uses a synthetic pretraining dataset provided by the MaxText framework. By default, the job
   is configured to execute 50 training steps. If you want to change the number of training steps,
   see [Configure and submit a pretraining job](#configure-and-submit-a-pretraining-job).
@@ -32,7 +32,7 @@ This recipe has been optimized for and tested with the following configuration:
 Before running this recipe, ensure your environment is configured as follows:
 
 - A GKE cluster with the following setup:
-    - An A3 Ultra node pool (32 nodes - 256 GPUS, 64 nodes - 512 GPUs, 96 nodes - 768 GPUs or 128 nodes - 1024 GPUs)
+    - An A3 Ultra node pool (32 nodes - 256 GPUs or 64 nodes - 512 GPUs)
     - Topology-aware scheduling enabled
 - An Artifact Registry repository to store the Docker image.
 - A Google Cloud Storage (GCS) bucket to store results.
@@ -96,7 +96,7 @@ cd
 git clone https://github.com/ai-hypercomputer/gpu-recipes.git
 cd gpu-recipes
 export REPO_ROOT=`git rev-parse --show-toplevel`
-export RECIPE_ROOT=$REPO_ROOT/training/a3ultra/llama-3.1-405b/maxtext-pretraining-gke
+export RECIPE_ROOT=$REPO_ROOT/training/a3ultra/llama3-1-70b/maxtext-pretraining-gke
 ```
 
 ### Get cluster credentials
@@ -142,75 +142,103 @@ To build the container, complete the following steps from your client:
 
 #### Using 32 nodes (256 GPUs)
 
-The default job setting is 15 training steps and fp8 precision. To execute the job with the
+The default job setting is 50 training steps and bf16 precision. To execute the job with the
 default settings, run the following command from your client:
 
 ```bash
 cd $RECIPE_ROOT
 helm install -f values.yaml \
-    --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/llama-3.1-405b-256gpus-a3u-fp8.yaml \
+    --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/llama3-1-70b-256gpus-a3u-bf16.yaml \
     --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
-    --set workload.run_name=$USER-llama-3-1-405b-maxtext-fp8 \
+    --set workload.run_name=$USER-llama-3-1-70b-maxtext \
     --set workload.gpus=256 \
     --set queue=$KUEUE_NAME \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
-    $USER-llama-3-1-405b-maxtext-fp8 \
+    $USER-llama-3-1-70b-maxtext \
+    $REPO_ROOT/src/helm-charts/a3ultra/maxtext-training
+```
+
+To run the recipe on `fp8` precision, run the following command from your client:
+```bash
+cd $RECIPE_ROOT
+helm install -f values.yaml \
+    --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/llama3-1-70b-256gpus-a3u-fp8.yaml \
+    --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
+    --set workload.run_name=$USER-llama-3-1-70b-maxtext-fp8 \
+    --set workload.gpus=256 \
+    --set queue=$KUEUE_NAME \
+    --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+    $USER-llama-3-1-70b-maxtext-fp8 \
     $REPO_ROOT/src/helm-charts/a3ultra/maxtext-training
 ```
 
 #### Using 64 nodes (512 GPUs)
 
-The default job setting is 15 training steps and fp8 precision. To execute the job with the
+The default job setting is 50 training steps and bf16 precision. To execute the job with the
 default settings, run the following command from your client:
 
 ```bash
 cd $RECIPE_ROOT
 helm install -f values.yaml \
-    --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/llama-3.1-405b-512gpus-a3u-fp8.yaml \
+    --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/llama3-1-70b-512gpus-a3u-bf16.yaml \
     --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
-    --set workload.run_name=$USER-llama-3-1-405b-maxtext-fp8 \
+    --set workload.run_name=$USER-llama-3-1-70b-maxtext-64nodes \
     --set workload.gpus=512 \
     --set queue=$KUEUE_NAME \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
-    $USER-llama-3-1-405b-maxtext-fp8 \
+    $USER-llama-3-1-70b-maxtext-64nodes \
     $REPO_ROOT/src/helm-charts/a3ultra/maxtext-training
 ```
 
-#### Using 96 nodes (768 GPUs)
-
-The default job setting is 15 training steps and fp8 precision. To execute the job with the
-default settings, run the following command from your client:
-
+To run the recipe on `fp8` precision, run the following command from your client:
 ```bash
 cd $RECIPE_ROOT
 helm install -f values.yaml \
-    --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/llama-3.1-405b-768gpus-a3u-fp8.yaml \
+    --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/llama3-1-70b-512gpus-a3u-fp8.yaml \
     --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
-    --set workload.run_name=$USER-llama-3-1-405b-maxtext-fp8 \
-    --set workload.gpus=768 \
+    --set workload.run_name=$USER-llama-3-1-70b-maxtext-fp8-64nodes \
+    --set workload.gpus=512 \
     --set queue=$KUEUE_NAME \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
-    $USER-llama-3-1-405b-maxtext-fp8 \
+    $USER-llama-3-1-70b-maxtext-fp8-64nodes \
     $REPO_ROOT/src/helm-charts/a3ultra/maxtext-training
 ```
-#### Using 128 nodes (1024 GPUs)
 
-The default job setting is 15 training steps and fp8 precision. To execute the job with the
+#### 64 nodes (512 GPUs) global batch size 2048
+
+The default job setting is 50 training steps and fp8 precision. To execute the job with the
 default settings, run the following command from your client:
 
 ```bash
 cd $RECIPE_ROOT
 helm install -f values.yaml \
-    --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/llama-3.1-405b-1024gpus-a3u-fp8.yaml \
+    --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/llama3-1-70b-512gpus-a3u-fp8-gbs2048.yaml \
     --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
-    --set workload.run_name=$USER-llama-3-1-405b-maxtext-fp8 \
+    --set workload.run_name=$USER-llama-3-1-70b-maxtext-fp8-64nodes-2048 \
+    --set workload.gpus=512 \
+    --set queue=$KUEUE_NAME \
+    --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+    $USER-llama-3-1-70b-maxtext-fp8-64nodes-2048 \
+    $REPO_ROOT/src/helm-charts/a3ultra/maxtext-training
+```
+
+#### 128 nodes (1024 GPUs) global batch size 2048
+
+The default job setting is 50 training steps and fp8 precision. To execute the job with the
+default settings, run the following command from your client:
+
+```bash
+cd $RECIPE_ROOT
+helm install -f values.yaml \
+    --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/llama3-1-70b-1024gpus-a3u-fp8-gbs2048.yaml \
+    --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
+    --set workload.run_name=$USER-llama-3-1-70b-maxtext-fp8-128nodes-2048 \
     --set workload.gpus=1024 \
     --set queue=$KUEUE_NAME \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
-    $USER-llama-3-1-405b-maxtext-fp8 \
+    $USER-llama-3-1-70b-maxtext-fp8-128nodes-2048 \
     $REPO_ROOT/src/helm-charts/a3ultra/maxtext-training
 ```
-
 
 #### Configure job settings
 
@@ -221,14 +249,13 @@ helm install -f values.yaml \
 ```bash
 cd $RECIPE_ROOT
 helm install -f values.yaml \
-    --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/llama-3.1-405b-512gpus-a3u-fp8.yaml \
+    --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/llama3-1-70b-256gpus-a3u-bf16.yaml \
     --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
-    --set workload.run_name=$USER-llama-3-1-405b-maxtext-fp8 \
-    --set workload.gpus=512 \
+    --set workload.run_name=$USER-llama-3-1-70b-maxtext \
     --set queue=$KUEUE_NAME \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     --set workload.steps=100 \
-    $USER-llama-3-1-405b-maxtext-fp8 \
+    $USER-llama-3-1-70b-maxtext \
     $REPO_ROOT/src/helm-charts/a3ultra/maxtext-training
 ```
 
@@ -237,7 +264,7 @@ helm install -f values.yaml \
 To check the status of pods in the indexed job, run the following command from your client:
 
 ```
-kubectl get pods | grep $USER-llama-3-1-405b-maxtext-fp8
+kubectl get pods | grep $USER-llama-3-1-70b-maxtext
 ```
 
 To get the logs for one of the pods, run the following command from your client:
@@ -268,20 +295,23 @@ completed step: 12, seconds: 15.516, TFLOP/s/device: 508.371, Tokens/s/device: 1
 
 The logs will show you the step time in seconds and the TFLOP/s/device.
 
-### Calculate training performance metrics (eMFU)
+### Calculate training performance metrics (MFU)
 
-This section explains how to calculate the effective Model FLOPS Utilization (eMFU), using the logs from the pods.
-Using the example logs from the previous step, and considering the number of TFLOP/s/device of 903.017,
-you can compute the eMFU using the following formula:
-
-```
-           TFLOP/s/device        903.017
-eMFU =   ------------------- =  --------- = 0.514 = 91.3%
-             MAX TFLOP H200        989
+This section explains how to calculate the Model FLOPS Utilization (MFU), using the logs from the pods.
+Using the example logs from the previous step, and considering the number of TFLOP/s/device of 508.371,
+you can compute the MFU using the following formula:
 
 ```
+           TFLOP/s/device       508.371
+MFU =   ------------------- =  --------- = 0.514 = 51.4%
+             MAX TFLOP H200       989
 
-MAX TFLOP H200: 989
+```
+
+MAX TFLOP H200:
+
+- BF16: 989
+- FP8: 1979
 
 
 ### Uninstall the Helm release
@@ -290,7 +320,15 @@ You can delete the job and other resources created by the Helm chart.
 To uninstall Helm, run the following command from your client:
 
 ```bash
-helm uninstall $USER-llama-3-1-405b-maxtext-fp8
+helm uninstall $USER-llama-3-1-70b-maxtext
+helm uninstall $USER-llama-3-1-70b-maxtext-64nodes
+```
+
+or for fp8:
+
+```bash
+helm uninstall $USER-llama-3-1-70b-maxtext-fp8
+helm uninstall $USER-llama-3-1-70b-maxtext-fp8-64nodes
 ```
 
 ### Running the recipe on a cluster that does not use the default configuration.
@@ -307,9 +345,9 @@ To configure the correct networking annotations for a cluster that uses non-defa
 ```bash
 cd $RECIPE_ROOT
 helm install -f values.yaml \
-    --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/llama-3.1-405b-512gpus-a3u-fp8.yaml \
+    --set-file maxtext_config=$REPO_ROOT/src/frameworks/a3ultra/maxtext-configs/llama3-1-70b-256gpus-a3u-bf16.yaml \
     --set workload.image=${ARTIFACT_REGISTRY}/maxtext-benchmark \
-    --set workload.run_name=$USER-llama-3-1-405b-maxtext-fp8 \
+    --set workload.run_name=$USER-llama-3-1-70b-maxtext \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     --set queue=$KUEUE_NAME \
     --set network.subnetworks[0]=default \
@@ -322,6 +360,6 @@ helm install -f values.yaml \
     --set network.subnetworks[7]=rdma-5 \
     --set network.subnetworks[8]=rdma-6 \
     --set network.subnetworks[9]=rdma-7 \
-    $USER-llama-3-1-405b-maxtext-fp8 \
+    $USER-llama-3-1-70b-maxtext \
     $REPO_ROOT/src/helm-charts/a3ultra/maxtext-training
 ```
