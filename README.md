@@ -35,12 +35,12 @@ Models             | GPU Machine Type                                           
 **Llama-3.1-405B** | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) | NeMo.     | Pre-training  | GKE          | [Link](./training/a3ultra/llama3-1-405b/nemo-pretraining-gke/README.md)
 **Mixtral-8-7B**   | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) | NeMo      | Pre-training  | GKE          | [Link](./training/a3ultra/mixtral-8x7b/nemo-pretraining-gke/README.md)
 
-### Training benchmarks A4 High
+### Training benchmarks A4
 
-Models             | GPU Machine Type                                                                                            | Framework | Workload Type | Orchestrator | Link to the recipe
------------------- | ----------------------------------------------------------------------------------------------------------- | --------- | ------------- | ------------ | ------------------
-**Llama-3.1-405B** | [A4 High (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-high-vms)   | MaxText   | Pre-training  | GKE          | [Link](./training/a4high/llama3-1-405b/maxtext-pretraining-gke/README.md)
-**Llama-3.1-405B** | [A4 High (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-high-vms)   | NeMo      | Pre-training  | GKE          | [Link](./training/a4high/llama3-1-405b/nemo-pretraining-gke/README.md)
+Models             | GPU Machine Type                                                                                     | Framework | Workload Type | Orchestrator | Link to the recipe
+------------------ | ---------------------------------------------------------------------------------------------------- | --------- | ------------- | ------------ | ------------------
+**Llama-3.1-405B** | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms) | MaxText   | Pre-training  | GKE          | [Link](./training/a4/llama3-1-405b/maxtext-pretraining-gke/README.md)
+**Llama-3.1-405B** | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms) | NeMo      | Pre-training  | GKE          | [Link](./training/a4/llama3-1-405b/nemo-pretraining-gke/README.md)
 
 ### Inference benchmarks A3 Mega
 

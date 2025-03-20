@@ -1,6 +1,6 @@
-# Configuring the environment for running benchmark recipes on a GKE Cluster with A4 High Node Pools
+# Configuring the environment for running benchmark recipes on a GKE Cluster with A4 Node Pools
 
-This [guide](https://cloud.google.com/ai-hypercomputer/docs/create/gke-ai-hypercompute) outlines the steps to configure the environment required to run benchmark recipes on a [Google Kubernetes Engine (GKE) cluster](https://cloud.google.com/kubernetes-engine/docs/concepts/kubernetes-engine-overview) with [A4 High](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms) node pools.
+This [guide](https://cloud.google.com/ai-hypercomputer/docs/create/gke-ai-hypercompute) outlines the steps to configure the environment required to run benchmark recipes on a [Google Kubernetes Engine (GKE) cluster](https://cloud.google.com/kubernetes-engine/docs/concepts/kubernetes-engine-overview) with [A4](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms) node pools.
 
 ## Prerequisites
 
@@ -26,7 +26,7 @@ Before you begin, ensure you have completed the following:
 
 ## Reserve capacity
 
-To ensure that your workloads have the A4 High GPU resources required for these
+To ensure that your workloads have the A4 GPU resources required for these
 instructions, you can create a [future reservation request](https://cloud.google.com/compute/docs/instances/future-reservations-overview).
 With this request, you can reserve blocks of capacity for a defined duration in the
 future. At that date and time in the future, Compute Engine automatically
@@ -77,7 +77,7 @@ The environment comprises of the following components:
 - [Artifact Registry](https://cloud.google.com/artifact-registry/docs/overview): serves as a
   private container registry for storing and managing Docker images used in the deployment.
 - [Google Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine/docs/concepts/kubernetes-engine-overview)
-  Cluster with A4 High Node Pools: provides a managed Kubernetes environment to run benchmark
+  Cluster with A4 Node Pools: provides a managed Kubernetes environment to run benchmark
   recipes.
 
 ## Set up the client workstation
@@ -150,16 +150,16 @@ Replace the following:
      repository descriptions are not encrypted.
 
 
-## Create a GKE Cluster with A4 High Node Pools
+## Create a GKE Cluster with A4 Node Pools
 
 Follow [this guide]() for
-detailed instructions to create a GKE cluster with A4 High node pools and required GPU driver versions.
+detailed instructions to create a GKE cluster with A4 node pools and required GPU driver versions.
 
 The documentation uses [ Cluster Toolkit](https://cloud.google.com/cluster-toolkit/docs/overview) to create your GKE cluster quickly while incorporating best practices:
 
 - Creation of the necessary VPC networks and subnets.
 - Creation of a GKE cluster with multi-networking enabled.
-- Creation of an A4 High node pool with NVIDIA B200 GPUs.
+- Creation of an A4 node pool with NVIDIA B200 GPUs.
 - Installation of the required components for GPUDirect-RDMA and NCCL plugin.
 
 1.  [Launch Cloud Shell](https://cloud.google.com/shell/docs/launching-cloud-shell). You can use a
@@ -205,13 +205,13 @@ The documentation uses [ Cluster Toolkit](https://cloud.google.com/cluster-toolk
       previous step to store the state of Terraform deployment.
    * `PROJECT_ID`: your Google Cloud project ID.
    * `COMPUTE_REGION`: the compute region for the cluster.
-   * `COMPUTE_ZONE`: the compute zone for the node pool of A4 High machines.
+   * `COMPUTE_ZONE`: the compute zone for the node pool of A4 machines.
    * `IP_ADDRESS/SUFFIX`: The IP address range that you want to allow to
       connect with the cluster. This CIDR block must include the IP address of
       the machine to call Terraform.
    * `RESERVATION_NAME`: the name of your reservation.
    * `BLOCK_NAME`: the name of a specific block within the reservation.
-   * `NODE_COUNT`: the number of A4 High nodes in your cluster.
+   * `NODE_COUNT`: the number of A4 nodes in your cluster.
 
   To modify advanced settings, edit
   `examples/gke-a4-highgpu/gke-a4-highgpu.yaml`.
@@ -220,7 +220,7 @@ The documentation uses [ Cluster Toolkit](https://cloud.google.com/cluster-toolk
    to provide access to Terraform.
 
 1.  Deploy the blueprint to provision the GKE infrastructure
-    using A4 High machine types:
+    using A4 machine types:
 
    ```sh
    cd ~/cluster-toolkit
@@ -242,7 +242,7 @@ VPC networks and GKE cluster:
 
 ## What's next
 
-Once you have set up your GKE cluster with A4 High node pools, you can proceed to deploy and
+Once you have set up your GKE cluster with A4 node pools, you can proceed to deploy and
 run your [benchmark recipes](../README.md#benchmarks-support-matrix).
 
 ## Get Help
