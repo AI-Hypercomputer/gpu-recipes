@@ -305,6 +305,7 @@ spec:
           +exp_manager.version="$JOB_IDENTIFIER" \
           +exp_manager.exp_dir="$EXPERIMENT_DIR" \
           +exp_manager.dllogger_logger_kwargs.json_file="${EXPERIMENT_DIR}/${EXPERIMENT_NAME}/$JOB_IDENTIFIER/dllogger/rank-$NODE_RANK/dllogger.json" \
+          +exp_manager.explicit_log_dir="${EXPERIMENT_DIR}/${EXPERIMENT_NAME}/$JOB_IDENTIFIER" \
           {{- range $root.Values.workload.arguments }}
           {{ . }} \
           {{- end }}
