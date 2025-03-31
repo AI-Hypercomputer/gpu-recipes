@@ -27,7 +27,7 @@ This recipe has been optimized for and tested with the following configuration:
     machines.
 -   Machine placement in the cluster is configured using a
     [compact placement policy](https://cloud.google.com/kubernetes-engine/docs/how-to/compact-placement)
--   FP8 precision training
+-   FP8 and BF16 precision training
 -   Uses a synthetic pretraining dataset provided by the MaxText framework. By
     default, the job is configured to execute 15 training steps. If you want to
     change the number of training steps, see
@@ -121,7 +121,9 @@ gcloud container clusters get-credentials $CLUSTER_NAME --region $CLUSTER_REGION
 #### Using 32 nodes (256 GPUs)
 
 The default job setting is 15 training steps and fp8 precision. To execute the
-job with the default settings, run the following command from your client:
+job with the default settings, run the following commands from your client:
+
+- for fp8 precision:
 
 ```bash
 cd $RECIPE_ROOT
@@ -133,6 +135,21 @@ helm install -f values.yaml \
     --set queue=$KUEUE_NAME \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     $USER-llama-3-1-405b-maxtext-fp8 \
+    $REPO_ROOT/src/helm-charts/a4/maxtext-training
+```
+
+- for bf16 precision:
+
+```bash
+cd $RECIPE_ROOT
+helm install -f values.yaml \
+    --set-file maxtext_config=$REPO_ROOT/src/frameworks/a4/maxtext-configs/llama3-1-405b-256gpus-a4-bf16.yaml \
+    --set workload.image=us-central1-docker.pkg.dev/deeplearning-images/reproducibility/jax-maxtext-gpu:jax0.5.1-cuda_dl25.02-rev1-maxtext-20150317  \
+    --set workload.run_name=$USER-llama-3-1-405b-maxtext-bf16 \
+    --set workload.gpus=256 \
+    --set queue=$KUEUE_NAME \
+    --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+    $USER-llama-3-1-405b-maxtext-bf16 \
     $REPO_ROOT/src/helm-charts/a4/maxtext-training
 ```
 
@@ -216,4 +233,5 @@ uninstall Helm, run the following command from your client:
 
 ```bash
 helm uninstall $USER-llama-3-1-405b-maxtext-fp8
+helm uninstall $USER-llama-3-1-405b-maxtext-bf16
 ```
