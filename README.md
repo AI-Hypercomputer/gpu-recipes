@@ -25,6 +25,7 @@ Models            | GPU Machine Type                                            
 **Llama-3.1-70B** | [A3 Mega (NVIDIA H100)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-mega-vms) | NeMo      | Pre-training  | GKE          | [Link](./training/a3mega/llama3-1-70b/nemo-pretraining-gke/README.md)
 **Mixtral-8-7B**  | [A3 Mega (NVIDIA H100)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-mega-vms) | NeMo      | Pre-training  | GKE          | [Link](./training/a3mega/mixtral-8x7b/nemo-pretraining-gke/README.md)
 
+
 ### Training benchmarks A3 Ultra
 
 Models             | GPU Machine Type                                                                                            | Framework | Workload Type | Orchestrator | Link to the recipe
@@ -59,6 +60,14 @@ Models             | GPU Machine Type                                           
 | **Llama-3.1-405B**     | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms)    | TensorRT-LLM  | Inference   | GKE          | [Link](./inference/a3ultra/llama-3.1-405b/trtllm-inference-gke/single-node/README.md)
 | **DeepSeek R1 671B**     | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms)    | SGLang  | Inference   | GKE          | [Link](./inference/a3ultra/deepseek-r1-671b/sglang-serving-gke/README.md)
 | **DeepSeek R1 671B**     | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms)    | vLLM  | Inference   | GKE          | [Link](./inference/a3ultra/deepseek-r1-671b/vllm-serving-gke/README.md)
+
+### Checkpointing benchmarks
+
+Models            | GPU Machine Type                                                                                          | Framework | Workload Type | Orchestrator | Link to the recipe
+----------------- | --------------------------------------------------------------------------------------------------------- | --------- | ------------- | ------------ | ------------------
+**Llama-3.1-70B** | [A3 Mega (NVIDIA H100)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-mega-vms) | NeMo      | Pre-training using Google Cloud Storage buckets for checkpoints  | GKE          | [Link](./training/a3mega/llama3-1-70b/nemo-pretraining-gke-gcs/README.md)
+**Llama-3.1-70B** | [A3 Mega (NVIDIA H100)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-mega-vms) | NeMo      | Pre-training using Google Cloud Parallelstore for checkpoints  | GKE          | [Link](./training/a3mega/llama3-1-70b/nemo-pretraining-gke-parallelstore/README.md)
+
 
 
 ## Repository structure

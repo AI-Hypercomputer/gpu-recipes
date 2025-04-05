@@ -1,0 +1,49 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+{{- $root := . -}}
+{{- range $ps := .Values.psVolumes }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: "{{ $ps.name }}-pv"
+spec:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: {{ default "12000Gi" $root.Values.capacity }}
+  persistentVolumeReclaimPolicy: Retain
+  volumeMode: Filesystem
+  storageClassName: parallelstore-storage
+  claimRef:
+    name: {{ $ps.name }}-pvc
+    namespace: {{ default "default" $ps.namespace }}
+  csi:
+    driver: parallelstore.csi.storage.gke.io
+    volumeHandle: "{{ $root.Values.projectID }}/{{ $root.Values.zone }}/{{ $root.Values.instanceName }}/default-pool/default-container:{{ randAlphaNum 4 | lower}}"
+    volumeAttributes:
+      accessPoints: {{ $root.Values.accessPoints | replace ";" "," }}
+      network: {{ $root.Values.network }}
+{{- if eq $ps.type "data" }}
+  mountOptions:
+  - eq-count=8
+  - thread-count=16
+  - read_ahead_kb=4096
+  - max_ratio=100
+{{- else if eq $ps.type "checkpoints" }}
+  mountOptions:
+  - disable-caching
+{{- end }}
+---
+{{- end }}

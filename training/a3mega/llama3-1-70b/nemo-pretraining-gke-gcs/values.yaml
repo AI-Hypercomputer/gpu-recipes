@@ -1,0 +1,56 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+queue:
+
+dwsSettings:
+  maxRunDurationSeconds:
+
+tasSettings:
+  topologyRequest:
+    kueue.x-k8s.io/podset-preferred-topology: "kubernetes.io/hostname"
+
+volumes:
+  gcsVolumes: true
+  gcsMounts:
+  - bucketName:
+    mountPath: "/job-logs"
+  - bucketName: cloud-samples-data
+    mountPath: "/artifacts"
+    mountOptions: "implicit-dirs"
+  pvcMounts:
+  - claimName: "gcs-data-pvc"
+    mountPath: "/data"
+  - claimName: "gcs-checkpoints-pvc"
+    mountPath: "/checkpoints"
+
+workload:
+  gpus: 256
+  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-nemo:ckpt-monitoring-patch
+  gcsSidecarImage: gcr.io/gke-release/gcs-fuse-csi-driver-sidecar-mounter@sha256:698fb0a9fe7c19adff792256a478963d1596faf4f7ceb8d516a5c85787c66606
+  torchDistributedTarget: "/opt/NeMo/examples/nlp/language_modeling/megatron_gpt_pretraining.py"
+  experimentName: "nemo-experiments-storage"
+  experimentRootDir: "/job-logs"
+  checkpointsRootDir: "/checkpoints"
+  tokenizerPath: "/artifacts/third-party/tokenizers/gpt2"
+  nemoConfigOverrides[]:
+  enableNemoDebug: false
+
+network:
+  daemonVersion: "us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/tcpgpudmarxd-dev:v1.0.13_1"
+  pluginVersion: "us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/nccl-plugin-gpudirecttcpx-dev:v1.0.7"
+
+  ncclSettings:
+  - name: NCCL_DEBUG
+    value: "VERSION"

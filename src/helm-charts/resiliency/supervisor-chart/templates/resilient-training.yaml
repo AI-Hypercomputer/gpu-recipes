@@ -1,0 +1,233 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+{{- $configMapName := printf "endpoint-config-%s" $.Release.Name }}
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Release.Name }}-actuator-service
+  namespace: {{ $.Release.Namespace }}
+spec:
+  selector:
+    app: {{ $.Release.Name }}-actuator
+  ports:
+    - protocol: TCP
+      port: {{ .Values.actuator.port }}
+      targetPort: {{ .Values.actuator.port }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Release.Name }}-sensor-service
+  namespace: {{ $.Release.Namespace }}
+spec:
+  selector:
+    app: {{ $.Release.Name }}-sensor
+  ports:
+    - protocol: TCP
+      port: {{ .Values.sensor.port }}
+      targetPort: {{ .Values.sensor.port }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Release.Name }}-controller-service
+  namespace: {{ $.Release.Namespace }}
+spec:
+  selector:
+    app: {{ $.Release.Name }}-controller
+  ports:
+    - protocol: TCP
+      port: {{ .Values.controller.port }}
+      targetPort: {{ .Values.controller.port }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Release.Name }}-actuator-deployment
+  namespace: {{ $.Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $.Release.Name }}-actuator
+  template:
+    metadata:
+      labels:
+        app: {{ $.Release.Name }}-actuator
+    spec:
+      serviceAccountName: supervisor-sa
+      containers:
+        - name: actuator
+          image: {{ $.Values.actuator.image }}
+          imagePullPolicy: Always
+          command:
+            - python3
+            - {{ $.Values.actuator.command }}
+          ports:
+            - containerPort: {{ .Values.actuator.port }}
+          env:
+            - name: PORT
+              value: "{{ .Values.actuator.port }}"
+          envFrom:
+            - configMapRef:
+                name: {{ $configMapName }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Release.Name }}-sensor-deployment
+  namespace: {{ $.Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $.Release.Name }}-sensor
+  template:
+    metadata:
+      labels:
+        app: {{ $.Release.Name }}-sensor
+    spec:
+      serviceAccountName: supervisor-sa
+      containers:
+        - name: sensor
+          image: {{ $.Values.sensor.image }}
+          imagePullPolicy: Always
+          command:
+            - python3
+            - {{ $.Values.sensor.command }}
+          ports:
+            - containerPort: {{ .Values.sensor.port }}
+          env:
+            - name: PORT
+              value: "{{ .Values.sensor.port }}"
+          envFrom:
+            - configMapRef:
+                name: {{ $configMapName }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Release.Name }}-controller-deployment
+  namespace: {{ $.Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $.Release.Name }}-controller
+  template:
+    metadata:
+      labels:
+        app: {{ $.Release.Name }}-controller
+    spec:
+      serviceAccountName: supervisor-sa
+      containers:
+        - name: controller
+          image: {{ $.Values.controller.image }}
+          imagePullPolicy: Always
+          command:
+            - python3
+            - {{ $.Values.controller.command }}
+          ports:
+            - containerPort: {{ .Values.controller.port }}
+          env:
+            - name: PORT
+              value: "{{ .Values.controller.port }}"
+          envFrom:
+            - configMapRef:
+                name: {{ $configMapName }}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ $.Release.Name }}-host-daemonset
+  namespace: {{ $.Release.Namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ $.Release.Name }}-host-daemonset
+  template:
+    metadata:
+      labels:
+        app: {{ $.Release.Name }}-host-daemonset
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      serviceAccountName: supervisor-sa
+      terminationGracePeriodSeconds: 3
+      hostPID: true
+      nodeSelector:
+        cloud.google.com/gke-gpu: "true"
+      tolerations:
+        - operator: "Exists"
+          key: nvidia.com/gpu
+        {{if eq .Values.useA3high "yes"}}
+        - operator: "Exists"
+          key: aiinfra/gpu-healthcheck
+        {{end}}
+      containers:
+      - name: host-daemon
+        image: {{ $.Values.host_daemon.image }}
+        command:
+          - "python3"
+          - {{ $.Values.host_daemon.command }}
+        imagePullPolicy: Always
+        securityContext:
+          privileged: true
+          capabilities:
+            add:
+              - SYS_ADMIN
+              - SYS_PTRACE
+              - IPC_LOCK
+        ports:
+          - containerPort: {{ .Values.host_daemon.port }}
+            hostPort: {{ .Values.host_daemon.port }}
+            protocol: TCP
+        envFrom:
+          - configMapRef:
+              name: {{ $configMapName }}
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+  updateStrategy:
+    type: RollingUpdate # Or OnDelete if you prefer
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $configMapName }}
+  namespace: {{ $.Release.Namespace }}
+data:
+  SENSOR_ADDRESS: "{{ $.Release.Name }}-sensor-service:{{ .Values.sensor.port }}"
+  ACTUATOR_ADDRESS: "{{ $.Release.Name }}-actuator-service:{{ .Values.actuator.port }}"
+  CONTROLLER_ADDRESS: "{{ $.Release.Name }}-controller-service:{{ .Values.controller.port }}"
+  HOST_DAEMON_PORT: "{{ .Values.host_daemon.port }}"
+  HEARTBEAT_POLLING_PERIOD_S: "{{ .Values.heartbeat_polling_period_s }}"
+  HEARTBEAT_TIMEOUT_S: "{{ .Values.heartbeat_timeout_s }}"
+  WORKERS_PER_HOST: "{{ .Values.workers_per_host }}"
+  JOB_NAMESPACE: "{{ .Values.job_namespace }}"
+  NUM_NODES_PER_DP: "{{ .Values.num_nodes_per_dp }}"
+  NUM_DP_REPLICAS: "{{ .Values.num_dp_replicas }}"
+  PROJECT: "{{ .Values.project }}"
+  POD_TERMINATION_THRESHOLD_S: "{{ .Values.pod_termination_threshold_s }}"
+  JOBSET_DOWNTIME_THRESHOLD_S: "{{ .Values.jobset_downtime_threshold_s }}"
+  REPLICATED_JOB_NAME: "{{ .Values.replicated_job_name }}"
+  WORKLOAD_CONTAINER_NAME: "{{ .Values.workload_container_name }}"
+  ENABLE_FAULT_INJECTION: "{{ .Values.enable_fault_injection }}"
+  FAULT_INJECTION_PERIOD_S: "{{ .Values.fault_injection_period_s }}"
+  GLOG_logtostderr: "{{ .Values.log_to_stderr }}"
+  GLOG_v: "{{ .Values.verbosity }}"

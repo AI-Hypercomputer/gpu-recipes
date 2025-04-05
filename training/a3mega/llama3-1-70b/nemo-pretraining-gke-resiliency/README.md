@@ -1,0 +1,286 @@
+# Pretrain Llama-3.1-70B workloads on A3 Mega GKE Node pools using the Google Cloud Resiliency library.
+
+This recipe outlines the steps for running a Llama-3.1-70B pretraining workload on
+[A3 Mega GKE Node pools](https://cloud.google.com/kubernetes-engine) by using the
+[NVIDIA NeMo framework](https://github.com/NVIDIA/nemo). The recipe uses the Google Cloud Resiliency library to maximize Goodput of a training job.
+
+
+## Orchestration and deployment tools
+
+For this recipe, the following setup is used:
+
+- Orchestration - [Google Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine),
+- Job configuration and deployment - a Helm chart is used to configure and deploy the
+  [Kubernetes JobSet](https://github.com/kubernetes-sigs/jobset).
+  This JobsSet resource encapsulates a NVIDIA NeMo 2.0 Megatron GPT pretraining workload
+  with built-in checkpointing optimizations provided by the Google Cloud Resiliency library.
+- Job resilience - The Google Cloud Resiliency library supervises the cluster and the workloads running on it, performing mitigation actions in case of failures.
+
+## Test environment
+
+This recipe has been tested on the following environment configuration:
+
+- A GKE cluster with the following configuration:
+  - GKE version: 1.32.2-gke.1475000 or later,
+  - A GPU node pool with 16  [a3-megagpu-8g](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-mega-vms) machines using a [compact placement policy](https://cloud.google.com/kubernetes-engine/docs/how-to/compact-placement),
+  - A CPU node pool with 2 e2-standard-8 machines,
+  - Workload Identity Federation for GKE enabled cluster,
+  - Cloud Storage FUSE CSI driver enabled,
+  - DCGM metrics enabled,
+  - Kueue and JobSet APIs are installed.
+- A Google Cloud Storage bucket with [hierarchical namespace](https://cloud.google.com/storage/docs/hns-overview) is used for checkpoints and logs. The bucket must be in the same region as the GKE cluster
+- A client workstation with the following pre-installed:
+   - Google Cloud SDK,
+   - Helm,
+   - kubectl.
+
+To prepare the required environment, see
+[GKE environment setup guide](../../../../docs/configuring-environment-gke-a3-mega.md).
+
+### Add a CPU node pool to the GKE cluster
+
+The Cluster Toolkit blueprint used in the [GKE environment setup guide](../../../../docs/configuring-environment-gke-a3-mega.md) doesn't create a dedicated CPU node pool required by this recipe to host Google PyTorch Resilience library components. To create the node pool execute the following command after the cluster is ready.
+
+```
+gcloud container node-pools create supervisor-cpu-pool \
+--cluster <CLUSTER_NAME> \
+--location <CLUSTER_REGION> \
+--machine-type e2-standard-8 \
+--num-nodes 2 \
+--node-locations <ZONE>
+```
+
+Replace the following:
+- `CLUSTER_NAME`: the name of your GKE cluster
+- `CLUSTER_REGION`: the region where you cluster is located
+- `ZONE`: the zone where your cluster's A3 Mega node pool is located. It is recommended that the CPU node pool is in the same zone as the A3 Mega node pool
+
+
+## Training dataset
+
+The recipe uses a mock pretraining dataset provided by the NeMo framework.
+
+
+## Run the recipe
+
+It's recommended to use Cloud Shell as your client to complete the steps.
+Cloud Shell comes pre-installed with the necessary utilities, including
+`kubectl`, `the Google Cloud SDK`, and `Helm`.
+
+### Launch Cloud Shell
+
+In the Google Cloud console, start a [Cloud Shell Instance](https://console.cloud.google.com/?cloudshell=true).
+
+### Configure environment settings
+
+From your client, complete the following steps:
+
+1. Set the environment variables to match your environment:
+
+  ```bash
+  export PROJECT_ID=<PROJECT_ID>
+  export REGION=<CLUSTER_REGION>
+  export CLUSTER_REGION=<CLUSTER_REGION>
+  export CLUSTER_NAME=<CLUSTER_NAME>
+  export GCS_BUCKET=<GCS_BUCKET>
+  ```
+  Replace the following values:
+
+  - `<PROJECT_ID>`: your Google Cloud project ID
+  - `<REGION>`: The region where you want to run the Cloud Build
+  - `<CLUSTER_REGION>`: the region where your cluster is located
+  - `<CLUSTER_NAME>`: the name of your GKE cluster
+  - `<GCS_BUCKET>`: the name of your Cloud Storage bucket with hierarchical namespace enabled. Don't include the `gs://` prefix
+
+2. Set the default project:
+
+  ```bash
+  gcloud config set project $PROJECT_ID
+  ```
+
+### Get the recipe
+
+From your client, clone the `gpu-recipes` repository and set a reference to the recipe folder.
+
+```
+git clone https://github.com/ai-hypercomputer/gpu-recipes.git
+cd gpu-recipes
+export REPO_ROOT=`git rev-parse --show-toplevel`
+export RECIPE_ROOT=$REPO_ROOT/training/a3mega/llama3-1-70b/nemo-pretraining-gke-resiliency
+```
+
+### Get cluster credentials
+
+From your client, get the credentials for your cluster.
+
+```
+gcloud container clusters get-credentials $CLUSTER_NAME --region $CLUSTER_REGION
+```
+
+### Deploy supervisor components from the Google Cloud Resiliency library.
+
+
+In this section, you'll deploy the supervisor components from the Google Cloud Resiliency library into your GKE cluster. The supervisor comprises two primary components: the Supervisor itself and Host Monitors.
+
+The Supervisor is deployed as a set of three [Kubernetes Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/): the Actuator, the Sensor, and the Controller. They're deployed to the CPU node pool of your cluster.
+
+The Host Monitor is deployed as a [Kubernetes DaemonSet](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/). A Host Monitor Pod is deployed to each A3 Mega node in the A3 Mega node pool of your cluster.
+
+
+#### Create Supervisor Service Account and Role
+
+Run the following command to create a GKE service account and role for the Supervisor.
+
+```
+cd $RECIPE_ROOT
+kubectl apply -f ksa-setup.yaml
+```
+
+To verify that the account was created successfully execute the following command:
+
+```
+kubectl get clusterroles | grep supervisor
+```
+
+If the output isn't empty, the cluster role was successfully created.
+
+
+#### Deploy the Supervisor and the Host Monitor
+
+```
+cd $RECIPE_ROOT
+helm install -f values-supervisor.yaml \
+  $USER-supervisor \
+  $REPO_ROOT/src/helm-charts/resiliency/supervisor-chart
+```
+
+To verify that the Supervisor has been deployed successfully, execute the following command:
+
+```
+kubectl get deployments
+```
+
+You should see an output similar to the following:
+
+```
+NAME                                      READY   UP-TO-DATE   AVAILABLE   AGE
+user-supervisor-actuator-deployment     1/1     1            0           4m36s
+user-supervisor-controller-deployment   1/1     1            0           4m36s
+user-supervisor-sensor-deployment       1/1     1            0           4m36s
+```
+
+The Supervisor is ready when all Deployments are in the Ready state.
+
+To verify that the Host Monitors have been deployed successfully, execute the following command:
+
+```
+kubectl get daemonsets
+```
+
+You should see an output similar to the following
+
+```
+NAME                               DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR                   AGE
+user-supervisor-host-daemonset   16        16        16      16           16          cloud.google.com/gke-gpu=true   8m1s
+```
+
+The Host Monitor is ready when the number of `READY` pods is equal to the number of nodes in your cluster's A3 Mega node pool.
+
+
+### Create Persistent Volumes and Persistent Volume Claims
+
+The JobSet, orchestrating a training job, accesses a GCS checkpoints and logs bucket through the [the Cloud Storage FUSE CSI driver](https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/cloud-storage-fuse-csi-driver) configured using a Kubernetes Persistent Volume (PV) and Persistent Volume Claim (PVC). You must generate a PV and a PVC for the bucket using the [gcs-fuse helper Helm chart](../../../../src/helm-charts/storage/gcs-fuse). The chart configures the FUSE driver settings following best practices for optimizing access to a bucket that manages checkpoints.
+
+```
+helm install -f values-gcs.yaml \
+--set gcsVolumes[0].bucketName=${GCS_BUCKET} \
+$USER-gcs-pv-pvc \
+$REPO_ROOT/src/helm-charts/storage/gcs-fuse
+```
+
+### Configure and submit a training job
+
+By default the training job will run 500 steps and generate a checkpoint every 25 steps.
+To execute the job with the default settings, run the following command from your client:
+
+```bash
+cd $RECIPE_ROOT
+helm install -f values.yaml \
+  $USER-rt \
+  $REPO_ROOT/src/helm-charts/a3mega/nemo-training-resiliency
+```
+
+
+#### Monitor the training job
+
+To check the status of pods in the indexed job, run the following command from your client:
+
+```
+kubectl get pods | grep $USER-llama3-1-70b-resilient-training
+```
+
+To get the logs for one of the pods, run the following command from your client:
+
+```
+kubectl logs "<pod_name>"
+```
+
+#### Goodput Analysis for the job
+
+This section explains how to perform the goodput analysis of the training job. We provide a tool called [resiliency-metrics](../../../../src/utils/resiliency_metrics/)
+to help analyze the training job and provide the Goodput Percentage of the training. This tool will provide the following metrics:
+
+- *Total Events*: Total events during the training session
+- *Job Started Count*: Number of times the job have started
+- *Checkpoints Loafed*: Number of times checkpoints have been loaded
+- *Checkpoints Saved*: Number of times a checkpoint have been saved
+- *Total Runtime (hours)*: Total number of hours of the job
+- *Min Loaded Step*: The minim step used to load a checkpoint
+- *Max Saved Step*: The maximum step on which a checkpoint was saved
+- *Step Difference*: Progress made in number of steps
+- *Effective Computation Time (hours)*: Amount of time effectively running the training job
+- *Goodput Percentage*: Percentage of the total time that the job was making progress
+
+To run the analysis:
+
+1. Create virtual environment and install the required libraries:
+```bash
+cd $REPO_ROOT/src/utils/resiliency_metrics
+python3 -m venv venv
+source venv/bin/activate
+python3 -m pip install --upgrade pip
+pip3 install -r requirements.txt
+```
+2. Run the [`calculator.py`](../../../../src/utils/resiliency_metrics/calculator.py)
+   script, specifying the <JOB_NAME>
+
+```bash
+python3 calculator.py --job-name <JOB_NAME> \
+  --export mymetrics.json \
+  --gcloud-logging-lookback-days 1 \
+  --verbose \
+  --reference-step-time=8
+```
+
+To get the <JOB_NAME> you can run:
+```
+kubectl get jobsets
+```
+
+
+### Remove the training job
+
+To delete the training job execute the following command:
+
+```bash
+helm uninstall $USER-rt
+```
+
+#### Uninstall the Supervisor and the Host Monitors
+
+To remove the Supervisor and the Host Monitors, execute the following command:
+
+```bash
+helm uninstall $USER-supervisor
+```
+

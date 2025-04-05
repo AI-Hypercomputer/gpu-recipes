@@ -1,0 +1,43 @@
+images:
+  network_rx_daemon: us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/tcpgpudmarxd-dev:v1.0.13
+  nccl_plugin_installer: us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/nccl-plugin-gpudirecttcpx-dev:v1.0.7
+  watchdog: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250402
+  megatron: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250402
+
+infrastructure:
+  gpu_gen: a3m
+  num_nodes: 16
+  gpus_per_node: 8
+  max_restarts: 20
+  replicas: 1
+  enable_gcsfuse: true
+  pvc: gcs-checkpoints-pvc
+  nodepool: a3-megagpu-8g-a3megagpupool
+  use_supervisor: true
+  host_daemon_port: 60010
+  enable_high_scale_ckpt: false
+
+workload:
+  job_name_include_date: true
+  model_size: 70B
+  master_port: 6002
+  log_dir_prefix: /gcs/nemo-experiments
+  ft_param_initial_rank_heartbeat_timeout: 600
+  ft_param_rank_heartbeat_timeout: 120
+  flags: |
+    --model=${MODEL_SIZE} \
+    --num-nodes=${NNODES} \
+    --tokenizer-path tokenizer.model \
+    --max-runtime 86400 \
+    --log-dir=${LOG_DIR_PREFIX} \
+    --job-name=${JOB_IDENTIFIER} \
+    --max-steps=500
+    --topk-ckpt=-1 \
+    --checkpoint-interval=25 \
+    --ckpt-threads-per-rank=2 \
+    --enable_dist_ckpt \
+    --enable_comm_overlap \
+    --enable_gc \
+    --enable_async_ckpt \
+    --enable-fault-tolerance \
+    --enable_optimized_async_ckpt
