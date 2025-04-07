@@ -88,5 +88,3 @@ If you have any questions or if you found any problems with this repository, ple
 ## Disclaimer
 
 This is not an officially supported Google product. The code in this repository is for demonstrative purposes only.
-
-

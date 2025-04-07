@@ -49,24 +49,11 @@ spec:
             - path: /dev/nvidia-uvm
             - path: /dev/dmabuf_import_helper
           networking.gke.io/default-interface: "eth0"
-          networking.gke.io/interfaces: |
-          {{- if $root.Values.network.subnetworks }}
-            [
-              {{- range $i, $subnetwork := $root.Values.network.subnetworks }}
-              {"interfaceName":"eth{{ $i }}","network":"{{ $subnetwork }}"}{{ eq $i 8 | ternary "" ","}}
-              {{- end }}
-            ]
-          {{- else }}
-            [
-              {"interfaceName":"eth0","network":"default"},
-              {{- range  $i := until 8 }}
-              {"interfaceName":"eth{{ add 1 $i }}","network":"{{ $root.Values.clusterName }}-gpunet-{{ $i }}-subnet"}{{ eq $i 7 | ternary "" ","}}
-              {{- end }}
-            ]
-          {{- end}}
       spec:
         subdomain: "{{.Release.Name}}"
         restartPolicy: Always
+        hostNetwork: true
+        dnsPolicy: ClusterFirstWithHostNet
         {{ if $root.Values.targetNodes }}
         affinity:
           nodeAffinity:
@@ -375,24 +362,11 @@ spec:
             - path: /dev/nvidia-uvm
             - path: /dev/dmabuf_import_helper
           networking.gke.io/default-interface: "eth0"
-          networking.gke.io/interfaces: |
-          {{- if $root.Values.network.subnetworks }}
-            [
-              {{- range $i, $subnetwork := $root.Values.network.subnetworks }}
-              {"interfaceName":"eth{{ $i }}","network":"{{ $subnetwork }}"}{{ eq $i 8 | ternary "" ","}}
-              {{- end }}
-            ]
-          {{- else }}
-            [
-              {"interfaceName":"eth0","network":"default"},
-              {{- range  $i := until 8 }}
-              {"interfaceName":"eth{{ add 1 $i }}","network":"{{ $root.Values.clusterName }}-gpunet-{{ $i }}-subnet"}{{ eq $i 7 | ternary "" ","}}
-              {{- end }}
-            ]
-          {{- end}}
       spec:
         subdomain: "{{.Release.Name}}"
         restartPolicy: Always
+        hostNetwork: true
+        dnsPolicy: ClusterFirstWithHostNet
         {{ if $root.Values.targetNodes }}
         affinity:
           nodeAffinity:

@@ -1,0 +1,330 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+{{ $nodes := div .Values.job.gpus 8 | max 1 }}
+{{ $gpusPerNode := min .Values.job.gpus 8 }}
+
+{{- $root := . -}}
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: {{ .Release.Name }}-serving
+  labels:
+    app: {{ .Release.Name }}-serving
+spec:
+  replicas: {{ $nodes }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-serving
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-serving
+      annotations:
+        kubectl.kubernetes.io/default-container: serving
+
+        gke-gcsfuse/volumes: "true"
+        gke-gcsfuse/cpu-limit: "0"
+        gke-gcsfuse/memory-limit: "0"
+        gke-gcsfuse/ephemeral-storage-limit: "0"
+        devices.gke.io/container.tcpxo-daemon: |+
+          - path: /dev/nvidia0
+          - path: /dev/nvidia1
+          - path: /dev/nvidia2
+          - path: /dev/nvidia3
+          - path: /dev/nvidia4
+          - path: /dev/nvidia5
+          - path: /dev/nvidia6
+          - path: /dev/nvidia7
+          - path: /dev/nvidiactl
+          - path: /dev/nvidia-uvm
+          - path: /dev/dmabuf_import_helper
+        networking.gke.io/default-interface: "eth0"
+    spec:
+      restartPolicy: Always
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      subdomain: "{{.Release.Name}}"
+      {{ if $root.Values.targetNodes }}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                {{- range $hostname := $root.Values.targetNodes }}
+                - {{ $hostname }}
+                {{- end }}
+      {{ end }}
+
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+      - key: cloud.google.com/impending-node-termination
+        operator: Exists
+      volumes:
+      - name: nvidia-dir-host
+        hostPath:
+          path: /home/kubernetes/bin/nvidia
+      {{- if not $root.Values.gpuPlatformSettings.useHostPlugin }}
+      - name: nccl-plugin-volume
+        emptyDir: {}
+      {{- end }}
+      - name: sys
+        hostPath:
+          path: /sys
+      - name: proc-sys
+        hostPath:
+          path: /proc/sys
+      - name: aperture-devices
+        hostPath:
+          path: /dev/aperture_devices
+      - name: workload-terminated-volume
+        emptyDir: {}
+      - name: local-ssd
+        hostPath:
+          path: /mnt/stateful_partition/kube-ephemeral-ssd
+      - name: shared-memory
+        emptyDir:
+          medium: "Memory"
+          sizeLimit: 250Gi
+
+      {{- range $gcs := $root.Values.volumes.gcsMounts }}
+      - name: "{{ $gcs.bucketName }}"
+        csi:
+          driver: gcsfuse.csi.storage.gke.io
+          volumeAttributes:
+            bucketName: "{{ $gcs.bucketName }}"
+      {{- end}}
+
+      initContainers:
+      {{- if not $root.Values.gpuPlatformSettings.useHostPlugin }}
+      - name: nccl-plugin-installer
+        image: "{{ $root.Values.gpuPlatformSettings.ncclPluginImage }}"
+        imagePullPolicy: Always
+        volumeMounts:
+          - name: nccl-plugin-volume
+            mountPath: /usr/local/nccl-plugin
+        env:
+        - name: BUILD_TYPE
+          value: "{{ $root.Values.gpuPlatformSettings.ncclBuildType }}"
+        command:
+        - bash
+        - -c
+        - |
+          set -ex
+          chmod 755 /scripts/container_entry.sh
+          /scripts/container_entry.sh install --install-nccl --nccl-buildtype ${BUILD_TYPE}
+          cp -r /var/lib/tcpxo/* /usr/local/nccl-plugin/
+
+      {{- end }}
+
+      - name: tcpxo-daemon
+        image: {{ $root.Values.gpuPlatformSettings.rxdmImage }}
+        imagePullPolicy: Always
+        securityContext:
+          capabilities:
+            add:
+              - NET_ADMIN
+              - NET_BIND_SERVICE
+        restartPolicy: Always
+        volumeMounts:
+        - name: nvidia-dir-host
+          mountPath: /usr/local/nvidia
+        - name: sys
+          mountPath: /hostsysfs
+        - name: proc-sys
+          mountPath: /hostprocsysfs
+        env:
+        - name: LD_LIBRARY_PATH
+          value: /usr/local/nvidia/lib64
+        command:
+        - bash
+        - -c
+        - |
+          cleanup() {
+            echo "Received SIGTERM, exiting RxDM"
+            if [ -n "$child_pid" ]; then
+              echo "Sending SIGTERM to child process"
+              kill -TERM "$child_pid"
+            fi
+            exit 0
+          }
+          trap cleanup SIGTERM
+
+          chmod 755 /fts/entrypoint_rxdm_container.sh
+          /fts/entrypoint_rxdm_container.sh --num_hops=2 --num_nics=8  --uid= --alsologtostderr & child_pid=$!
+
+          wait "$child_pid"
+
+      containers:
+        - name: serving
+          image: {{ $root.Values.job.image.repository }}:{{ $root.Values.job.image.tag }}
+          securityContext:
+            privileged: true
+          resources:
+            requests:
+              nvidia.com/gpu: {{ $gpusPerNode }}
+            limits:
+              nvidia.com/gpu: {{ $gpusPerNode }}
+          env:
+            - name: JOB_ORCHESTRATOR
+              value: "gke"
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ $root.Values.huggingface.secretName }}"
+                  key: "{{ $root.Values.huggingface.secretData.token }}"
+            - name: HF_HUB_ENABLE_HF_TRANSFER
+              value: "1"
+            - name: TORCH_DISTRIBUTED_DEBUG
+              value: "INFO"
+            - name: GLOO_SOCKET_IFNAME
+              value: "eth0"
+            {{- if  $root.Values.gpuPlatformSettings.useHostPlugin }}
+            - name: LD_LIBRARY_PATH
+              value: /usr/local/nvidia/lib64
+            - name: NCCL_LIB_DIR
+              value: /usr/local/nvidia/lib64
+            {{- else }}
+            - name: LD_LIBRARY_PATH
+              value: /usr/local/nccl-plugin/lib64:/usr/local/nvidia/lib64
+            - name: NCCL_LIB_DIR
+              value: /usr/local/nccl-plugin/lib64
+            {{- end }}
+            - name: NCCL_FASTRAK_LLCM_DEVICE_DIRECTORY
+              value: /dev/aperture_devices
+
+            # NCCL settings from A3Mega configuration
+            - name: NCCL_FASTRAK_CTRL_DEV
+              value: "eth0"
+            - name: NCCL_SOCKET_IFNAME
+              value: "eth0"
+            - name: NCCL_CROSS_NIC
+              value: "0"
+            - name: NCCL_ALGO
+              value: "Ring,Tree"
+            - name: NCCL_PROTO
+              value: "Simple"
+            - name: NCCL_MIN_NCHANNELS
+              value: "4"
+            - name: NCCL_DYNAMIC_CHUNK_SIZE
+              value: "524288"
+            - name: NCCL_P2P_NET_CHUNKSIZE
+              value: "524288"
+            - name: NCCL_P2P_PCI_CHUNKSIZE
+              value: "524288"
+            - name: NCCL_P2P_NVL_CHUNKSIZE
+              value: "1048576"
+            - name: NCCL_FASTRAK_NUM_FLOWS
+              value: "2"
+            - name: NCCL_BUFFSIZE
+              value: "8388608"
+            - name: NCCL_NET_GDR_LEVEL
+              value: "PIX"
+            - name: NCCL_DEBUG_SUBSYS
+              value: "INIT,GRAPH,ENV,TUNING,NET"
+            - name: NCCL_FASTRAK_ENABLE_HOTPATH_LOGGING
+              value: "0"
+            - name: NCCL_FASTRAK_USE_SNAP
+              value: "1"
+            - name: NCCL_FASTRAK_ENABLE_CONTROL_CHANNEL
+              value: "0"
+            - name: NCCL_FASTRAK_USE_LLCM
+              value: "1"
+            - name: NCCL_TUNER_PLUGIN
+              value: "libnccl-tuner.so"
+            - name: NCCL_TUNER_CONFIG_PATH
+              value: "/usr/local/nccl-plugin/lib64/a3plus_tuner_config.textproto"
+            - name: NCCL_SHIMNET_GUEST_CONFIG_CHECKER_CONFIG_FILE
+              value: "/usr/local/nccl-plugin/lib64/a3plus_guest_config.textproto"
+            - name: NCCL_NVLS_ENABLE
+              value: "0"
+            - name: NCCL_FASTRAK_PLUGIN_ACCEPT_TIMEOUT_MS
+              value: "600000"
+            - name: CUDA_VISIBLE_DEVICES
+              value: "0,1,2,3,4,5,6,7"
+            - name: NCCL_FASTRAK_IFNAME
+              value: "eth1,eth2,eth3,eth4,eth5,eth6,eth7,eth8"
+
+            # The following is needed to prevent send-receive stalling execution
+            - name: NVTE_FWD_LAYERNORM_SM_MARGIN
+              value: "8"
+            - name: NVTE_BWD_LAYERNORM_SM_MARGIN
+              value: "8"
+
+            # NCCL settings
+            - name: NCCL_P2P_PXN_LEVEL
+              value: "0"
+
+            {{- range $environment_variable := $root.Values.network.ncclSettings }}
+            - name: {{ $environment_variable.name }}
+              value: "{{ $environment_variable.value }}"
+            {{- end }}
+
+          command:
+          - bash
+          - -c
+          - |
+            # Launch the server
+
+            vllm serve {{ $root.Values.model.name }} \
+              --tokenizer {{ $root.Values.model.name }} \
+              --trust-remote-code \
+              --tensor-parallel-size {{ $root.Values.model.tp_size }} \
+              --pipeline-parallel-size {{ $root.Values.model.pp_size }}{{- if $root.Values.vllm.serverArgs }} \ {{- end }}
+            {{- if $root.Values.vllm.serverArgs }}
+              {{- $first := true }}
+              {{- range $key, $value := $root.Values.vllm.serverArgs }}
+                {{- if not $first }} \ {{- end }}
+                {{- $first = false }}
+              {{- if kindIs "bool" $value }}
+              --{{ $key }}{{ if not $value }}=False{{ end }}
+              {{- else }}
+              --{{ $key }} {{ $value }}
+              {{- end }}
+              {{- end }}
+            {{- end }}
+
+          ports:
+            - containerPort: {{ $root.Values.vllm.service.ports.http }}
+
+          volumeMounts:
+          - name: nvidia-dir-host
+            mountPath: /usr/local/nvidia
+          - name: aperture-devices
+            mountPath: /dev/aperture_devices
+          {{- if not $root.Values.gpuPlatformSettings.useHostPlugin }}
+          - name: nccl-plugin-volume
+            mountPath: /usr/local/nccl-plugin
+          {{- end }}
+          - name: sys
+            mountPath: /hostsysfs
+          - name: proc-sys
+            mountPath: /hostprocsysfs
+          - name: workload-terminated-volume
+            mountPath: /semaphore
+          - name: shared-memory
+            mountPath: /dev/shm
+          - name: local-ssd
+            mountPath: "{{ $root.Values.volumes.ssdMountPath }}"
+
+          {{- range $gcs := $root.Values.volumes.gcsMounts }}
+          - name: "{{ $gcs.bucketName }}"
+            mountPath: "{{ $gcs.mountPath }}"
+          {{- end }}

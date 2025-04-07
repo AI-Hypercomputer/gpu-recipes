@@ -182,7 +182,7 @@ The recipe uses the helm chart to run the above steps.
     --set job.image.tag=${VLLM_VERSION} \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     $USER-serving-deepseek-r1-model \
-    $REPO_ROOT/src/helm-charts/a3mega/vllm-inference
+    $REPO_ROOT/src/helm-charts/a3mega/vllm-inference/multi-host
     ```
 
 4. To view the logs for the service, you can run
