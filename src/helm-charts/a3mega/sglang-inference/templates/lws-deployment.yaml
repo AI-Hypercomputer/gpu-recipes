@@ -297,23 +297,32 @@ spec:
             - |
               # Launch the server
               echo "Pod on $(hostname --fqdn) is running"
+
               GLOO_SOCKET_IFNAME=eth0 python3 -m sglang.launch_server \
-                --model-path {{ .Values.model.name }} \
-                --tp {{ .Values.model.tp_size }} \
+                --model-path {{ $root.Values.model.name }} \
+                --tp {{ $root.Values.model.tp_size }} \
                 --dist-init-addr ${LWS_LEADER_ADDRESS}:6002 \
                 --nnodes ${LWS_GROUP_SIZE} \
                 --node-rank ${LWS_WORKER_INDEX} \
-                --trust-remote-code \
-                --enable-torch-compile \
-                --quantization fp8 \
-                --kv-cache-dtype fp8_e5m2 \
-                --disable-cuda-graph
+                --trust-remote-code{{- if $root.Values.sglang.serverArgs }} \ {{- end }}
+              {{- if $root.Values.sglang.serverArgs }}
+                {{- $first := true }}
+                {{- range $key, $value := $root.Values.sglang.serverArgs }}
+                  {{- if not $first }} \ {{- end }}
+                  {{- $first = false }}
+                {{- if kindIs "bool" $value }}
+                --{{ $key }}{{ if not $value }} false{{ end }}
+                {{- else }}
+                --{{ $key }} {{ $value }}
+                {{- end }}
+                {{- end }}
+              {{- end }}
 
             ports:
-              - containerPort: {{ .Values.sglang.service.ports.http }}
+              - containerPort: {{ $root.Values.sglang.service.ports.http }}
             readinessProbe:
               tcpSocket:
-                port: {{ .Values.sglang.service.ports.http }}
+                port: {{ $root.Values.sglang.service.ports.http }}
               initialDelaySeconds: 15
               periodSeconds: 10
 
@@ -622,11 +631,19 @@ spec:
                 --dist-init-addr ${LWS_LEADER_ADDRESS}:6002 \
                 --nnodes ${LWS_GROUP_SIZE} \
                 --node-rank ${LWS_WORKER_INDEX} \
-                --trust-remote-code \
-                --enable-torch-compile \
-                --quantization fp8 \
-                --kv-cache-dtype fp8_e5m2 \
-                --disable-cuda-graph
+                --trust-remote-code{{- if .Values.sglang.serverArgs }} \ {{- end }}
+              {{- if .Values.sglang.serverArgs }}
+                {{- $first := true }}
+                {{- range $key, $value := .Values.sglang.serverArgs }}
+                  {{- if not $first }} \ {{- end }}
+                  {{- $first = false }}
+                {{- if kindIs "bool" $value }}
+                --{{ $key }}{{ if not $value }} false{{ end }}
+                {{- else }}
+                --{{ $key }} {{ $value }}
+                {{- end }}
+                {{- end }}
+              {{- end }}
 
             volumeMounts:
             - name: nvidia-dir-host

@@ -36,7 +36,7 @@ spec:
       annotations:
         kubectl.kubernetes.io/default-container: serving
 
-        {{- if .Values.volumes.gcsMounts }}
+        {{- if $root.Values.volumes.gcsMounts }}
         gke-gcsfuse/volumes: "true"
         gke-gcsfuse/cpu-limit: "0"
         gke-gcsfuse/memory-limit: "0"
@@ -88,7 +88,7 @@ spec:
         - name: local-ssd
           hostPath:
             path: /mnt/stateful_partition/kube-ephemeral-ssd
-        {{- range $gcs := .Values.volumes.gcsMounts }}
+        {{- range $gcs := $root.Values.volumes.gcsMounts }}
         - name: "{{ $gcs.bucketName }}"
           csi:
             driver: gcsfuse.csi.storage.gke.io
@@ -98,7 +98,7 @@ spec:
 
       containers:
       - name: serving
-        image: "{{ .Values.job.image.repository }}:{{ .Values.job.image.tag }}"
+        image: "{{ $root.Values.job.image.repository }}:{{ $root.Values.job.image.tag }}"
         imagePullPolicy: Always
         securityContext:
           privileged: true
@@ -112,8 +112,8 @@ spec:
           - name: HF_TOKEN
             valueFrom:
               secretKeyRef:
-                name: "{{ .Values.huggingface.secretName }}"
-                key: "{{ .Values.huggingface.secretData.token }}"
+                name: "{{ $root.Values.huggingface.secretName }}"
+                key: "{{ $root.Values.huggingface.secretData.token }}"
 
           # Enable faster downloads of model weights from HuggingFace
           - name: HF_HUB_ENABLE_HF_TRANSFER
@@ -124,7 +124,7 @@ spec:
             value: "INFO"
           # Workload specific environment variables
           - name: MODEL_DOWNLOAD_DIR
-            value: "/ssd/{{ .Values.model.name }}"
+            value: "/ssd/{{ $root.Values.model.name }}"
 
           {{- range $gcs := $root.Values.volumes.gcsMounts }}
           - name: GCS_FUSE_BUCKET
@@ -137,27 +137,27 @@ spec:
           - |
             #!/bin/bash
 
-            mkdir -p /gcs/benchmark_logs/sglang_benchmarks
-
             # Set recommended NCCL environment variables
             source /usr/local/gib/scripts/set_nccl_env.sh
 
-            # List contents in LD_LIBRARY_PATH
-            echo "Contents of ${LD_LIBRARY_PATH}:"
-            for path in ${LD_LIBRARY_PATH//:/ }; do
-              echo "Files in $path:"
-              ls -l "$path"
-            done
-
-            # Fix symbolic links - remove libnccl-net.so
-            mv /usr/local/nvidia/lib64/libnccl-net.so /usr/local/nvidia/lib64/libnccl-net.so.1
-            ln -sf /usr/local/nvidia/lib64/libnccl-net.so /usr/local/nvidia/lib64/libnccl-net.so.1
-
-            # Update shared library cache, links
-            ldconfig
-
             # Launch the server
-            python3 -m sglang.launch_server --model {{ .Values.model.name }} --tp {{ .Values.model.tp_size }} --trust-remote-code --enable-dp-attention
+
+            python3 -m sglang.launch_server \
+              --model {{ $root.Values.model.name }} \
+              --tp {{ $root.Values.model.tp_size }} \
+              --trust-remote-code{{- if $root.Values.sglang.serverArgs }} \ {{- end }}
+            {{- if .$rootValues.sglang.serverArgs }}
+              {{- $first := true }}
+              {{- range $key, $value := $root.Values.sglang.serverArgs }}
+                {{- if not $first }} \ {{- end }}
+                {{- $first = false }}
+              {{- if kindIs "bool" $value }}
+              --{{ $key }}{{ if not $value }} false{{ end }}
+              {{- else }}
+              --{{ $key }} {{ $value }}
+              {{- end }}
+              {{- end }}
+            {{- end }}
 
         volumeMounts:
           - name: library-dir-host
@@ -167,8 +167,8 @@ spec:
           - name: shared-memory
             mountPath: /dev/shm
           - name: local-ssd
-            mountPath: {{ .Values.volumes.ssdMountPath }}
-          {{- range $gcs := .Values.volumes.gcsMounts }}
+            mountPath: {{ $root.Values.volumes.ssdMountPath }}
+          {{- range $gcs := $root.Values.volumes.gcsMounts }}
           - name: "{{ $gcs.bucketName }}"
             mountPath: "{{ $gcs.mountPath }}"
           {{- end }}

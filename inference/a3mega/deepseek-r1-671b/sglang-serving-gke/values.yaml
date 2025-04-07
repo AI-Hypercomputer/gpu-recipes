@@ -53,8 +53,12 @@ network:
 
 sglang:
   replicaCount: 1
-
   service:
     type: ClusterIP
     ports:
       http: 30000
+  serverArgs:
+    enable-torch-compile: True
+    quantization: fp8
+    kv-cache-dtype: fp8_e5m2
+    disable-cuda-graph: True

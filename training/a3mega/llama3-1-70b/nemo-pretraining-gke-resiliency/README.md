@@ -79,7 +79,6 @@ From your client, complete the following steps:
 
   ```bash
   export PROJECT_ID=<PROJECT_ID>
-  export REGION=<CLUSTER_REGION>
   export CLUSTER_REGION=<CLUSTER_REGION>
   export CLUSTER_NAME=<CLUSTER_NAME>
   export GCS_BUCKET=<GCS_BUCKET>
@@ -87,7 +86,6 @@ From your client, complete the following steps:
   Replace the following values:
 
   - `<PROJECT_ID>`: your Google Cloud project ID
-  - `<REGION>`: The region where you want to run the Cloud Build
   - `<CLUSTER_REGION>`: the region where your cluster is located
   - `<CLUSTER_NAME>`: the name of your GKE cluster
   - `<GCS_BUCKET>`: the name of your Cloud Storage bucket with hierarchical namespace enabled. Don't include the `gs://` prefix
@@ -216,7 +214,7 @@ helm install -f values.yaml \
 To check the status of pods in the indexed job, run the following command from your client:
 
 ```
-kubectl get pods | grep $USER-llama3-1-70b-resilient-training
+kubectl get pods | grep $USER-rt
 ```
 
 To get the logs for one of the pods, run the following command from your client:
@@ -227,19 +225,19 @@ kubectl logs "<pod_name>"
 
 #### Goodput Analysis for the job
 
-This section explains how to perform the goodput analysis of the training job. We provide a tool called [resiliency-metrics](../../../../src/utils/resiliency_metrics/)
-to help analyze the training job and provide the Goodput Percentage of the training. This tool will provide the following metrics:
+This section explains how to perform the goodput analysis of the training job. You can use the [resiliency-metrics](../../../../src/utils/resiliency_metrics/) tool
+to help analyze the training job and provide the Goodput Percentage of the training. The tool calculates the following metrics:
 
-- *Total Events*: Total events during the training session
-- *Job Started Count*: Number of times the job have started
-- *Checkpoints Loafed*: Number of times checkpoints have been loaded
-- *Checkpoints Saved*: Number of times a checkpoint have been saved
-- *Total Runtime (hours)*: Total number of hours of the job
-- *Min Loaded Step*: The minim step used to load a checkpoint
-- *Max Saved Step*: The maximum step on which a checkpoint was saved
-- *Step Difference*: Progress made in number of steps
-- *Effective Computation Time (hours)*: Amount of time effectively running the training job
-- *Goodput Percentage*: Percentage of the total time that the job was making progress
+- *Total Events*: the total events during the training session
+- *Job Started Count*: the number of times the job have started
+- *Checkpoints Loafed*: the number of times checkpoints have been loaded
+- *Checkpoints Saved*: the number of times a checkpoint have been saved
+- *Total Runtime (hours)*: the total number of hours of the job
+- *Min Loaded Step*: the minimum step used to load a checkpoint
+- *Max Saved Step*: the maximum step on which a checkpoint was saved
+- *Step Difference*: the progress made in number of steps
+- *Effective Computation Time (hours)*: the amount of time effectively running the training job
+- *Goodput Percentage*: the percentage of the total time that the job was making progress
 
 To run the analysis:
 

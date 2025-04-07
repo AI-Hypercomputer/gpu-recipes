@@ -42,3 +42,4 @@ vllm:
     type: ClusterIP
     ports:
       http: 8000
+  serverArgs:

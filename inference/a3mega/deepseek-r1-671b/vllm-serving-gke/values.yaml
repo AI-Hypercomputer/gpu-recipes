@@ -53,8 +53,12 @@ network:
 
 vllm:
   replicaCount: 1
-
   service:
     type: ClusterIP
     ports:
       http: 8000
+  serverArgs:
+    max-model-len: 32768
+    max-num-seqs: 128
+    gpu-memory-utilization: 0.85
+    disable-log-requests: True

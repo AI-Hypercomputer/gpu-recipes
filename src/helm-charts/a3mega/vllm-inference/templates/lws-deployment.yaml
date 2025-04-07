@@ -22,9 +22,9 @@ kind: LeaderWorkerSet
 metadata:
   name: {{ .Release.Name }}
 spec:
-  replicas: {{ .Values.vllm.replicaCount }}
+  replicas: {{ $root.Values.vllm.replicaCount }}
   leaderWorkerTemplate:
-    size: {{ div (mul .Values.model.tp_size .Values.model.pp_size) $gpusPerNode }}
+    size: {{ div (mul $root.Values.model.tp_size $root.Values.model.pp_size) $gpusPerNode }}
     restartPolicy: RecreateGroupOnPodRestart
     leaderTemplate:
       metadata:
@@ -183,7 +183,7 @@ spec:
 
         containers:
           - name: vllm-leader
-            image: {{ .Values.job.image.repository }}:{{ .Values.job.image.tag }}
+            image: {{ $root.Values.job.image.repository }}:{{ $root.Values.job.image.tag }}
             securityContext:
               privileged: true
               capabilities:
@@ -200,8 +200,8 @@ spec:
               - name: HF_TOKEN
                 valueFrom:
                   secretKeyRef:
-                    name: "{{ .Values.huggingface.secretName }}"
-                    key: "{{ .Values.huggingface.secretData.token }}"
+                    name: "{{ $root.Values.huggingface.secretName }}"
+                    key: "{{ $root.Values.huggingface.secretData.token }}"
               - name: LWS_WORKER_INDEX
                 valueFrom:
                   fieldRef:
@@ -301,21 +301,29 @@ spec:
               echo "Pod on $(hostname --fqdn) is running"
               /vllm-workspace/ray_init.sh leader --ray_cluster_size=${LWS_GROUP_SIZE}
 
-              vllm serve {{ .Values.model.name }} \
-                --tokenizer {{ .Values.model.name }} \
+              vllm serve {{ $root.Values.model.name }} \
+                --tokenizer {{ $root.Values.model.name }} \
                 --trust-remote-code \
-                --tensor-parallel-size {{ .Values.model.tp_size }} \
-                --pipeline-parallel-size {{ .Values.model.pp_size }} \
-                --max-model-len 32768 \
-                --max-num-seqs 128 \
-                --gpu-memory-utilization 0.85 \
-                --disable-log-requests
+                --tensor-parallel-size {{ $root.Values.model.tp_size }} \
+                --pipeline-parallel-size {{ $root.Values.model.pp_size }}{{- if $root.Values.vllm.serverArgs }} \ {{- end }}
+              {{- if $root.Values.vllm.serverArgs }}
+                {{- $first := true }}
+                {{- range $key, $value := $root.Values.vllm.serverArgs }}
+                  {{- if not $first }} \ {{- end }}
+                  {{- $first = false }}
+                {{- if kindIs "bool" $value }}
+                --{{ $key }}{{ if not $value }}=False{{ end }}
+                {{- else }}
+                --{{ $key }} {{ $value }}
+                {{- end }}
+                {{- end }}
+              {{- end }}
 
             ports:
-              - containerPort: {{ .Values.vllm.service.ports.http }}
+              - containerPort: {{ $root.Values.vllm.service.ports.http }}
             readinessProbe:
               tcpSocket:
-                port: {{ .Values.vllm.service.ports.http }}
+                port: {{ $root.Values.vllm.service.ports.http }}
               initialDelaySeconds: 15
               periodSeconds: 10
 
@@ -521,8 +529,8 @@ spec:
               - name: HF_TOKEN
                 valueFrom:
                   secretKeyRef:
-                    name: "{{ .Values.huggingface.secretName }}"
-                    key: "{{ .Values.huggingface.secretData.token }}"
+                    name: "{{ $root.Values.huggingface.secretName }}"
+                    key: "{{ $root.Values.huggingface.secretData.token }}"
               - name: LWS_WORKER_INDEX
                 valueFrom:
                   fieldRef:

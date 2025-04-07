@@ -42,3 +42,5 @@ sglang:
     type: ClusterIP
     ports:
       http: 30000
+  serverArgs:
+    enable-dp-attention: True
