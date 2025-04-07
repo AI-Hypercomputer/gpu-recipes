@@ -50,6 +50,7 @@ Models             | GPU Machine Type                                           
 
 | Models           | GPU Machine Type | Framework | Workload Type       | Orchestrator | Link to the recipe |
 | ---------------- | ---------------- | --------- | ------------------- | ------------ | ------------------ |
+| **Llama-4**      | [A3 Mega (NVIDIA H100)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-mega-vms)    | SGLang  | Inference   | GKE          | [Link](./inference/a3mega/llama-4/vllm-serving-gke/README.md)
 | **DeepSeek R1 671B**     | [A3 Mega (NVIDIA H100)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-mega-vms)    | SGLang  | Inference   | GKE          | [Link](./inference/a3mega/deepseek-r1-671b/sglang-serving-gke/README.md)
 | **DeepSeek R1 671B**     | [A3 Mega (NVIDIA H100)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-mega-vms)    | vLLM  | Inference   | GKE          | [Link](./inference/a3mega/deepseek-r1-671b/vllm-serving-gke/README.md)
 
@@ -57,6 +58,7 @@ Models             | GPU Machine Type                                           
 
 | Models           | GPU Machine Type | Framework | Workload Type       | Orchestrator | Link to the recipe |
 | ---------------- | ---------------- | --------- | ------------------- | ------------ | ------------------ |
+| **Llama-4**      | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms)    | vLLM  | Inference   | GKE          | [Link](./inference/a3ultra/llama-4/vllm-serving-gke/README.md)
 | **Llama-3.1-405B**     | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms)    | TensorRT-LLM  | Inference   | GKE          | [Link](./inference/a3ultra/llama-3.1-405b/trtllm-inference-gke/single-node/README.md)
 | **DeepSeek R1 671B**     | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms)    | SGLang  | Inference   | GKE          | [Link](./inference/a3ultra/deepseek-r1-671b/sglang-serving-gke/README.md)
 | **DeepSeek R1 671B**     | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms)    | vLLM  | Inference   | GKE          | [Link](./inference/a3ultra/deepseek-r1-671b/vllm-serving-gke/README.md)
