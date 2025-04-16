@@ -1,0 +1,22 @@
+[
+  {
+    "message": "PersistentVolumeClaim \"gcs-data-pvc\" is in the default namespace, which is not allowed.",
+    "policyName": "defaultnamespace",
+    "resourceKey": {
+      "kind": "PersistentVolumeClaim",
+      "name": "gcs-data-pvc",
+      "namespace": "default",
+      "version": "v1"
+    }
+  },
+  {
+    "message": "PersistentVolumeClaim \"gcs-checkpoints-pvc\" is in the default namespace, which is not allowed.",
+    "policyName": "defaultnamespace",
+    "resourceKey": {
+      "kind": "PersistentVolumeClaim",
+      "name": "gcs-checkpoints-pvc",
+      "namespace": "default",
+      "version": "v1"
+    }
+  }
+]
