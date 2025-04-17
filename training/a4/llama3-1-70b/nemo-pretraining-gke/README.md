@@ -158,8 +158,8 @@ helm  install -f values.yaml \
 #### Configure job settings
 
 You can overwrite any of the default
-[NeMo configurations fp8](../../../../src/frameworks/a4/nemo-configs/llama3-1-70b-456gpus-a4-fp8.yaml)
-[NeMo configurations bf16](../../../../src/frameworks/a4/nemo-configs/llama3-1-70b-356gpus-a4-bf16.yaml)
+[NeMo configurations fp8](../../../../src/frameworks/a4/nemo-configs/llama3-1-70b-256gpus-a4-fp8.yaml)
+[NeMo configurations bf16](../../../../src/frameworks/a4/nemo-configs/llama3-1-70b-256gpus-a4-bf16.yaml)
 
 for this job. To do this, we can set the new arguments using `--set
 workload.arguments`.
@@ -232,14 +232,14 @@ gs://${GCS_BUCKET}/nemo-experiments/megatron_gpt/<JOB_ID>
 Here is an example of an entry in the DLLogger log:
 
 ```json
-DLLL 
+DLLL
 {
     "timestamp": "1742531120.867155",
     "datetime": "2025-03-21 04:25:20.867155",
     "elapsedtime": "416.858187",
     "type": "LOG",
     "step": 11,
-    "data": 
+    "data":
     {
         "reduced_train_loss": 2.589764356613159,
         "lr": 8.249999723375367e-07,
