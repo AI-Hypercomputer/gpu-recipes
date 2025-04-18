@@ -1,8 +1,8 @@
 images:
   network_rx_daemon: us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/tcpgpudmarxd-dev:v1.0.13
   nccl_plugin_installer: us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/nccl-plugin-gpudirecttcpx-dev:v1.0.7
-  watchdog: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250402
-  megatron: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250402
+  watchdog: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250415
+  megatron: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250415
 
 infrastructure:
   gpu_gen: a3m

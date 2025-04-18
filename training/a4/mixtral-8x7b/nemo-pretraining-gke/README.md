@@ -130,8 +130,8 @@ helm  install -f values.yaml \
 
 #### Using 32 nodes (256 GPUs) BF16
 
-The default job setting is 50 training steps and fp8 precision. To execute the job with the
-default settings, run the following command from your client:
+The default job setting is 50 training steps and bf16 precision. To execute the
+job with the default settings, run the following command from your client:
 
 ```bash
 cd $RECIPE_ROOT
@@ -165,8 +165,8 @@ helm  install -f values.yaml \
 
 #### Using 4 nodes (32 GPUs) BF16
 
-The default job setting is 50 training steps and fp8 precision. To execute the job with the
-default settings, run the following command from your client:
+The default job setting is 50 training steps and bf16 precision. To execute the
+job with the default settings, run the following command from your client:
 
 ```bash
 cd $RECIPE_ROOT
@@ -199,8 +199,8 @@ helm  install -f values.yaml \
 
 #### Using 2 nodes (16 GPUs) BF16
 
-The default job setting is 50 training steps and fp8 precision. To execute the job with the
-default settings, run the following command from your client:
+The default job setting is 50 training steps and bf16 precision. To execute the
+job with the default settings, run the following command from your client:
 
 ```bash
 cd $RECIPE_ROOT
@@ -287,7 +287,7 @@ DLLL {
   "elapsedtime": "347.470315",
   "type": "LOG",
   "step": 38,
-  "data": 
+  "data":
   {
     "reduced_train_loss": 2.0715765953063965,
     "lr": 5.974842679279391e-06,
