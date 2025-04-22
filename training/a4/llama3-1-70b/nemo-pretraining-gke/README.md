@@ -22,7 +22,7 @@ For this recipe, the following setup is used:
 
 This recipe has been optimized for and tested with the following configuration:
 
--   A cluster with 32
+-   A cluster with 32 or 64
     [a4-highgpu-8g](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)
     machines
 -   Machine placement in the cluster is configured using a
@@ -40,7 +40,7 @@ This recipe has been optimized for and tested with the following configuration:
 Before running this recipe, ensure your environment is configured as follows:
 
 -   A GKE cluster with the following setup:
-    -   An A4 node pool (32 nodes, 256 GPUs)
+    -   An A4 node pool (32 nodes, 256 GPUs or 64 nodes, 512 GPUs)
     -   Topology-aware scheduling enabled
 -   An Artifact Registry repository to store the Docker image.
 -   A Google Cloud Storage (GCS) bucket to store results. *Important: This
@@ -128,6 +128,8 @@ v1.0.5, bundling all NCCL binaries validated for use with A4 GPUs.
 
 ### Configure and submit a pretraining job
 
+#### Using 32 nodes (256 GPUs) FP8 precision
+
 The default job setting is 15 training steps and fp8 precision. To execute the
 job with the default settings, run the following command from your client:
 
@@ -142,7 +144,10 @@ helm  install -f values.yaml \
     $REPO_ROOT/src/helm-charts/a4/nemo-training
 ```
 
--   for BF16 precision:
+#### Using 32 nodes (256 GPUs) BF16 precision
+
+The default job setting is 15 training steps and bf16 precision. To execute the
+job with the default settings, run the following command from your client:
 
 ```bash
 cd $RECIPE_ROOT
@@ -155,11 +160,45 @@ helm  install -f values.yaml \
     $REPO_ROOT/src/helm-charts/a4/nemo-training
 ```
 
+#### Using 64 nodes (512 GPUs) FP8 precision
+
+The default job setting is 15 training steps and fp8 precision. To execute the
+job with the default settings, run the following command from your client:
+
+```bash
+cd $RECIPE_ROOT
+helm  install -f values-64nodes.yaml \
+    --set-file nemo_config=$REPO_ROOT/src/frameworks/a4/nemo-configs/llama3-1-70b-512gpus-a4-fp8.yaml \
+    --set workload.image=us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-nemo-nccl:nemo25.02-gib1.0.5-A4  \
+    --set queue=${KUEUE_NAME} \
+    --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+    $USER-llama-3-1-70b-nemo-fp8 \
+    $REPO_ROOT/src/helm-charts/a4/nemo-training
+```
+
+#### Using 64 nodes (512 GPUs) BF16 precision
+
+The default job setting is 15 training steps and bf16 precision. To execute the
+job with the default settings, run the following command from your client:
+
+```bash
+cd $RECIPE_ROOT
+helm  install -f values-64nodes.yaml \
+    --set-file nemo_config=$REPO_ROOT/src/frameworks/a4/nemo-configs/llama3-1-70b-512gpus-a4-bf16.yaml \
+    --set workload.image=us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-nemo-nccl:nemo25.02-gib1.0.5-A4 \
+    --set queue=${KUEUE_NAME} \
+    --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+    $USER-llama-3-1-70b-nemo-bf16 \
+    $REPO_ROOT/src/helm-charts/a4/nemo-training
+```
+
 #### Configure job settings
 
-You can overwrite any of the default
-[NeMo configurations fp8](../../../../src/frameworks/a4/nemo-configs/llama3-1-70b-256gpus-a4-fp8.yaml)
-[NeMo configurations bf16](../../../../src/frameworks/a4/nemo-configs/llama3-1-70b-256gpus-a4-bf16.yaml)
+You can overwrite any of the default:
+- [NeMo configurations 32 nodes fp8](../../../../src/frameworks/a4/nemo-configs/llama3-1-70b-256gpus-a4-fp8.yaml)
+- [NeMo configurations 32 nodes bf16](../../../../src/frameworks/a4/nemo-configs/llama3-1-70b-256gpus-a4-bf16.yaml)
+- [NeMo configurations 64 nodes fp8](../../../../src/frameworks/a4/nemo-configs/llama3-1-70b-512gpus-a4-fp8.yaml)
+- [NeMo configurations 64 nodes bf16](../../../../src/frameworks/a4/nemo-configs/llama3-1-70b-512gpus-a4-bf16.yaml)
 
 for this job. To do this, we can set the new arguments using `--set
 workload.arguments`.
