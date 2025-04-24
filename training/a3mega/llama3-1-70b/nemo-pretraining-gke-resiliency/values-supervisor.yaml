@@ -13,24 +13,24 @@
 # limitations under the License.
 
 actuator:
-  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250415
+  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250422
   port: 60080
-  command: "gpu-goodput/src/resilient-training/actuator.py"
+  command: "resiliency/supervisor/actuator.py"
 
 sensor:
-  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250415
+  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250422
   port: 60081
-  command: "gpu-goodput/src/resilient-training/sensor.py"
+  command: "resiliency/supervisor/sensor.py"
 
 controller:
-  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250415
+  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250422
   port: 60082
-  command: "gpu-goodput/src/resilient-training/controller.py"
+  command: "resiliency/supervisor/controller.py"
 
 host_daemon:
-  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250415
+  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250422
   port: 60010
-  command: "gpu-goodput/src/resilient-training/host_daemon.py"
+  command: "resiliency/supervisor/host_daemon.py"
 
 # Cluster parameters
 project:

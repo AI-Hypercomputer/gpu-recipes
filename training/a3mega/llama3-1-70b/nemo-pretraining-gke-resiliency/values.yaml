@@ -1,8 +1,8 @@
 images:
   network_rx_daemon: us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/tcpgpudmarxd-dev:v1.0.13
   nccl_plugin_installer: us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/nccl-plugin-gpudirecttcpx-dev:v1.0.7
-  watchdog: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250415
-  megatron: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250415
+  watchdog: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250422
+  megatron: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250422
 
 infrastructure:
   gpu_gen: a3m
@@ -35,9 +35,9 @@ workload:
     --topk-ckpt=-1 \
     --checkpoint-interval=25 \
     --ckpt-threads-per-rank=2 \
-    --enable_dist_ckpt \
-    --enable_comm_overlap \
-    --enable_gc \
-    --enable_async_ckpt \
+    --enable-dist-ckpt \
+    --enable-comm-overlap \
+    --enable-gc \
+    --enable-async-ckpt \
     --enable-fault-tolerance \
-    --enable_optimized_async_ckpt
+    --enable-optimized-async-ckpt

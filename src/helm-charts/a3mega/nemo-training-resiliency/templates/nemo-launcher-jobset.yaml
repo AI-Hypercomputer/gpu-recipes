@@ -93,15 +93,15 @@ spec:
                 {{- if $.Values.workload.delete_old_ckpt }}
                   {{- if $.Values.infrastructure.enable_gcsfuse }}
                     if [[ "${NODE_RANK}" == "0" ]]; then
-                      bash gpu-goodput/src/scripts/rm_old_ckpts.sh &
+                      bash resiliency/scripts/rm_old_ckpts.sh &
                     fi
                   {{- else }}
-                    bash gpu-goodput/src/scripts/rm_old_ckpts.sh &
+                    bash resiliency/scripts/rm_old_ckpts.sh &
                   {{- end }}
                 {{- end }}
 
                 {{- if .Values.infrastructure.use_supervisor }}
-                  CMD="exec python3 gpu-goodput/src/launcher.py --use-supervisor"
+                  CMD="exec python3 resiliency/launcher.py --use-supervisor"
                 {{- else }}
                   CMD="exec ft_launcher"
                 {{- end }}
@@ -114,7 +114,7 @@ spec:
                 --rdzv_id="${JOB_IDENTIFIER}" \
                 --master_addr="${MASTER_ADDR}" \
                 --master_port="${MASTER_PORT}" \
-                gpu-goodput/src/train.py ${FLAGS}"
+                resiliency/examples/train.py ${FLAGS}"
 
                 eval echo "Launching command: $CMD"
                 eval "$CMD"
