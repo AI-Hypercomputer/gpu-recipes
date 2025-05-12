@@ -17,6 +17,63 @@
 set -x
 set -e
 
+usage()
+{
+cat << EOF
+usage: bash ./nccl-test.sh [--benchmark <benchmark>] [--mask <mask>] [--begin_msg_size <begin_msg_size>] [--end_msg_size <end_msg_size>] [--factor <factor>] [--warmup_iters <warmup_iters>] [--run_iters <run_iters>]
+EOF
+}
+
+
+parse_args() {
+  while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+      -t|--benchmark)
+        benchmark="$2"
+        shift 2
+        ;;
+      -m|--mask)
+        mask="$2"
+        shift 2
+        ;;
+      -g|--gpus_per_node)
+        gpus_per_node="$2"
+        shift 2
+        ;;
+      -b|--begin_msg_size)
+        begin_msg_size="$2"
+        shift 2
+        ;;
+      -e|--end_msg_size)
+        end_msg_size="$2"
+        shift 2
+        ;;
+      -f|--factor)
+        factor="$2"
+        shift 2
+        ;;
+      -w|--warmup_iters)
+        warmup_iters="$2"
+        shift 2
+        ;;
+      -n|--run_iters)
+        run_iters="$2"
+        shift 2
+        ;;
+      -h|--help)
+        usage
+        exit
+        ;;
+      *)
+        echo "Invalid argument: $1"
+        usage
+        exit 1
+        ;;
+    esac
+  done
+}
+
+
 clean_up() {
   echo "Notifying all ranks to exit"
   OMPI_MCA_orte_keep_fqdn_hostnames=t mpirun --allow-run-as-root --mca plm_rsh_no_tree_spawn true \
@@ -65,6 +122,7 @@ configure_hostfiles() {
   done
 }
 
+
 run_test_ultra() {
   local benchmark=$1
   local mask=$2
@@ -96,18 +154,34 @@ run_test_ultra() {
        -w ${warmup_iters} -n ${run_iters}" 2>&1 |  tee ${log_path}
 }
 
-echo "Pod on $(hostname --fqdn) is running"
-echo "Pod is assigned job index of $JOB_COMPLETION_INDEX"
+
+echo "Running on $(hostname --fqdn) is running"
+echo "Assigned job index of $JOB_COMPLETION_INDEX"
 echo "Job ID is $JOB_IDENTIFIER"
 echo "Restarting ssh"
 service ssh restart
 
-echo "NCCL_LIB_DIR: ${NCCL_LIB_DIR}"
+export LD_LIBRARY_PATH="$NCCL_PLUGIN_PATH"
+ldconfig $LD_LIBRARY_PATH
+echo "Added $LD_LIBRARY_PATH to ldconfig:"
+ldconfig -p | grep libcuda | sed 's/^/  /'
+echo ""
+
 echo "LD_LIBRARY_PATH: ${LD_LIBRARY_PATH}"
 
 if [ "$JOB_COMPLETION_INDEX" -ne 0 ]; then
   wait_for_tasks
 fi
+
+benchmark="all_gather"
+mask="0x0"
+begin_msg_size="1K"
+end_msg_size="16G"
+factor="2"
+warmup_iters="50"
+run_iters="100"
+
+parse_args "$@"
 
 echo "Configuring hostfiles:"
 hostfile_dir="/tmp/hostfiles"
@@ -117,29 +191,27 @@ configure_hostfiles "$hostfile_dir"
 
 nhosts="${#hostnames[@]}"
 date_str=$(date "+%Y-%m-%d-%H-%M-%S")
-log_file_name="${BENCHMARK}_${nhosts}_${GPUS_PER_NODE}_${BEGIN_MESSAGE_SIZE}_${END_MESSAGE_SIZE}_${FACTOR}_${WARMUP_ITERATIONS}_${RUN_ITERATIONS}_${date_str}.log"
+log_file_name="${benchmark}_${nhosts}_${GPUS_PER_NODE}_${begin_msg_size}_${end_msg_size}_${factor}_${warmup_iters}_${run_iters}_${date_str}.log"
 log_path="${LOG_DIR}/${log_file_name}"
-
-echo "Running the test with the following parameters:"
-echo "  Benchmark: $BENCHMARK"
-echo "  Mask: $MASK"
-echo "  Begin message size: $BEGIN_MESSAGE_SIZE"
-echo "  End message size: $END_MESSAGE_SIZE"
-echo "  Factor: $FACTOR"
-echo "  Warmup iterations: $WARMUP_ITERATIONS"
-echo "  Run iterations: $RUN_ITERATIONS"
-echo "  Hosts: ${hostnames[@]}"
-echo "  Log path: ${GCS_LOG_DIR}/${log_file_name}"
 
 mkdir -p "${LOG_DIR}"
 
-args=("$BENCHMARK" \
-  "$MASK" \
-  "$BEGIN_MESSAGE_SIZE" \
-  "$END_MESSAGE_SIZE" \
-  "$FACTOR" \
-  "$WARMUP_ITERATIONS" \
-  "$RUN_ITERATIONS" \
+echo "Running the test with the following parameters:"
+echo "  Benchmark: $benchmark"
+echo "  Mask: $mask"
+echo "  Begin message size: $begin_msg_size"
+echo "  End message size: $end_msg_size"
+echo "  Factor: $factor"
+echo "  Warmup iterations: $warmup_iters"
+echo "  Run iterations: $run_iters"
+
+args=("$benchmark" \
+  "$mask" \
+  "$begin_msg_size" \
+  "$end_msg_size" \
+  "$factor" \
+  "$warmup_iters" \
+  "$run_iters" \
   "$GPUS_PER_NODE" \
   "$log_path" \
   "${hostnames[@]}")

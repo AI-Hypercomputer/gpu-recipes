@@ -1,6 +1,6 @@
-# Configuring the environment for running benchmark recipes on a GKE Cluster with A3 Ultra Node Pools
+# Configuring the environment for running  benchmark recipes on a GKE Cluster with A3 Ultra Node Pools
 
-This [guide](https://cloud.google.com/ai-hypercomputer/docs/create/gke-ai-hypercompute) outlines the steps to configure the environment required to run benchmark recipes on a [Google Kubernetes Engine (GKE) cluster](https://cloud.google.com/kubernetes-engine/docs/concepts/kubernetes-engine-overview) with [A3 Ultra](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-vms) node pools.
+This guide outlines the steps to configure the environment required to run  benchmark recipes on a [Google Kubernetes Engine (GKE) cluster](https://cloud.google.com/kubernetes-engine/docs/concepts/kubernetes-engine-overview) with [A3 Ultra](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-vms) node pools.
 
 ## Prerequisites
 
@@ -13,77 +13,128 @@ Before you begin, ensure you have completed the following:
 
 2. Enabled the following APIs:
 
+   - [Cloud Resource Manager API](https://console.cloud.google.com/apis/library/cloudresourcemanager.googleapis.com).
    - [Service Usage API](https://console.cloud.google.com/apis/library/serviceusage.googleapis.com).
    - [Google Kubernetes Engine API](https://console.cloud.google.com/flows/enableapi?apiid=container.googleapis.com).
    - [Cloud Storage API](https://console.cloud.google.com/flows/enableapi?apiid=storage.googleapis.com).
    - [Artifact Registry API](https://console.cloud.google.com/flows/enableapi?apiid=artifactregistry.googleapis.com).
+   - [Cloud Monitoring API](https://console.cloud.google.com/flows/enableapi?apiid=monitoring.googleapis.com).
+   - [Cloud Logging API](https://console.cloud.google.com/flows/enableapi?apiid=logging.googleapis.com)
 
-3. Requested enough GPU quotas. Each `a3-ultragpu-8g` machine has 8 H200 GPUs attached.
-  1. To view quotas, see [View the quotas for your project](/docs/quotas/view-manage).
-     In the Filter field, select **Dimensions(e.g location)** and
-     specify [`gpu_family:NVIDIA_H200`](https://cloud.google.com/compute/resource-usage#gpu_quota).
-  1. If you don't have enough quota, [request a higher quota](https://cloud.google.com/docs/quotas/view-manage#requesting_higher_quota).
+3. Make sure that you have a [reservation](https://cloud.google.com/compute/docs/instances/reservations-overview) for the required number of `a3-ultragpu-8g` machines using the `DENSE` deployment type.
+
+4. Ensure that you have been granted the following IAM roles:
+    - Editor (`roles/editor`)
+    - Project IAM Admin (`roles/resourcemanager.projectIamAdmin`)
+    - Kubernetes Engine Admin (`roles/container.admin`)
+    - Service Account Admin (`roles/serviceAccountAdmin`)
 
 ## The environment
 
 The environment comprises of the following components:
 
-- Client workstation: this is used to prepare, submit, and monitor ML workloads.
-- [Google Cloud Storage (GCS) Bucket](https://cloud.google.com/storage/docs): used for storing
-  datasets and logs.
-- [Artifact Registry](https://cloud.google.com/artifact-registry/docs/overview): serves as a
+- A client workstation: this is used to prepare, submit, and monitor ML workloads.
+- An [Artifact Registry](https://cloud.google.com/artifact-registry/docs/overview): serves as a
   private container registry for storing and managing Docker images used in the deployment.
-- [Google Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine/docs/concepts/kubernetes-engine-overview)
-  Cluster with A3 Ultra Node Pools: provides a managed Kubernetes environment to run benchmark
-  recipes.
+- A [Google Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine/docs/concepts/kubernetes-engine-overview)
+  cluster configured as follows:
+    - [A GKE regional standard cluster](https://cloud.google.com/kubernetes-engine/docs/concepts/configuration-overview) version: 1.31.7-gke.1265000 or later.
+    - A GPU node pool with the user specified number of [a3-ultragpu-8g](https://cloud.google.com/compute/docs/gpus#h200-gpus) provisioned using the DENSE deployment type.
+    - [Workload Identity Federation for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity) enabled.
+    - [Cloud Storage FUSE CSI driver for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/cloud-storage-fuse-csi-driver) enabled.
+    - [DCGM metrics](https://cloud.google.com/kubernetes-engine/docs/how-to/dcgm-metrics) enabled.
+    - [Kueue](https://kueue.sigs.k8s.io/docs/reference/kueue.v1beta1/) and [JobSet](https://jobset.sigs.k8s.io/docs/overview/) APIs installed.
+    - Kueue configured to support [Topology Aware Scheduling](https://kueue.sigs.k8s.io/docs/concepts/topology_aware_scheduling/).
+- A regional [Google Cloud Storage (GCS) Bucket](https://cloud.google.com/storage/docs) for storing the test environment configuration and state and the execution logs generated by recipes.
+- A regional GCS bucket with [hierarchical namespace](https://cloud.google.com/storage/docs/hns-overview) enabled for managing training datasets.
+- A regional GCS bucket with [hierarchical namespace](https://cloud.google.com/storage/docs/hns-overview) enabled for managing checkpoints.
+
+
 
 ## Set up the client workstation
 
-You have two options, you can use either a local machine or Google Cloud Shell.
+You have two options: you can use either your own workstation (e.g., a local machine or Google Cloud VM) or [Google Cloud Shell](https://cloud.google.com/shell/docs).
 
-### Google Cloud Shell
 
-We recommend using [Google Cloud Shell](https://cloud.google.com/shell/docs) as it
-comes with all necessary components pre-installed.
+### Set up Google Cloud Shell
 
-### Local client
-If you prefer to use your local machine, ensure your local machine has the following
-components installed.
+[Google Cloud Shell](https://cloud.google.com/shell/docs) comes with all the necessary components pre-installed, so no additional configuration is needed.
 
-1. Google Cloud SDK. To install, see
-   [Install the gcloud CLI](https://cloud.google.com/sdk/docs/install).
-2. kubectl. To install, see the
-   [kuberenetes documentation](https://kubernetes.io/docs/tasks/tools/#kubectl).
+**IMPORTANT**: Make sure that you have at least 2GB of disk space remaining in your home directory.
+
+
+### Set up your own workstation
+
+If you prefer to use your own workstation, ensure you have the following components installed:
+
+1. Cluster Toolkit [dependencies](https://cloud.google.com/cluster-toolkit/docs/setup/install-dependencies).
+2. kubectl with GKE authentication plugin. To install, see the
+   [GKE documentation](https://cloud.google.com/kubernetes-engine/docs/how-to/cluster-access-for-kubectl).
 3. Helm. To install, see the [Helm documentation](https://helm.sh/docs/intro/quickstart/).
-4. Docker. To install, see the [Docker documentation](https://docs.docker.com/engine/install/).
 
 
-## Set up a Google Cloud Storage bucket
+## Set you Project ID
 
+Launch your client workstation and set your Project ID.
+
+```
+gcloud config set project PROJECT_ID
+```
+
+
+Replace the following:
+- PROJECT_ID: your project ID.
+
+## Set up a Google Cloud Storage bucket for environment state and logs
+
+The bucket is used to manage the state of the [Cluster Toolkit blueprint](https://cloud.google.com/cluster-toolkit/docs/setup/cluster-blueprint) that you'll use to provision a GKE cluster. The bucket is also used by the recipes to manage execution logs.
+
+
+To create the bucket execute the following command:
 ```bash
-gcloud storage buckets create gs://<BUCKET_NAME> --location=<BUCKET_LOCATION> --no-public-access-prevention
+gcloud storage buckets create gs://BUCKET_NAME \
+--location=BUCKET_LOCATION \
+--no-public-access-prevention --uniform-bucket-level-access
 ```
 
 Replace the following:
 
 - `BUCKET_NAME`: the name of your bucket. The name must comply with the
    [Cloud Storage bucket naming conventions](https://cloud.google.com/storage/docs/buckets#naming).
-- `BUCKET_LOCATION`: the location of your bucket. The bucket must be located in
-   the same region as the GKE cluster.
+- `BUCKET_LOCATION`: the location of your bucket.  The bucket must be in the same region as your cluster.
 
-Add IAM binding to allow workloads authenticated via a workload identity (with the default service account) to access Cloud Storage objects.
 
-   ```bash
-   PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
-   gcloud storage buckets add-iam-policy-binding gs://<BUCKET_NAME> \
-   --role=roles/storage.objectUser \
-   --member=principal://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$PROJECT_ID.svc.id.goog/subject/ns/default/sa/default \
-   --condition=None
-   ```
+
+## Configure access control to the bucket
+
+A3 Ultra compute recipes access Google Cloud Storage buckets using the Kubernetes default ServiceAccount. You need to grant this account the rights to access the Google Cloud Storage bucket.
+
+```
+gcloud storage buckets add-iam-policy-binding gs://BUCKET_NAME \
+--role=roles/storage.objectAdmin \
+--member=principal://iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/PROJECT_ID.svc.id.goog/subject/ns/default/sa/default \
+--condition=None
+
+gcloud storage buckets add-iam-policy-binding gs://BUCKET_NAME \
+--role=roles/storage.legacyBucketReader \
+--member=principal://iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/PROJECT_ID.svc.id.goog/subject/ns/default/sa/default \
+--condition=None
+
+```
 
 Replace the following:
+- BUCKET_NAME - the name of your bucket
+- PROJECT_ID: your Google Cloud project ID.
+- PROJECT_NUMBER: your numerical Google Cloud project number.
 
-- `BUCKET_NAME`: the name of your bucket created in the previous step
+You can retrieve the project number from Cloud Console or using the following command:
+
+```
+PROJECT_NUMBER=$(gcloud projects describe PROJECT_ID --format="value(projectNumber)")
+```
+
+Replace the following:
+- PROJECT_ID: your Google Cloud project ID.
 
 ## Set up an Artifact Registry
 
@@ -92,10 +143,10 @@ Replace the following:
 - If you don't use Cloud KMS, you can create your repository by using the following command:
 
   ```bash
-    gcloud artifacts repositories create <REPOSITORY> \
+    gcloud artifacts repositories create REPOSITORY \
         --repository-format=docker \
-        --location=<LOCATION> \
-        --description="<DESCRIPTION>" \
+        --location=LOCATION \
+        --description="DESCRIPTION"
   ```
   Replace the following:
 
@@ -107,22 +158,171 @@ Replace the following:
      repository descriptions are not encrypted.
 
 
-## Create a GKE Cluster with A3 Ultra Node Pools
+## Create a GKE Cluster environment with A3 Ultra Node Pools
 
-Follow [this guide](https://cloud.google.com/ai-hypercomputer/docs/create/gke-ai-hypercompute) for
-detailed instructions to create a GKE cluster with A3 Ultra node pools, GPUDirect-RDMA and required GPU driver versions.
 
-The documentation uses [ Cluster Toolkit](https://cloud.google.com/cluster-toolkit/docs/overview) to create your GKE cluster quickly while incorporating best practices:
+You'll use the [Cluster Toolkit](https://cloud.google.com/cluster-toolkit/docs/overview)  to create your GKE cluster environment.
+The Cluster Toolkit [blueprint](https://github.com/GoogleCloudPlatform/cluster-toolkit/tree/v1.50/examples/gke-a3-ultragpu) used in this setup creates and configures the following components:
 
-- Creation of the necessary VPC networks and subnets.
-- Creation of a GKE cluster with multi-networking enabled.
-- Creation of an A3 Ultra node pool with NVIDIA H200 GPUs.
-- Installation of the required components for GPUDirect-RDMA and NCCL plugin.
+- VPC networks, subnets, routers, and firewall rules.
+- A GKE cluster with the required features enabled.
+- Service accounts with the required permissions.
+- An A3 Ultra node pool with `a3-ultragup-8g` nodes.
+- [JobSet](https://jobset.sigs.k8s.io/docs/overview/) and [Kueue](https://kueue.sigs.k8s.io/docs/overview/) APIs.
+- Cloud Storage buckets with hierarchical namespace enabled for training data and checkpoints.
+
+The A3 Ultra compute recipes have been validated on a cluster created with the v1.50 version of the Cluster Toolkit.
+
+1. Configure Application Default Credentials
+
+   Before deploying the Cluster Toolkit blueprint, you need to configure Application Default Credentials (ADC).
+
+   ```
+   gcloud auth application-default login
+   ```
+   You will be prompted to open your web browser and authenticate to Google Cloud.
+
+2. Clone the Cluster Toolkit from the GitHub repository:
+
+    ```bash
+    git clone  --branch v1.50 --single-branch https://github.com/GoogleCloudPlatform/cluster-toolkit
+    ```
+3. Install the Cluster Toolkit
+   ```
+   cd cluster-toolkit && make
+   ```
+
+4. Deploy the cluster:
+   ```
+   ./gcluster deploy \
+   examples/gke-a3-ultragpu/gke-a3-ultragpu.yaml \
+   --backend-config "bucket=BUCKET_NAME" \
+   --vars "deployment_name=CLUSTER_NAME" \
+   --vars "project_id=PROJECT_ID" \
+   --vars "region=COMPUTE_REGION" \
+   --vars "zone=COMPUTE_ZONE" \
+   --vars "authorized_cidr=AUTHORIZED_CIDR" \
+   --vars "extended_reservation=RESERVATION_NAME" \
+   --vars "static_node_count=NODE_COUNT" \
+   --vars "system_node_pool_disk_size_gb=200" \
+   --vars "a3ultra_node_pool_disk_size_gb=200"
+   ```
+
+Replace the following:
+   - BUCKET_NAME: the name of the Cloud Storage bucket  created in the previous step. Don't use the `gs://` prefix in the name.
+   - CLUSTER_NAME: the name for your cluster. Make sure that the name is shorter than 16 characters.
+   - PROJECT_ID: the project ID of your project.
+   - COMPUTE_REGION: the compute region for the cluster.
+   - COMPUTE_ZONE: the compute zone for the node pool of A3 Ultra machines.
+   - AUTHORIZED_CIDR: The IP address range that you want to allow to connect with the cluster. This CIDR block must include the IP address of the machine to call Cluster Toolkit. If you want to allow access from any IP address use `0.0.0.0/0`.
+   - NODE_COUNT: the number of A3 Ultra nodes to provision in your cluster.
+   - RESERVATION_NAME: the  name of your reservation.   If you want to target a specific block within your reservation to use when creating a node pool, use the following format : `RESERVATION_NAME/reservationBlocks/BLOCK_NAME`. To get the names of the blocks that are available for your reservation, run the following command:
+
+     ```
+     gcloud beta compute reservations blocks list RESERVATION_NAME \
+     --zone=COMPUTE_ZONE --format "value(name)"
+     ```
+
+
+
+
+
+## Verify cluster settings
+
+After the cluster toolkit blueprint has completed verify key configurations.
+
+1. Get cluster credentials:
+
+   ```
+   gcloud container clusters get-credentials CLUSTER_NAME \
+   --location COMPUTE_REGION
+   ```
+
+   Replace the following:
+   - CLUSTER_NAME - the name of your cluster
+   - COMPUTE_REGION - the region of your cluster
+
+2. List Kueue local queues
+    ```
+    kubectl get queues
+    ```
+    You should see the output similar to the following:
+    ```
+    NAME       CLUSTERQUEUE   PENDING WORKLOADS   ADMITTED WORKLOADS
+    a3-ultra   a3-ultra       0                   0
+    ```
+    The blueprint configures Kueue using the `a3-ultra` as a default name for both the local queue and the cluster queue.
+
+3. Make sure that all A3 Ultra nodes are in the ready state:
+    ```
+    kubectl get nodes
+    ```
+    You should see the output similar to the following:
+    ```
+    NAME                                                  STATUS   ROLES    AGE   VERSION
+    gke-a3-ultra-a3-ultragpu-8g-a3-ff1944d6-0dmj   Ready    <none>   47m   v1.31.7-gke.1265000
+    gke-a3-ultra-a3-ultragpu-8g-a3-ff1944d6-1374   Ready    <none>   45m   v1.31.7-gke.1265000
+    gke-a3-ultra-a3-ultragpu-8g-a3-ff1944d6-1x1k   Ready    <none>   48m   v1.31.7-gke.1265000
+    gke-a3-ultra-a3-ultragpu-8g-a3-ff1944d6-3wj1   Ready    <none>   47m   v1.31.7-gke.1265000
+    gke-a3-ultra-a3-ultragpu-8g-a3-ff1944d6-65r9   Ready    <none>   48m   v1.31.7-gke.1265000
+    gke-a3-ultra-a3-ultragpu-8g-a3-ff1944d6-6ldr   Ready    <none>   47m   v1.31.7-gke.1265000
+    gke-a3-ultra-a3-ultragpu-8g-a3-ff1944d6-7jxs   Ready    <none>   48m   v1.31.7-gke.1265000
+    gke-a3-ultra-a3-ultragpu-8g-a3-ff1944d6-887s   Ready    <none>   45m   v1.31.7-gke.1265000
+    gke-a3-ultra-a3-ultragpu-8g-a3-ff1944d6-9rxq   Ready    <none>   48m   v1.31.7-gke.1265000
+    ...
+    ```
 
 ## What's next
 
 Once you have set up your GKE cluster with A3 Ultra node pools, you can proceed to deploy and
 run your [benchmark recipes](../README.md#benchmarks-support-matrix).
+
+
+## Clean up the environment
+
+If you want to remove the resources created when setting up the environment follow the below instructions.
+
+### Clean up resources created by Cluster Toolkit
+
+To remove resources created by the Cluster Toolkit blueprint:
+
+```
+cd ~/cluster-toolkit
+   ./gcluster destroy DEPLOYMENT_NAME
+```
+
+Replace the following:
+- DEPLOYMENT_NAME: the name you used during the deployment. This is the name of your cluster.
+
+
+### Remove Cloud Storage buckets
+
+If you want to remove Cloud Storage buckets in your environment execute the following command:
+
+**IMPORTANT**. This command removes the bucket and all objects within it. You'll not be able to recover them after the command is executed.
+
+
+```
+gcloud storage rm -r gs://BUCKET_NAME
+```
+
+Replace the following:
+- BUCKET_NAME: the name of your bucket
+
+
+### Remove Artifact Registry
+
+To delete the Artfiact Registry:
+
+```
+gcloud artifacts repositories delete REPOSITORY --location=LOCATION
+```
+
+Replace the following:
+- REPOSITORY: the name of your repository
+- LOCAION: the location of your repository
+
+
 
 ## Get Help
 
@@ -132,4 +332,8 @@ resources:
 - Consult the [official GKE documentation](https://cloud.google.com/kubernetes-engine/docs).
 - Check the issues section of this repository for known problems and solutions.
 - Reach out to Google Cloud support.
+
+
+
+
 

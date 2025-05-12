@@ -1,4 +1,4 @@
-# Copyright 2024 Google LLC
+# Copyright 2025 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,24 +13,52 @@
 # limitations under the License.
 
 queue:
+
+dwsSettings:
+  maxRunDurationSeconds:
+
 tasSettings:
-  useLegacyTAS: false
   topologyRequest:
-    kueue.x-k8s.io/podset-preferred-topology: "cloud.google.com/gce-topology-block"
+    kueue.x-k8s.io/podset-preferred-topology: "kubernetes.io/hostname"
 
 volumes:
-  # The VM host path for SSDs is assumed at /mnt/stateful_partition/kube-ephemeral-ssd
-  ssdMountPath: "/ssd"
-
+  gcsVolumes: true
+  psVolumes: false
   gcsMounts:
-    - bucketName:
-      mountPath: /gcs
+  - bucketName:
+    mountPath: "/job-logs"
+  - bucketName: cloud-samples-data
+    mountPath: "/artifacts"
+    mountOptions: "implicit-dirs"
 
 workload:
-  torchDistributedTarget: "/opt/NeMo/examples/nlp/language_modeling/megatron_gpt_pretraining.py"
   gpus: 576 # This should be one of: {<= 8,  multiple of 8}
-  experiment_dir: /gcs/nemo-experiments
-  experiment_name: "megatron_gpt"
+  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-nemo-nccl:nemo24.12-gib1.0.3-A3U
+  defaultArguments[]:
+  arguments[]:
+  configFile: nemo-config.yaml
+  configPath: /workload/configs
+  envs:
+  - name: NEMO_CONFIG_PATH
+    value: "/workload/configs"
+  - name: NEMO_CONFIG_NAME
+    value: "nemo-config.yaml"
+  - name: EXPERIMENT_NAME
+    value: "nemo-experiments"
+  - name: EXPERIMENT_ROOT_DIR
+    value: "/job-logs"
+  - name: NVTE_FWD_LAYERNORM_SM_MARGIN
+    value: "8"
+  - name: NVTE_BWD_LAYERNORM_SM_MARGIN
+    value: "8"
+  - name: NVTE_UB_SOCKET_IFNAME
+    value: "eth1"
+  - name: GLOO_SOCKET_IFNAME
+    value: "eth0"
+  - name: TOKENIZER_PATH
+    value: "/artifacts/third-party/tokenizers/gpt2"
+  - name: NEMO_LAUNCH_SCRIPT
+    value: "/opt/NeMo/examples/nlp/language_modeling/megatron_gpt_pretraining.py"
 
 network:
   subnetworks[]:
@@ -38,7 +66,5 @@ network:
   ncclSettings:
   - name: NCCL_DEBUG
     value: "VERSION"
-  - name: NCCL_WORK_FIFO_DEPTH 
+  - name: NCCL_WORK_FIFO_DEPTH
     value: "4194304"
-  - name: NVTE_UB_SOCKET_IFNAME
-    value: "eth1"

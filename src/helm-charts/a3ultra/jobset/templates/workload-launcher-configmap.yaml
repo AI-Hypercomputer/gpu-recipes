@@ -15,7 +15,13 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: "{{ .Release.Name }}"
+  name: "{{ .Release.Name }}-launcher"
 data:
-  run_test.sh: |-
-{{ .Files.Get "run_test.sh" | nindent 4 }}
+  launch-workload.sh: |-
+{{- if .Values.workload_launcher }}
+{{ .Values.workload_launcher | nindent 4 }}
+{{- else }}
+    #!/bin/bash
+    echo "No workload launcher specified"
+    exit 1
+{{- end }}
