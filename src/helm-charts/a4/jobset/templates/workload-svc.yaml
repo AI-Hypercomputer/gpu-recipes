@@ -4,7 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#      https://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,23 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-base_config: "base.yml"
-model_name: llama3.1-405b
-
-hardware: gpu
-dcn_data_parallelism: 2
-dcn_fsdp_parallelism: 16
-ici_fsdp_parallelism: 8
-per_device_batch_size: 2
-max_target_length: 8192
-learning_rate: 0.001
-enable_checkpointing: false
-attention: cudnn_flash_te
-remat_policy: full
-use_iota_embed: true
-dataset_type: synthetic
-logits_dot_in_fp32: false
-enable_goodput_recording: false
-monitor_goodput: false
-save_config_to_gcs: true
-
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ .Release.Name }}"
+spec:
+  clusterIP: None
+  selector:
+    jobset.sigs.k8s.io/jobset-name: "{{ .Release.Name }}"

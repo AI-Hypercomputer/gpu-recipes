@@ -230,7 +230,7 @@ to help analyze the training job and provide the Goodput Percentage of the train
 
 - *Total Events*: the total events during the training session
 - *Job Started Count*: the number of times the job have started
-- *Checkpoints Loafed*: the number of times checkpoints have been loaded
+- *Checkpoints Loaded*: the number of times checkpoints have been loaded
 - *Checkpoints Saved*: the number of times a checkpoint have been saved
 - *Total Runtime (hours)*: the total number of hours of the job
 - *Min Loaded Step*: the minimum step used to load a checkpoint

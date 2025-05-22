@@ -1,7 +1,8 @@
 run:
-  name: llama3_1_405b
-  time_limit: 0-02:30:00
-  dependency: singleton
+  name: llama3_1_70b
+  results_dir:
+  time_limit: "0-01:30:00"
+  dependency: "singleton"
 trainer:
   devices: 8
   accelerator: gpu
@@ -11,7 +12,7 @@ trainer:
   use_distributed_sampler: false
   max_epochs: null
   max_steps: 15
-  max_time: 05:23:30:00
+  max_time: "05:23:30:00"
   log_every_n_steps: 1
   val_check_interval: null
   limit_val_batches: 0.0
@@ -19,48 +20,52 @@ trainer:
   accumulate_grad_batches: 1
   gradient_clip_val: 1.0
 exp_manager:
+  explicit_log_dir:
   exp_dir: null
   name: megatron_llama
-  resume_if_exists: false
+  create_wandb_logger: false
+  wandb_logger_kwargs:
+    project: nemo_llama_pretrain
+    name: ${run.name}
   create_dllogger_logger: true
   dllogger_logger_kwargs:
     verbose: true
     stdout: true
-
+  resume_if_exists: false
   resume_ignore_no_checkpoint: true
   create_checkpoint_callback: false
   checkpoint_callback_params:
     monitor: val_loss
     save_top_k: 10
     mode: min
-    always_save_nemo: false
-    save_nemo_on_train_end: false
-    filename: megatron_llama--{val_loss:.2f}-{step}-{consumed_samples}
+    always_save_nemo: False
+    save_nemo_on_train_end: False
+    filename: 'megatron_llama--{val_loss:.2f}-{step}-{consumed_samples}'
     model_parallel_size: ${multiply:${model.tensor_model_parallel_size}, ${model.pipeline_model_parallel_size}}
   log_step_timing: true
+  log_tflops_per_sec_per_gpu: true
   step_timing_kwargs:
     sync_cuda: true
     buffer_size: 5
   seconds_to_sleep: 60
-  explicit_log_dir: null
 model:
   tp_only_amax_red: true
   mcore_gpt: true
   micro_batch_size: 1
-  global_batch_size: 2016
+  global_batch_size: 2048
   rampup_batch_size: null
-  tensor_model_parallel_size: 4
-  pipeline_model_parallel_size: 14
-  virtual_pipeline_model_parallel_size: 9
-  context_parallel_size: 2
+  tensor_model_parallel_size: 2
+  pipeline_model_parallel_size: 4
+  virtual_pipeline_model_parallel_size: 20
+  context_parallel_size: 1
   encoder_seq_length: 8192
   max_position_embeddings: 8192
-  num_layers: 126
-  hidden_size: 16384
-  ffn_hidden_size: 53248
-  num_attention_heads: 128
-  num_query_groups: 16
-  init_method_std: 0.02
+  num_layers: 80
+  hidden_size: 8192
+  ffn_hidden_size: 28672
+  num_attention_heads: 64
+  num_query_groups: 8
+  init_method_std: 0.008944
   use_scaled_init_method: true
   hidden_dropout: 0.0
   attention_dropout: 0.0
@@ -90,9 +95,10 @@ model:
     library: 'megatron'
     type: 'GPT2BPETokenizer'
     model: null
-    delimiter: null
+    delimiter: null  # only used for tabular tokenizer
     vocab_file: gpt2-vocab.json
     merge_file: gpt2-merges.txt
+
   native_amp_init_scale: 4294967296
   native_amp_growth_interval: 1000
   hysteresis: 2
@@ -102,7 +108,6 @@ model:
   grad_allreduce_chunk_size_mb: 125
   grad_div_ar_fusion: true
   gradient_accumulation_fusion: true
-  cross_entropy_loss_fusion: true
   bias_activation_fusion: true
   bias_dropout_add_fusion: true
   masked_softmax_fusion: true
@@ -119,24 +124,32 @@ model:
   num_micro_batches_with_partial_activation_checkpoints: null
   activations_checkpoint_layers_per_pipeline: null
   sequence_parallel: true
-  defer_embedding_wgrad_compute: true
-  wgrad_deferral_limit: 50
-  deterministic_mode: false
+
+
+  ## Transformer Engine
   transformer_engine: true
   fp8: false # enables fp8 in TransformerLayer forward
-  fp8_e4m3: False # sets fp8_format = recipe.Format.E4M3
+  fp8_e4m3: true # sets fp8_format = recipe.Format.E4M3
   fp8_hybrid: true # sets fp8_format = recipe.Format.HYBRID
   fp8_margin: 0 # scaling margin
   fp8_interval: 1 # scaling update interval
   fp8_amax_history_len: 1024 # Number of steps for which amax history is recorded per tensor
   fp8_amax_compute_algo: max # 'most_recent' or 'max'. Algorithm for computing amax from history
-  ub_tp_comm_overlap: true
+  ub_tp_comm_overlap: false
   use_flash_attention: true
   overlap_p2p_comm: true
   batch_p2p_comm: false
   gc_interval: 100
+  nsys_profile:
+    enabled: False
+    trace: [nvtx,cuda]
+    start_step: 10  # Global batch to start profiling
+    end_step: 10 # Global batch to end profiling
+    ranks: [0] # Global rank IDs to profile
+    gen_shape: False # Generate model and kernel details including input shapes
+  fp8_params: true
   optim:
-    name: distributed_fused_adam
+    name: mcore_distributed_optim
     lr: 0.00015
     weight_decay: 0.1
     betas:
@@ -147,6 +160,7 @@ model:
     overlap_param_sync: true
     contiguous_grad_buffer: true
     contiguous_param_buffer: true
+    grad_sync_dtype: bf16
     sched:
       name: CosineAnnealing
       warmup_steps: 2000
@@ -159,19 +173,8 @@ model:
     skip_warmup: true
     num_workers: 2
     dataloader_type: single
-    reset_position_ids: true
-    reset_attention_mask: true
+    reset_position_ids: false
+    reset_attention_mask: false
     eod_mask_loss: false
     index_mapping_dir: null
     data_prefix: null
-  nsys_profile:
-    enabled: false
-    trace:
-    - nvtx
-    - cuda
-    start_step: 7
-    end_step: 9
-    ranks:
-    - 0
-    - 8
-    gen_shape: false

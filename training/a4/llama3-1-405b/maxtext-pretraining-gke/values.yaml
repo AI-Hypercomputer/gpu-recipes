@@ -1,4 +1,4 @@
-# Copyright 2024 Google LLC
+# Copyright 2025 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,44 +13,68 @@
 # limitations under the License.
 
 queue:
-podsetPreferredTopology: "kubernetes.io/hostname"
+
+dwsSettings:
+  maxRunDurationSeconds:
+
+tasSettings:
+  topologyRequest:
+    kueue.x-k8s.io/podset-preferred-topology: "kubernetes.io/hostname"
 
 volumes:
-  # The VM host path for SSDs is assumed at /mnt/stateful_partition/kube-ephemeral-ssd
-  ssdMountPath: "/ssd"
-
-  gcsMounts:
-    - bucketName:
-      mountPath: /gcs
+  gcsVolumes: false
+  psVolumes: false
 
 workload:
   gpus: 256 # This should be one of: {<= 8,  multiple of 8}
-  steps: 15
+  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/jax-maxtext-gpu:jax0.5.1-cuda_dl25.02-rev1-maxtext-20150317
+  configFile: maxtext-config.yaml
+  configPath: /workload/configs
+  defaultArguments:
+  - steps=15
+  arguments[]:
+  envs:
+  - name: MAXTEXT_CONFIG_PATH
+    value: "/workload/configs/maxtext-config.yaml"
+  - name: TF_CPP_VMODULE
+    value: "profile_guided_latency_estimator=10"
+  - name: TF_CPP_MIN_LOG_LEVEL
+    value: "0"
+  - name: TF_CPP_MAX_LOG_LEVEL
+    value: "100"
+  - name: XLA_PYTHON_CLIENT_MEM_FRACTION
+    value: "0.98"
+  - name: CUDA_DEVICE_MAX_CONNECTIONS
+    value: "1"
+  - name: NVTE_FUSED_ATTN
+    value: "1"
+  - name: JAX_REMOVE_CUSTOM_PARTITIONING_PTR_FROM_CACHE_KEY
+    value: "true"
+  - name: JAX_ENABLE_PGLE
+    value: "false"
+  - name: JAX_ENABLE_COMPILATION_CACHE
+    value: "false"
+  - name: XLA_FLAGS
+    value: >-
+      --xla_gpu_enable_latency_hiding_scheduler=true
+      --xla_gpu_enable_triton_gemm=false
+      --xla_gpu_enable_command_buffer=FUSION,CUSTOM_CALL
+      --xla_gpu_all_reduce_combine_threshold_bytes=17179869184
+      --xla_gpu_all_gather_combine_threshold_bytes=17179869184
+      --xla_gpu_reduce_scatter_combine_threshold_bytes=17179869184
+      --xla_gpu_enable_pipelined_all_gather=true
+      --xla_gpu_enable_pipelined_reduce_scatter=true
+      --xla_gpu_enable_pipelined_all_reduce=true
+      --xla_gpu_enable_while_loop_double_buffering=true
+      --xla_gpu_enable_all_gather_combine_by_dim=false
+      --xla_gpu_enable_reduce_scatter_combine_by_dim=false
+      --xla_disable_hlo_passes=rematerialization
 
 network:
   hostNetwork: True
-  subnetworks[]:
   gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:v1.0.5
+  subnetworks[]:
   ncclSettings:
   - name: NCCL_DEBUG
-    value: "INFO"
-  - name: JAX_ENABLE_COMPILATION_CACHE
-    value: False
-
-xlaFlags: >-
-  --xla_gpu_enable_latency_hiding_scheduler=true
-  --xla_gpu_enable_triton_gemm=false
-  --xla_gpu_enable_command_buffer=FUSION,CUSTOM_CALL
-  --xla_gpu_all_reduce_combine_threshold_bytes=17179869184
-  --xla_gpu_all_gather_combine_threshold_bytes=17179869184
-  --xla_gpu_reduce_scatter_combine_threshold_bytes=17179869184
-  --xla_gpu_enable_pipelined_all_gather=true
-  --xla_gpu_enable_pipelined_reduce_scatter=true
-  --xla_gpu_enable_pipelined_all_reduce=true
-  --xla_gpu_enable_while_loop_double_buffering=true
-  --xla_gpu_enable_all_gather_combine_by_dim=false
-  --xla_gpu_enable_reduce_scatter_combine_by_dim=false
-  --xla_disable_hlo_passes=rematerialization
-
-
+    value: "VERSION"
 

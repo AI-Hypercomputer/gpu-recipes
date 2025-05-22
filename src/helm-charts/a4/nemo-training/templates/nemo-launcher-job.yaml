@@ -220,7 +220,7 @@ spec:
           value: "8"
         - name: NVTE_BWD_LAYERNORM_SM_MARGIN
           value: "8"
-        
+
         # Additional NCCL settings
         {{- range $environment_variable := $root.Values.network.ncclSettings }}
         - name: {{ $environment_variable.name }}
@@ -259,7 +259,7 @@ spec:
           source /usr/local/gib/scripts/set_nccl_env.sh
 
           # Overriding NCCL_SOCKET_IFNAME definition
-          export NCCL_SOCKET_IFNAME="eth0,eth1" 
+          export NCCL_SOCKET_IFNAME="eth0,eth1"
           export NCCL_TUNER_CONFIG_PATH=/usr/local/gib/configs/tuner_config_a4.txtpb
 
           echo "Downloading GPT vocabulary files"

@@ -18,7 +18,7 @@ dwsSettings:
 
 tasSettings:
   topologyRequest:
-    kueue.x-k8s.io/podset-preferred-topology: "cloud.google.com/gce-topology-block"
+    kueue.x-k8s.io/podset-preferred-topology: "kubernetes.io/hostname"
 
 volumes:
   gcsVolumes: true
@@ -31,7 +31,7 @@ volumes:
     mountOptions: "implicit-dirs"
 
 workload:
-  gpus: 256 # This should be one of: {<= 8,  multiple of 8}
+  gpus: 512 # This should be one of: {<= 8,  multiple of 8}
   image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-nemo-nccl:nemo25.02-gib1.0.5-A4
   defaultArguments[]:
   arguments[]:
@@ -66,5 +66,3 @@ network:
   ncclSettings:
   - name: NCCL_DEBUG
     value: "VERSION"
-  - name: NVTE_UB_SOCKET_IFNAME
-    value: "eth1"
