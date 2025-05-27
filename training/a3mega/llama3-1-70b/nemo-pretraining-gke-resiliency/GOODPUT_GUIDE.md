@@ -57,8 +57,6 @@ Begin by optimizing your checkpointing process (Steps 1-4), choosing the techniq
 
 Checkpointing is vital for fault tolerance, allowing training to resume from a saved state. However, the checkpointing process itself can consume valuable time and, if not optimized, reduce GoodPut. The LLaMA3-1-70B recipe, as an example, incorporates several strategies for optimized checkpointing, aligning with principles from the [Google Cloud blog post](https://cloud.google.com/blog/products/ai-machine-learning/elastic-training-and-optimized-checkpointing-improve-ml-goodput).
 
-These strategies focus on making checkpointing faster, less intrusive, and more resilient. These strategies—asynchronous operations, distributed saves/loads, and leveraging robust cloud storage via FUSE—are themselves modular 'Lego blocks' that can be adopted independently or combined to enhance the I/O performance and resilience of various training setups, not limited to NeMo or this specific recipe.
-
 Choosing the right checkpointing strategy, or combination of strategies, is crucial for both minimizing training disruption and ensuring robust recovery. The methods described below—asynchronous, distributed, and multi-tier storage—can be seen as complementary building blocks. Your choice will depend on factors like model size, training scale, and infrastructure characteristics.
 
 Consider the following when making your decision:
@@ -173,6 +171,3 @@ Improving GoodPut is an ongoing process, and being able to measure it is critica
         *   Executing the `python3 calculator.py` script with necessary arguments, such as `--job-name <YOUR_JOB_NAME>` (which can be found using `kubectl get jobsets`), and parameters for log lookback periods (e.g., `--gcloud-logging-lookback-days 1`) and reference step times.
 
 Using this tool, or similar log analysis techniques, allows you to quantify the benefits of elastic training and optimized checkpointing, identify remaining bottlenecks, and further tune your setup for maximum efficiency.
-
-## Tying It All Together: A Holistic Approach
-Achieving and maintaining high ML GoodPut is an ongoing journey rather than a one-time setup. It demands a holistic strategy that thoughtfully combines resilient infrastructure, efficient training processes, and continuous operational diligence. The 'Lego blocks' detailed in this guide—from robust supervisor systems for elastic training to multifaceted checkpointing optimizations (asynchronous, distributed, and leveraging cloud storage)—are designed to be synergistic. By understanding how these components interact and adapting them to your specific workload and environment, you can build a truly efficient and resilient training pipeline. Remember that the strategies for minimizing BadPut and maximizing GoodPut are not static; continuous measurement, analysis (as discussed in 'Measuring Success: Goodput Analysis'), and refinement are key to unlocking sustained efficiency gains, faster model delivery, and optimized resource utilization in your large-scale ML endeavors.
