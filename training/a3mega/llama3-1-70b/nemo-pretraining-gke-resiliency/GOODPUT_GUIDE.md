@@ -41,7 +41,7 @@ Key sources of BadPut include:
     *   **Impact:** The longer it takes to identify that a problem has occurred and what the root cause is, the longer the downtime and the greater the BadPut.
     *   **Example:** A silent error corrupting data without immediate detection, or lack of clear logs making diagnosis time-consuming.
 
-The blog post further provides a table (via an image link: `https://storage.googleapis.com/gweb-cloudblog-publish/images/3_BRK2-131_xtcNYDc.max-2200x2200.jpg`) that details the specific metric improvements and ML GoodPut contributions for different techniques applied in their case study. While the visual data from the image cannot be rendered here, it underscores that a multi-faceted approach targeting these BadPut sources is key to substantial GoodPut gains.
+The blog post further provides a table (via an image link: ![ML GoodPut Contributions](images/goodput_blog_image.jpg)) that details the specific metric improvements and ML GoodPut contributions for different techniques applied in their case study. While the visual data from the image cannot be rendered here, it underscores that a multi-faceted approach targeting these BadPut sources is key to substantial GoodPut gains.
 
 ## Addressing Interruptions: Elastic Training
 
@@ -56,18 +56,36 @@ Key components and concepts include:
 A sophisticated supervisor system is deployed to monitor the health of the training cluster and the job itself. This system is crucial for quickly identifying issues and orchestrating a response. It consists of:
 
 *   **Supervisor Components:** These typically run on a dedicated CPU node pool.
-    *   **Sensor:** Actively monitors the training job and cluster components for failure signals, performance degradation, or straggler behavior. It might use heartbeat mechanisms (polling worker nodes) and receive signals from other sources like the Host Monitors. The `heartbeat_polling_period_s` and `heartbeat_timeout_s` in `values-supervisor.yaml` are critical for this.
+    *   **Sensor:** Actively monitors the training job and cluster components for failure signals, performance degradation, or straggler behavior. It might use heartbeat mechanisms (polling worker nodes) and receive signals from other sources like the Host Monitors. The [`heartbeat_polling_period_s`](values-supervisor.yaml) and [`heartbeat_timeout_s`](values-supervisor.yaml) in `values-supervisor.yaml` are critical for this.
     *   **Controller:** The central "brain" that receives event data from the Sensor. It consults a user-defined policy (or its internal logic) to decide on the appropriate remediation action.
     *   **Actuator:** Executes the remediation actions chosen by the Controller, such as initiating a job restart, requesting a node replacement, or triggering a scaling operation.
-    *   The configuration for these components, including their Docker images and startup commands, can be found in `training/a3mega/llama3-1-70b/nemo-pretraining-gke-resiliency/values-supervisor.yaml`.
-    *   The Kubernetes service accounts and roles required for the Supervisor to interact with GKE resources are defined in `training/a3mega/llama3-1-70b/nemo-pretraining-gke-resiliency/ksa-setup.yaml`.
-    *   The underlying Helm chart that deploys these supervisor components is located in `src/helm-charts/resiliency/supervisor-chart/`.
+    *   The configuration for these components, including their Docker images and startup commands, can be found in [values-supervisor.yaml](values-supervisor.yaml).
+    *   The Kubernetes service accounts and roles required for the Supervisor to interact with GKE resources are defined in [ksa-setup.yaml](ksa-setup.yaml).
+    *   The underlying Helm chart that deploys these supervisor components is located in [src/helm-charts/resiliency/supervisor-chart/](../../../../src/helm-charts/resiliency/supervisor-chart/).
+
+This entire Supervisor system (Sensor, Controller, Actuator, and Host Monitors) is designed as a modular 'Lego block'. While showcased here with NeMo, its components and principles can be adapted for other training frameworks by customizing the interaction points, primarily through the Actuator's remediation scripts and the policies defined in `values-supervisor.yaml`.
+
+#### Using the Supervisor with Your Custom Model
+This Supervisor system can be integrated with your custom training frameworks or models beyond the LLaMA3-1-70B NeMo example. Here's a general guide:
+
+*   **Deployment:** The Supervisor system (Supervisor controllers and Host Monitor DaemonSet) is deployed via its dedicated Helm chart, found at [src/helm-charts/resiliency/supervisor-chart/](../../../../src/helm-charts/resiliency/supervisor-chart/).
+*   **Configuration:** Crucially, you'll need to customize the [values-supervisor.yaml](values-supervisor.yaml) file. This includes:
+    *   Defining your GKE cluster setup (node pools, etc.).
+    *   Setting appropriate monitoring parameters like heartbeat intervals, timeouts, and failure detection thresholds ([`heartbeat_polling_period_s`](values-supervisor.yaml), [`heartbeat_timeout_s`](values-supervisor.yaml), [`pod_termination_threshold_s`](values-supervisor.yaml), [`jobset_downtime_threshold_s`](values-supervisor.yaml)) to match your job's behavior.
+    *   Specifying the remediation policies and scripts the Actuator should use for events like job restarts, node replacements, or scaling.
+*   **Actuator Integration:** The core of the integration lies in how the Supervisor's Actuator component interacts with your custom training application. Your application must be controllable via external commands or signals that the Actuator can trigger. This might involve:
+    *   The Actuator executing custom scripts that interact with your job (e.g., to stop, start, or send signals).
+    *   Your training framework exposing APIs that the Actuator can call.
+    *   Using signals (e.g., SIGUSR1, SIGTERM) that your application traps to initiate actions like saving a checkpoint and exiting, or re-evaluating cluster membership.
+*   **Checkpointing and Resumption:** Your custom application must implement robust checkpointing and the ability to resume training from these checkpoints. This is essential because Supervisor-initiated actions (like restarting a job after a failure or preemption) will rely on your application's capability to continue from the last known good state.
+
+By carefully configuring these aspects, you can leverage the Google Cloud Resiliency library's Supervisor system to bring enhanced fault tolerance and elastic training capabilities to a wide range of ML workloads.
 
 *   **Host Monitors:** These are deployed as a Kubernetes DaemonSet, ensuring one runs on each GPU worker node (e.g., A3 Mega nodes).
     *   They provide granular, node-level health information and can detect local hardware issues (like GPU errors) more directly.
-    *   They communicate with the central Supervisor, feeding it critical data for decision-making. Configuration details are also present in `values-supervisor.yaml` (see `host_daemon` section).
+    *   They communicate with the central Supervisor, feeding it critical data for decision-making. Configuration details are also present in `values-supervisor.yaml` (see [`host_daemon` section](values-supervisor.yaml)).
 
-The interaction between these components allows the system to automatically sense disruptions (e.g., using parameters like `pod_termination_threshold_s` and `jobset_downtime_threshold_s` from `values-supervisor.yaml`) and initiate mitigation procedures. The system also supports fault injection (`enable_fault_injection` in `values-supervisor.yaml`) for testing resiliency.
+The interaction between these components allows the system to automatically sense disruptions (e.g., using parameters like [`pod_termination_threshold_s`](values-supervisor.yaml) and [`jobset_downtime_threshold_s`](values-supervisor.yaml) from `values-supervisor.yaml`) and initiate mitigation procedures. The system also supports fault injection ([`enable_fault_injection`](values-supervisor.yaml) in `values-supervisor.yaml`) for testing resiliency.
 
 ### 2. Remediation Strategies
 
@@ -75,7 +93,7 @@ The Google Cloud Resiliency library, leveraging the NVIDIA Resiliency Extension,
 
 *   **In-Job Restarts / GPU Reset:** For certain correctable errors (e.g., transient GPU issues), the NVIDIA library might enable an in-job restart or a GPU reset to restore functionality without full node replacement.
 *   **Node Hot Swap:** In case of unrecoverable hardware failures, the Supervisor can coordinate with GKE to replace the faulty node with a healthy one from a spare pool, then rejoin it to the training job.
-*   **Scaling Down (and Up):** If spare resources aren't immediately available, the job can be automatically scaled down (e.g., reducing the number of data-parallel replicas, configured via `num_dp_replicas` and `num_nodes_per_dp` in `values-supervisor.yaml`) to continue training on the remaining healthy nodes. When replacement nodes become available, the system is designed to allow the training job to scale back up, maximizing resource utilization. User-defined callbacks (typically part of the training framework integration) can help adjust hyperparameters like learning rate and batch size during such elasticity events.
+*   **Scaling Down (and Up):** If spare resources aren't immediately available, the job can be automatically scaled down (e.g., reducing the number of data-parallel replicas, configured via [`num_dp_replicas`](values-supervisor.yaml) and [`num_nodes_per_dp`](values-supervisor.yaml) in `values-supervisor.yaml`) to continue training on the remaining healthy nodes. When replacement nodes become available, the system is designed to allow the training job to scale back up, maximizing resource utilization. User-defined callbacks (typically part of the training framework integration) can help adjust hyperparameters like learning rate and batch size during such elasticity events.
 
 ### State of Support
 
@@ -84,7 +102,7 @@ The Elastic Training features provided by the Google Cloud Resiliency library, a
 
 Checkpointing is vital for fault tolerance, allowing training to resume from a saved state. However, the checkpointing process itself can consume valuable time and, if not optimized, reduce GoodPut. The LLaMA3-1-70B recipe, as an example, incorporates several strategies for optimized checkpointing, aligning with principles from the [Google Cloud blog post](https://cloud.google.com/blog/products/ai-machine-learning/elastic-training-and-optimized-checkpointing-improve-ml-goodput).
 
-These strategies focus on making checkpointing faster, less intrusive, and more resilient.
+These strategies focus on making checkpointing faster, less intrusive, and more resilient. These strategies—asynchronous operations, distributed saves/loads, and leveraging robust cloud storage via FUSE—are themselves modular 'Lego blocks' that can be adopted independently or combined to enhance the I/O performance and resilience of various training setups, not limited to NeMo or this specific recipe.
 
 ### 1. Asynchronous Checkpointing
 
@@ -124,50 +142,6 @@ The optimal frequency for saving checkpoints is a balance: too infrequent, and y
 ### State of Support
 
 The Optimized Checkpointing features showcased in this recipe, including asynchronous and distributed checkpointing via NeMo/PyTorch flags and the use of GCS with GCS FUSE for durable checkpoint storage, are considered **Production-ready**. These are well-established techniques for improving I/O performance and resilience in large-scale training. Tuning these parameters appropriately for your specific model size, training duration, and failure rates is key to maximizing their benefit.
-## A "DIY" Approach: Composable Lego Blocks for GoodPut
-
-While this guide and the accompanying LLaMA3-1-70B recipe demonstrate a
-comprehensive solution for maximizing GoodPut, it's important to view the
-underlying technologies as a collection of "Lego blocks." You can choose,
-configure, and combine these components to best suit your specific ML training
-workload and infrastructure.
-
-The key takeaway is that achieving high GoodPut isn't about a single monolithic
-solution, but rather about strategically applying various techniques. Here's how
-the components discussed can be seen as reusable blocks:
-
-*   **Google Cloud Resiliency Library (Supervisor & Host Monitors):**
-    *   This is a powerful, standalone system for adding failure detection and
-        automated remediation to jobs running on GKE. While shown here with
-        NeMo, its principles and components (Sensor, Controller, Actuator) can
-        be adapted for other training frameworks.
-    *   Customization is primarily done through its configuration (as seen in
-        `training/a3mega/llama3-1-70b/nemo-pretraining-gke-resiliency/values-supervisor.yaml`) and the policies you define for remediation.
-
-*   **Optimized Checkpointing Techniques:**
-    *   **Asynchronous and Distributed Checkpointing:** These are features often
-        provided by the training framework itself (like NeMo/PyTorch in this
-        case). You can enable and tune them using framework-specific parameters
-        (e.g., the `--enable-async-ckpt`, `--enable-dist-ckpt` flags in
-        `training/a3mega/llama3-1-70b/nemo-pretraining-gke-resiliency/values.yaml`).
-    *   **Google Cloud Storage (GCS) with GCS FUSE:** This provides a robust,
-        scalable, and accessible storage backend for your checkpoints,
-        regardless of the training framework. The setup using PV/PVC and the GCS
-        FUSE CSI driver (detailed in `training/a3mega/llama3-1-70b/nemo-pretraining-gke-resiliency/README.md` and configured via
-        `training/a3mega/llama3-1-70b/nemo-pretraining-gke-resiliency/values-gcs.yaml`) is a pattern applicable to many scenarios.
-
-*   **Helm Chart Configuration:**
-    *   The use of Helm charts (evident from the `training/a3mega/llama3-1-70b/nemo-pretraining-gke-resiliency/values.yaml`, `training/a3mega/llama3-1-70b/nemo-pretraining-gke-resiliency/values-supervisor.yaml`, and `training/a3mega/llama3-1-70b/nemo-pretraining-gke-resiliency/values-gcs.yaml` files, and the `helm install` commands in the `training/a3mega/llama3-1-70b/nemo-pretraining-gke-resiliency/README.md`) is a prime example of the "DIY"
-        approach. Helm allows you to parameterize and manage the deployment of
-        these components, making it easier to tailor the setup to different
-        models, cluster sizes, or resiliency requirements. You can modify these
-        values files or create your own Helm charts to integrate these GoodPut
-        strategies into your existing MLOps pipelines.
-
-By understanding each component's role, you can decide which ones are most
-relevant to your pain points and integrate them incrementally. For instance, you
-might start by optimizing your checkpointing strategy with GCS and then later
-implement the full Supervisor system for enhanced elastic training capabilities.
 ## Measuring Success: Goodput Analysis
 
 Improving GoodPut is an ongoing process, and being able to measure it is critical to understanding the impact of the strategies you implement. The `gpu-recipes` repository provides a utility to help with this analysis.
