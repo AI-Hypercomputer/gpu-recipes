@@ -2,6 +2,19 @@
 
 Effective utilization of resources in large-scale machine learning (ML) training is crucial for both cost efficiency and rapid model development. A key metric for measuring this efficiency is **ML GoodPut**. As discussed in the Google Cloud blog post, "[Train AI for less: Improve ML Goodput with elastic training and optimized checkpointing](https://cloud.google.com/blog/products/ai-machine-learning/elastic-training-and-optimized-checkpointing-improve-ml-goodput)," GoodPut represents the actual productive training time, excluding time lost to various inefficiencies. Even a small percentage improvement in GoodPut can lead to significant cost savings and faster time-to-market for your models. For instance, consider a large training job utilizing 1024 GPUs. If this job runs for 30 days, the total available GPU hours are 1024 GPUs * 30 days * 24 hours/day = 737,280 GPU hours. If the GoodPut is only 50%, this means 368,640 GPU hours are wasted due to inefficiencies. Improving GoodPut by just 10% (from 50% to 60%) would reclaim 73,728 GPU hours, potentially saving hundreds of thousands of dollars and accelerating research by weeks.
 
+## Table of Contents
+- [TLDR: Recommended Lego Blocks for Your Deployment](#tldr-recommended-lego-blocks-for-your-deployment)
+- [Minimizing Downtime: Optimized Checkpointing](#minimizing-downtime-optimized-checkpointing)
+  - [1. Asynchronous Checkpointing](#1-asynchronous-checkpointing)
+  - [2. Multi-Tier Checkpointing Strategy (Leveraging GCS with FUSE)](#2-multi-tier-checkpointing-strategy-leveraging-gcs-with-fuse)
+  - [3. Distributed Checkpointing](#3-distributed-checkpointing)
+  - [4. Configurable Checkpoint Frequency](#4-configurable-checkpoint-frequency)
+- [Addressing Interruptions: Elastic Training](#addressing-interruptions-elastic-training)
+  - [1. Failure Sensing and Mitigation: The Supervisor System](#1-failure-sensing-and-mitigation-the-supervisor-system)
+  - [2. Remediation Strategies](#2-remediation-strategies)
+- [Measuring Success: Goodput Analysis](#measuring-success-goodput-analysis)
+- [Tying It All Together: A Holistic Approach](#tying-it-all-together-a-holistic-approach)
+
 Achieving high GoodPut can be challenging due to several factors common in large distributed training environments. The table below outlines the main sources of BadPut and their potential impact:
 
 | Source of BadPut                             | Description/Impact                                                                          | Potential GoodPut Loss (Example %) |
@@ -20,30 +33,78 @@ For customers looking to improve GoodPut on their own ML training workloads, her
 
 1.  **Optimize Checkpointing - Start with Asynchronous Checkpointing:**
     *   **Why:** Minimize GPU idle time by offloading checkpoint saves to CPU/background processes. This directly boosts GoodPut. This can directly recover a significant portion of GoodPut, potentially 3-10%, by minimizing GPU idle time during saves.
-    *   **How:** Enable asynchronous checkpointing features in your training framework (e.g., `--enable-async-ckpt` in NeMo). Ensure you have sufficient CPU and memory resources on host machines for this.
-    *   **Key for your workload:** Verify that your checkpointing mechanism can indeed save without halting GPU computation.
+    *   **How:** Enable asynchronous checkpointing features in your training framework (e.g., `--enable-async-ckpt` in NeMo). Ensure you have sufficient CPU and memory resources on host machines for this. See [Asynchronous Checkpointing](#1-asynchronous-checkpointing) for details.
 
 2.  **Leverage Cloud Storage with FUSE for Checkpoints:**
     *   **Why:** Provides durable, accessible, and scalable storage for your checkpoints, crucial for recovery across different nodes or after failures.
-    *   **How:** Use a service like Google Cloud Storage (GCS) with the Cloud Storage FUSE CSI driver to mount GCS buckets as local filesystems. Configure your training job to save checkpoints to this mounted path.
-    *   **Key for your workload:** Ensure appropriate permissions and regional alignment between your compute and storage. Consider enabling Hierarchical Namespace on GCS buckets for potentially better performance.
+    *   **How:** Use a service like Google Cloud Storage (GCS) with the Cloud Storage FUSE CSI driver to mount GCS buckets as local filesystems. Configure your training job to save checkpoints to this mounted path. More details can be found in [Multi-Tier Checkpointing Strategy (Leveraging GCS with FUSE)](#2-multi-tier-checkpointing-strategy-leveraging-gcs-with-fuse).
 
 3.  **Consider Distributed Checkpointing (For Very Large Models/Setups):**
     *   **Why:** If asynchronous checkpointing is still too slow due to massive model size or a large number of distributed workers, parallelize the checkpoint save/load process itself.
-    *   **How:** Utilize distributed checkpointing features within your framework (e.g., `--enable-dist-ckpt` in NeMo/PyTorch). This typically involves each worker saving its shard of the model.
-    *   **Key for your workload:** This adds complexity, so evaluate if the benefits outweigh it based on your scale. Often used in conjunction with asynchronous checkpointing.
+    *   **How:** Utilize distributed checkpointing features within your framework (e.g., `--enable-dist-ckpt` in NeMo/PyTorch). This typically involves each worker saving its shard of the model. Refer to [Distributed Checkpointing](#3-distributed-checkpointing) for more information.
 
 4.  **Tune Checkpoint Frequency:**
     *   **Why:** Balance the risk of lost work against the overhead of checkpointing.
-    *   **How:** Configure how often checkpoints are saved (e.g., based on training steps or time). Monitor your failure rates and checkpoint durations to find an optimal balance.
-    *   **Key for your workload:** There's no one-size-fits-all; this needs empirical tuning.
+    *   **How:** Configure how often checkpoints are saved (e.g., based on training steps or time). Monitor your failure rates and checkpoint durations to find an optimal balance. See [Configurable Checkpoint Frequency](#4-configurable-checkpoint-frequency) for guidance.
 
 5.  **Implement a Robust Supervisor System (Elastic Training):**
     *   **Why:** This is foundational for resilience, addressing BadPut from hardware failures and preemptions, which can account for 5-15% of lost GoodPut. It automates detection and recovery.
-    *   **How:** Adapt or implement a supervisor system like the one detailed in the "Elastic Training" section. Focus on failure sensing, policy-based remediation (like node hot-swapping), and ensuring your training job can be controlled externally (start/stop/checkpoint). The Google Cloud Resiliency library components (Sensor, Controller, Actuator, Host Monitors) provide a strong template.
-    *   **Key for your workload:** Ensure your custom training application can gracefully handle external signals for checkpointing and resumption.
+    *   **How:** Adapt or implement a supervisor system like the one detailed in the 'Elastic Training' section. Focus on failure sensing, policy-based remediation (like node hot-swapping), and ensuring your training job can be controlled externally (start/stop/checkpoint). The Google Cloud Resiliency library components (Sensor, Controller, Actuator, Host Monitors) provide a strong template. Detailed implementation strategies are discussed in [Addressing Interruptions: Elastic Training](#addressing-interruptions-elastic-training).
 
 Begin by optimizing your checkpointing process (Steps 1-4), choosing the techniques most relevant to your workload's scale and characteristics, as this often provides the most immediate GoodPut gains. Then, implement a robust supervisor system (Step 5) to build upon this with comprehensive resilience against interruptions. Finally, continuously monitor your GoodPut to measure improvements.
+
+## Minimizing Downtime: Optimized Checkpointing
+
+Checkpointing is vital for fault tolerance, allowing training to resume from a saved state. However, the checkpointing process itself can consume valuable time and, if not optimized, reduce GoodPut. The LLaMA3-1-70B recipe, as an example, incorporates several strategies for optimized checkpointing, aligning with principles from the [Google Cloud blog post](https://cloud.google.com/blog/products/ai-machine-learning/elastic-training-and-optimized-checkpointing-improve-ml-goodput).
+
+These strategies focus on making checkpointing faster, less intrusive, and more resilient. These strategies—asynchronous operations, distributed saves/loads, and leveraging robust cloud storage via FUSE—are themselves modular 'Lego blocks' that can be adopted independently or combined to enhance the I/O performance and resilience of various training setups, not limited to NeMo or this specific recipe.
+
+Choosing the right checkpointing strategy, or combination of strategies, is crucial for both minimizing training disruption and ensuring robust recovery. The methods described below—asynchronous, distributed, and multi-tier storage—can be seen as complementary building blocks. Your choice will depend on factors like model size, training scale, and infrastructure characteristics.
+
+Consider the following when making your decision:
+
+*   **Asynchronous Checkpointing:** This is generally recommended for most training jobs. By offloading the checkpoint save operation to background processes (typically on the CPU), it allows the GPUs to continue training with minimal interruption. This directly improves GoodPut by reducing idle GPU time. It's effective for both single-node and multi-node training.
+
+*   **Distributed Checkpointing:** When training very large models across a significant number of nodes and GPUs, the process of gathering and saving the model state can still be time-consuming, even if asynchronous. Distributed checkpointing parallelizes the save (and load) process itself, where each worker or a subset of workers handles its portion of the model state concurrently. This is often used in conjunction with asynchronous checkpointing to further reduce the critical path of saving checkpoints.
+
+*   **Integration with the Supervisor System:** The Supervisor system (detailed in the "Elastic Training" section) acts as the overall training controller and relies on a robust and efficient checkpointing mechanism to enable automated recovery from hardware failures or preemptions. When the Supervisor restarts a job or a pod, it depends on the training application's ability to quickly load the latest checkpoint. Therefore, selecting fast and reliable checkpointing methods (like asynchronous and distributed, saved to resilient storage like GCS) is key to minimizing downtime when the Supervisor needs to intervene. The goal is a synergistic relationship: checkpointing provides the recovery points, and the Supervisor automates the recovery process.
+
+These strategies can often be combined. For instance, a large distributed training job would ideally use both distributed checkpointing (to quickly gather state from all workers) and asynchronous checkpointing (to offload the writing to persistent storage without stalling GPUs), all while being monitored by the Supervisor for fault tolerance.
+
+### 1. Asynchronous Checkpointing
+
+To prevent training pauses during checkpoint saves, this recipe leverages asynchronous checkpointing. This means the training process (e.g., GPU computation) can continue while checkpoints are being written to storage in the background. This is typically achieved by first copying the checkpoint data from GPU memory to host CPU memory, which is a fast operation, and then the host CPU handles the slower write to persistent storage.
+
+*   This capability is enabled in the NeMo framework (used in the LLaMA3-1-70B recipe) via flags in the main `workload.flags` section of [values.yaml](values.yaml):
+    *   `--enable-async-ckpt`: Enables the basic asynchronous checkpointing feature.
+    *   `--enable-optimized-async-ckpt`: Enables further optimizations for the asynchronous checkpointing mechanism, potentially improving the efficiency of offloading data from GPU HBM to host memory and managing the subsequent save.
+    *   `--ckpt-threads-per-rank=2`: (Example from [values.yaml](values.yaml)) Configures the number of threads per rank dedicated to checkpointing operations, which can help parallelize and speed up the process. Users can tune the `--ckpt-threads-per-rank` value; increasing it may improve checkpointing speed if the process is I/O bound and sufficient CPU resources are available, but excessive threads could also lead to contention. Optimal values should be determined through experimentation.
+
+### 2. Multi-Tier Checkpointing Strategy (Leveraging GCS with FUSE)
+
+The blog post describes an ideal multi-tiered approach (local node storage, peer node storage, cloud storage) for balancing speed and resilience. The LLaMA3-1-70B recipe prominently features Google Cloud Storage (GCS) as a robust and scalable tier for durable checkpoint storage, accessed via the [Cloud Storage FUSE CSI driver](https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/cloud-storage-fuse-csi-driver).
+
+*   **GCS for Checkpoints:**
+    *   The [values-gcs.yaml](values-gcs.yaml) file defines the GCS bucket to be used (e.g., `gcs-checkpoints`). Users should ensure this GCS bucket is provisioned in the same region as their GKE cluster, has appropriate write/read permissions for the training job's service account, and has Hierarchical Namespace enabled for potentially better performance, as detailed in the main recipe [README.md](README.md).
+    *   The main [README.md](README.md) of the recipe details setting up the GCS bucket (Hierarchical Namespace recommended) and configuring access via a Kubernetes Persistent Volume (PV) and Persistent Volume Claim (PVC).
+    *   The `infrastructure.enable_gcsfuse: true` setting in [values.yaml](values.yaml) ensures that GCS FUSE is utilized for the job.
+    *   The underlying Helm chart for GCS FUSE setup can be found in [src/helm-charts/storage/gcs-fuse/](../../../../src/helm-charts/storage/gcs-fuse/).
+*   **How GCS FUSE Helps:** GCS FUSE allows Kubernetes Pods to mount a GCS bucket as a local filesystem. This simplifies access for training frameworks, as they can read/write checkpoints to what appears to be a local path, while the data is actually persisted to GCS. This is crucial for both saving checkpoints and for restoring them during job recovery.
+*   While this recipe focuses on GCS as the primary persistent checkpointing backend, advanced configurations within NeMo/PyTorch might allow for staging checkpoints on local SSDs before asynchronous upload to GCS, achieving a multi-tier behavior.
+
+### 3. Distributed Checkpointing
+
+For large models trained across many GPUs, saving and loading checkpoints can be a bottleneck if handled by a single process or node. Distributed checkpointing, often a feature of the training framework (like PyTorch, which NeMo builds upon), addresses this by parallelizing the save/load operations across multiple workers/nodes. Each rank or a subset of ranks saves its portion of the model state concurrently.
+
+*   The `--enable-dist-ckpt` flag in [values.yaml](values.yaml) activates this feature.
+*   For more details on PyTorch's distributed checkpointing capabilities, refer to the [PyTorch Distributed Documentation](https://pytorch.org/docs/stable/distributed.html) (specific links may vary by PyTorch version, search for "distributed checkpointing" or "state_dict").
+
+### 4. Configurable Checkpoint Frequency
+
+The optimal frequency for saving checkpoints is a balance: too infrequent, and you risk losing significant work; too frequent, and the overhead (even if async) can become substantial.
+
+*   The `--checkpoint-interval=25` (by default, measured in training steps) in the `workload.flags` section of [values.yaml](values.yaml) allows users to tune this. This value is specified in terms of training steps. The optimal interval is a trade-off: smaller intervals reduce the amount of lost computation in case of a failure but increase the aggregate time spent on checkpointing. Larger intervals minimize checkpointing overhead but risk more lost work. Users should tune this based on their specific job's typical step duration and observed failure rates.
+*   Other related flags like `--topk-ckpt=-1` (from [values.yaml](values.yaml), meaning keep all checkpoints in this case) also play a role in the checkpointing strategy. A value of `-1` (as shown in the example) means all checkpoints are kept, which can consume considerable storage over long runs. Users should set this to a positive integer to keep only the latest 'k' checkpoints, balancing recovery needs with storage costs.
 
 ## Addressing Interruptions: Elastic Training
 
@@ -99,59 +160,6 @@ The Google Cloud Resiliency library, leveraging the NVIDIA Resiliency Extension,
 
 #### Customizing Remediation Logic
 While [values-supervisor.yaml](values-supervisor.yaml) defines the monitoring parameters (like heartbeats and timeouts) and high-level remediation policies (e.g., whether to attempt a node swap or scale down), the precise commands and mechanisms for interacting with the *specific training application* during remediation are typically implemented within the Actuator component or scripts called by the Actuator. For instance, the exact command to gracefully stop a NeMo pod, instruct MaxText to save an emergency checkpoint, or re-launch a specific training script with an updated list of participating nodes resides in this layer. Users can customize these Actuator scripts or provide their own implementations to integrate the Supervisor system seamlessly with their chosen training framework's operational needs, thus making the resiliency solution highly adaptable.
-
-## Minimizing Downtime: Optimized Checkpointing
-
-Checkpointing is vital for fault tolerance, allowing training to resume from a saved state. However, the checkpointing process itself can consume valuable time and, if not optimized, reduce GoodPut. The LLaMA3-1-70B recipe, as an example, incorporates several strategies for optimized checkpointing, aligning with principles from the [Google Cloud blog post](https://cloud.google.com/blog/products/ai-machine-learning/elastic-training-and-optimized-checkpointing-improve-ml-goodput).
-
-These strategies focus on making checkpointing faster, less intrusive, and more resilient. These strategies—asynchronous operations, distributed saves/loads, and leveraging robust cloud storage via FUSE—are themselves modular 'Lego blocks' that can be adopted independently or combined to enhance the I/O performance and resilience of various training setups, not limited to NeMo or this specific recipe.
-
-Choosing the right checkpointing strategy, or combination of strategies, is crucial for both minimizing training disruption and ensuring robust recovery. The methods described below—asynchronous, distributed, and multi-tier storage—can be seen as complementary building blocks. Your choice will depend on factors like model size, training scale, and infrastructure characteristics.
-
-Consider the following when making your decision:
-
-*   **Asynchronous Checkpointing:** This is generally recommended for most training jobs. By offloading the checkpoint save operation to background processes (typically on the CPU), it allows the GPUs to continue training with minimal interruption. This directly improves GoodPut by reducing idle GPU time. It's effective for both single-node and multi-node training.
-
-*   **Distributed Checkpointing:** When training very large models across a significant number of nodes and GPUs, the process of gathering and saving the model state can still be time-consuming, even if asynchronous. Distributed checkpointing parallelizes the save (and load) process itself, where each worker or a subset of workers handles its portion of the model state concurrently. This is often used in conjunction with asynchronous checkpointing to further reduce the critical path of saving checkpoints.
-
-*   **Integration with the Supervisor System:** The Supervisor system (detailed in the "Elastic Training" section) acts as the overall training controller and relies on a robust and efficient checkpointing mechanism to enable automated recovery from hardware failures or preemptions. When the Supervisor restarts a job or a pod, it depends on the training application's ability to quickly load the latest checkpoint. Therefore, selecting fast and reliable checkpointing methods (like asynchronous and distributed, saved to resilient storage like GCS) is key to minimizing downtime when the Supervisor needs to intervene. The goal is a synergistic relationship: checkpointing provides the recovery points, and the Supervisor automates the recovery process.
-
-These strategies can often be combined. For instance, a large distributed training job would ideally use both distributed checkpointing (to quickly gather state from all workers) and asynchronous checkpointing (to offload the writing to persistent storage without stalling GPUs), all while being monitored by the Supervisor for fault tolerance.
-
-### 1. Asynchronous Checkpointing
-
-To prevent training pauses during checkpoint saves, this recipe leverages asynchronous checkpointing. This means the training process (e.g., GPU computation) can continue while checkpoints are being written to storage in the background. This is typically achieved by first copying the checkpoint data from GPU memory to host CPU memory, which is a fast operation, and then the host CPU handles the slower write to persistent storage.
-
-*   This capability is enabled in the NeMo framework (used in the LLaMA3-1-70B recipe) via flags in the main `workload.flags` section of [values.yaml](values.yaml):
-    *   `--enable-async-ckpt`: Enables the basic asynchronous checkpointing feature.
-    *   `--enable-optimized-async-ckpt`: Enables further optimizations for the asynchronous checkpointing mechanism, potentially improving the efficiency of offloading data from GPU HBM to host memory and managing the subsequent save.
-    *   `--ckpt-threads-per-rank=2`: (Example from [values.yaml](values.yaml)) Configures the number of threads per rank dedicated to checkpointing operations, which can help parallelize and speed up the process. Users can tune the `--ckpt-threads-per-rank` value; increasing it may improve checkpointing speed if the process is I/O bound and sufficient CPU resources are available, but excessive threads could also lead to contention. Optimal values should be determined through experimentation.
-
-### 2. Distributed Checkpointing
-
-For large models trained across many GPUs, saving and loading checkpoints can be a bottleneck if handled by a single process or node. Distributed checkpointing, often a feature of the training framework (like PyTorch, which NeMo builds upon), addresses this by parallelizing the save/load operations across multiple workers/nodes. Each rank or a subset of ranks saves its portion of the model state concurrently.
-
-*   The `--enable-dist-ckpt` flag in [values.yaml](values.yaml) activates this feature.
-*   For more details on PyTorch's distributed checkpointing capabilities, refer to the [PyTorch Distributed Documentation](https://pytorch.org/docs/stable/distributed.html) (specific links may vary by PyTorch version, search for "distributed checkpointing" or "state_dict").
-
-### 3. Multi-Tier Checkpointing Strategy (Leveraging GCS with FUSE)
-
-The blog post describes an ideal multi-tiered approach (local node storage, peer node storage, cloud storage) for balancing speed and resilience. The LLaMA3-1-70B recipe prominently features Google Cloud Storage (GCS) as a robust and scalable tier for durable checkpoint storage, accessed via the [Cloud Storage FUSE CSI driver](https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/cloud-storage-fuse-csi-driver).
-
-*   **GCS for Checkpoints:**
-    *   The [values-gcs.yaml](values-gcs.yaml) file defines the GCS bucket to be used (e.g., `gcs-checkpoints`). Users should ensure this GCS bucket is provisioned in the same region as their GKE cluster, has appropriate write/read permissions for the training job's service account, and has Hierarchical Namespace enabled for potentially better performance, as detailed in the main recipe [README.md](README.md).
-    *   The main [README.md](README.md) of the recipe details setting up the GCS bucket (Hierarchical Namespace recommended) and configuring access via a Kubernetes Persistent Volume (PV) and Persistent Volume Claim (PVC).
-    *   The `infrastructure.enable_gcsfuse: true` setting in [values.yaml](values.yaml) ensures that GCS FUSE is utilized for the job.
-    *   The underlying Helm chart for GCS FUSE setup can be found in [src/helm-charts/storage/gcs-fuse/](../../../../src/helm-charts/storage/gcs-fuse/).
-*   **How GCS FUSE Helps:** GCS FUSE allows Kubernetes Pods to mount a GCS bucket as a local filesystem. This simplifies access for training frameworks, as they can read/write checkpoints to what appears to be a local path, while the data is actually persisted to GCS. This is crucial for both saving checkpoints and for restoring them during job recovery.
-*   While this recipe focuses on GCS as the primary persistent checkpointing backend, advanced configurations within NeMo/PyTorch might allow for staging checkpoints on local SSDs before asynchronous upload to GCS, achieving a multi-tier behavior.
-
-### 4. Configurable Checkpoint Frequency
-
-The optimal frequency for saving checkpoints is a balance: too infrequent, and you risk losing significant work; too frequent, and the overhead (even if async) can become substantial.
-
-*   The `--checkpoint-interval=25` (by default, measured in training steps) in the `workload.flags` section of [values.yaml](values.yaml) allows users to tune this. This value is specified in terms of training steps. The optimal interval is a trade-off: smaller intervals reduce the amount of lost computation in case of a failure but increase the aggregate time spent on checkpointing. Larger intervals minimize checkpointing overhead but risk more lost work. Users should tune this based on their specific job's typical step duration and observed failure rates.
-*   Other related flags like `--topk-ckpt=-1` (from [values.yaml](values.yaml), meaning keep all checkpoints in this case) also play a role in the checkpointing strategy. A value of `-1` (as shown in the example) means all checkpoints are kept, which can consume considerable storage over long runs. Users should set this to a positive integer to keep only the latest 'k' checkpoints, balancing recovery needs with storage costs.
 
 ## Measuring Success: Goodput Analysis
 
