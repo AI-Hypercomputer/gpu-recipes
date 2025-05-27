@@ -91,18 +91,30 @@ The interaction between these components allows the system to automatically sens
 
 The Google Cloud Resiliency library, leveraging the NVIDIA Resiliency Extension, is designed to support various remediation strategies. The exact policy and automation level can be customized:
 
-*   **In-Job Restarts / GPU Reset:** For certain correctable errors (e.g., transient GPU issues), the NVIDIA library might enable an in-job restart or a GPU reset to restore functionality without full node replacement.
-*   **Node Hot Swap:** In case of unrecoverable hardware failures, the Supervisor can coordinate with GKE to replace the faulty node with a healthy one from a spare pool, then rejoin it to the training job.
-*   **Scaling Down (and Up):** If spare resources aren't immediately available, the job can be automatically scaled down (e.g., reducing the number of data-parallel replicas, configured via [`num_dp_replicas`](values-supervisor.yaml) and [`num_nodes_per_dp`](values-supervisor.yaml) in `values-supervisor.yaml`) to continue training on the remaining healthy nodes. When replacement nodes become available, the system is designed to allow the training job to scale back up, maximizing resource utilization. User-defined callbacks (typically part of the training framework integration) can help adjust hyperparameters like learning rate and batch size during such elasticity events.
+*   **In-Job Restarts / GPU Reset:** For certain correctable errors (e.g., transient GPU issues identified by lower-level hardware monitoring), the NVIDIA library might enable an in-job restart or a GPU reset to restore functionality. Following such recovery attempts, the Supervisor system orchestrates the restart of the affected training job components (e.g., Kubernetes pods) to ensure they rejoin the training process and resume from the last valid checkpoint. The primary goal from the Supervisor's perspective is to bring the job back to a healthy, training state.
+*   **Node Hot Swap:** This is a core capability of the Supervisor system. When the Sensor (using health-check parameters like [`heartbeat_polling_period_s`](values-supervisor.yaml) and [`heartbeat_timeout_s`](values-supervisor.yaml) from `values-supervisor.yaml`) and the Host Monitors detect an unrecoverable node failure, the Controller evaluates the situation based on its configured policies. If a node replacement is deemed necessary, the Actuator component interacts with GKE to de-allocate the failed node and provision a new one from the available resource pool. The training job, often managed by a higher-level controller like JobSet, subsequently resumes on the reconstituted set of nodes, loading from the latest checkpoint.
+*   **Scaling Down (and Up):** The target size of the training job is defined by parameters such as [`num_dp_replicas`](values-supervisor.yaml) and [`num_nodes_per_dp`](values-supervisor.yaml) in `values-supervisor.yaml`. If nodes fail and replacement resources are not immediately available, the Supervisor's Controller can decide to scale down the job to continue training on the remaining healthy nodes. In such scenarios, the Actuator would modify the job specification (e.g., by updating the JobSet resource if Kubernetes JobSet is being used, or by interacting with the specific training framework's scaling mechanisms). The system is designed to scale back up to its target size if new resources become available or previously failed nodes are restored. The Supervisor components facilitating these actions are deployed via a Helm chart, available at [src/helm-charts/resiliency/supervisor-chart/](../../../../src/helm-charts/resiliency/supervisor-chart/).
 
-### State of Support
+#### Customizing Remediation Logic
+While `values-supervisor.yaml` defines the monitoring parameters (like heartbeats and timeouts) and high-level remediation policies (e.g., whether to attempt a node swap or scale down), the precise commands and mechanisms for interacting with the *specific training application* during remediation are typically implemented within the Actuator component or scripts called by the Actuator. For instance, the exact command to gracefully stop a NeMo pod, instruct MaxText to save an emergency checkpoint, or re-launch a specific training script with an updated list of participating nodes resides in this layer. Users can customize these Actuator scripts or provide their own implementations to integrate the Supervisor system seamlessly with their chosen training framework's operational needs, thus making the resiliency solution highly adaptable.
 
-The Elastic Training features provided by the Google Cloud Resiliency library, as demonstrated in the LLaMA3-1-70B recipe (Supervisor, Host Monitors, integration with GKE and NVIDIA Resiliency Extension), are considered **Production-ready** components. They provide a robust framework for improving the resilience of large-scale training jobs on Google Cloud. The specific remediation policies and their triggers can be further customized.
 ## Minimizing Downtime: Optimized Checkpointing
 
 Checkpointing is vital for fault tolerance, allowing training to resume from a saved state. However, the checkpointing process itself can consume valuable time and, if not optimized, reduce GoodPut. The LLaMA3-1-70B recipe, as an example, incorporates several strategies for optimized checkpointing, aligning with principles from the [Google Cloud blog post](https://cloud.google.com/blog/products/ai-machine-learning/elastic-training-and-optimized-checkpointing-improve-ml-goodput).
 
 These strategies focus on making checkpointing faster, less intrusive, and more resilient. These strategies—asynchronous operations, distributed saves/loads, and leveraging robust cloud storage via FUSE—are themselves modular 'Lego blocks' that can be adopted independently or combined to enhance the I/O performance and resilience of various training setups, not limited to NeMo or this specific recipe.
+
+Choosing the right checkpointing strategy, or combination of strategies, is crucial for both minimizing training disruption and ensuring robust recovery. The methods described below—asynchronous, distributed, and multi-tier storage—can be seen as complementary building blocks. Your choice will depend on factors like model size, training scale, and infrastructure characteristics.
+
+Consider the following when making your decision:
+
+*   **Asynchronous Checkpointing:** This is generally recommended for most training jobs. By offloading the checkpoint save operation to background processes (typically on the CPU), it allows the GPUs to continue training with minimal interruption. This directly improves GoodPut by reducing idle GPU time. It's effective for both single-node and multi-node training.
+
+*   **Distributed Checkpointing:** When training very large models across a significant number of nodes and GPUs, the process of gathering and saving the model state can still be time-consuming, even if asynchronous. Distributed checkpointing parallelizes the save (and load) process itself, where each worker or a subset of workers handles its portion of the model state concurrently. This is often used in conjunction with asynchronous checkpointing to further reduce the critical path of saving checkpoints.
+
+*   **Integration with the Supervisor System:** The Supervisor system (detailed in the "Elastic Training" section) acts as the overall training controller and relies on a robust and efficient checkpointing mechanism to enable automated recovery from hardware failures or preemptions. When the Supervisor restarts a job or a pod, it depends on the training application's ability to quickly load the latest checkpoint. Therefore, selecting fast and reliable checkpointing methods (like asynchronous and distributed, saved to resilient storage like GCS) is key to minimizing downtime when the Supervisor needs to intervene. The goal is a synergistic relationship: checkpointing provides the recovery points, and the Supervisor automates the recovery process.
+
+These strategies can often be combined. For instance, a large distributed training job would ideally use both distributed checkpointing (to quickly gather state from all workers) and asynchronous checkpointing (to offload the writing to persistent storage without stalling GPUs), all while being monitored by the Supervisor for fault tolerance.
 
 ### 1. Asynchronous Checkpointing
 
@@ -111,7 +123,7 @@ To prevent training pauses during checkpoint saves, this recipe leverages asynch
 *   This capability is enabled in the NeMo framework (used in the LLaMA3-1-70B recipe) via flags in the main `workload.flags` section of `training/a3mega/llama3-1-70b/nemo-pretraining-gke-resiliency/values.yaml`:
     *   `--enable-async-ckpt`: Enables the basic asynchronous checkpointing feature.
     *   `--enable-optimized-async-ckpt`: Enables further optimizations for the asynchronous checkpointing mechanism, potentially improving the efficiency of offloading data from GPU HBM to host memory and managing the subsequent save.
-    *   `--ckpt-threads-per-rank=2`: (Example from `values.yaml`) Configures the number of threads per rank dedicated to checkpointing operations, which can help parallelize and speed up the process.
+    *   `--ckpt-threads-per-rank=2`: (Example from `values.yaml`) Configures the number of threads per rank dedicated to checkpointing operations, which can help parallelize and speed up the process. Users can tune the `--ckpt-threads-per-rank` value; increasing it may improve checkpointing speed if the process is I/O bound and sufficient CPU resources are available, but excessive threads could also lead to contention. Optimal values should be determined through experimentation.
 
 ### 2. Distributed Checkpointing
 
@@ -125,7 +137,7 @@ For large models trained across many GPUs, saving and loading checkpoints can be
 The blog post describes an ideal multi-tiered approach (local node storage, peer node storage, cloud storage) for balancing speed and resilience. The LLaMA3-1-70B recipe prominently features Google Cloud Storage (GCS) as a robust and scalable tier for durable checkpoint storage, accessed via the [Cloud Storage FUSE CSI driver](https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/cloud-storage-fuse-csi-driver).
 
 *   **GCS for Checkpoints:**
-    *   The `training/a3mega/llama3-1-70b/nemo-pretraining-gke-resiliency/values-gcs.yaml` file defines the GCS bucket to be used (e.g., `gcs-checkpoints`).
+    *   The `training/a3mega/llama3-1-70b/nemo-pretraining-gke-resiliency/values-gcs.yaml` file defines the GCS bucket to be used (e.g., `gcs-checkpoints`). Users should ensure this GCS bucket is provisioned in the same region as their GKE cluster, has appropriate write/read permissions for the training job's service account, and has Hierarchical Namespace enabled for potentially better performance, as detailed in the main recipe `README.md`.
     *   The main `README.md` of the recipe details setting up the GCS bucket (Hierarchical Namespace recommended) and configuring access via a Kubernetes Persistent Volume (PV) and Persistent Volume Claim (PVC).
     *   The `infrastructure.enable_gcsfuse: true` setting in `training/a3mega/llama3-1-70b/nemo-pretraining-gke-resiliency/values.yaml` ensures that GCS FUSE is utilized for the job.
     *   The underlying Helm chart for GCS FUSE setup can be found in `src/helm-charts/storage/gcs-fuse/`.
@@ -136,23 +148,18 @@ The blog post describes an ideal multi-tiered approach (local node storage, peer
 
 The optimal frequency for saving checkpoints is a balance: too infrequent, and you risk losing significant work; too frequent, and the overhead (even if async) can become substantial.
 
-*   The `--checkpoint-interval=25` (by default, measured in training steps) in the `workload.flags` section of `training/a3mega/llama3-1-70b/nemo-pretraining-gke-resiliency/values.yaml` allows users to tune this.
-*   Other related flags like `--topk-ckpt=-1` (from `values.yaml`, meaning keep all checkpoints in this case) also play a role in the checkpointing strategy.
+*   The `--checkpoint-interval=25` (by default, measured in training steps) in the `workload.flags` section of `training/a3mega/llama3-1-70b/nemo-pretraining-gke-resiliency/values.yaml` allows users to tune this. This value is specified in terms of training steps. The optimal interval is a trade-off: smaller intervals reduce the amount of lost computation in case of a failure but increase the aggregate time spent on checkpointing. Larger intervals minimize checkpointing overhead but risk more lost work. Users should tune this based on their specific job's typical step duration and observed failure rates.
+*   Other related flags like `--topk-ckpt=-1` (from `values.yaml`, meaning keep all checkpoints in this case) also play a role in the checkpointing strategy. A value of `-1` (as shown in the example) means all checkpoints are kept, which can consume considerable storage over long runs. Users should set this to a positive integer to keep only the latest 'k' checkpoints, balancing recovery needs with storage costs.
 
-### State of Support
-
-The Optimized Checkpointing features showcased in this recipe, including asynchronous and distributed checkpointing via NeMo/PyTorch flags and the use of GCS with GCS FUSE for durable checkpoint storage, are considered **Production-ready**. These are well-established techniques for improving I/O performance and resilience in large-scale training. Tuning these parameters appropriately for your specific model size, training duration, and failure rates is key to maximizing their benefit.
 ## Measuring Success: Goodput Analysis
 
 Improving GoodPut is an ongoing process, and being able to measure it is critical to understanding the impact of the strategies you implement. The `gpu-recipes` repository provides a utility to help with this analysis.
 
 *   **Resiliency Metrics Tool:**
-    *   Located in the `src/utils/resiliency_metrics/` directory (relative to the root of the `gpu-recipes` repository), the `calculator.py` script is designed to analyze training job logs and calculate various metrics, including the overall GoodPut percentage.
-    *   The main `training/a3mega/llama3-1-70b/nemo-pretraining-gke-resiliency/README.md` for the LLaMA3-1-70B recipe includes instructions on how to set up and run this tool. It typically involves parsing logs to identify events like job starts, checkpoint loads/saves, and total runtime to derive the effective computation time versus total time.
+    *   Located in the [`src/utils/resiliency_metrics/`](../../../../src/utils/resiliency_metrics/) directory (relative to the root of the `gpu-recipes` repository), the [`calculator.py`](../../../../src/utils/resiliency_metrics/calculator.py) script is designed to analyze training job logs and calculate various metrics, including the overall GoodPut percentage.
+    *   The main `training/a3mega/llama3-1-70b/nemo-pretraining-gke-resiliency/README.md` for the LLaMA3-1-70B recipe includes detailed instructions on how to set up and run this tool (see the [Goodput Analysis for the job](README.md#goodput-analysis-for-the-job) section). Generally, using the tool involves these key steps:
+        *   Navigating to the `src/utils/resiliency_metrics/` directory.
+        *   Creating a Python virtual environment and installing required packages from `requirements.txt`.
+        *   Executing the `python3 calculator.py` script with necessary arguments, such as `--job-name <YOUR_JOB_NAME>` (which can be found using `kubectl get jobsets`), and parameters for log lookback periods (e.g., `--gcloud-logging-lookback-days 1`) and reference step times.
 
 Using this tool, or similar log analysis techniques, allows you to quantify the benefits of elastic training and optimized checkpointing, identify remaining bottlenecks, and further tune your setup for maximum efficiency.
-## Conclusion: Towards More Efficient and Resilient Training
-
-Maximizing ML GoodPut is essential for controlling costs and accelerating innovation in large-scale AI model development. By implementing robust elastic training mechanisms and optimized checkpointing strategies, as demonstrated in this LLaMA3-1-70B recipe, you can significantly reduce wasted compute time and improve the overall efficiency and resilience of your training pipelines.
-
-The Google Cloud Resiliency library, combined with features within frameworks like NVIDIA NeMo and PyTorch, and leveraging Google Cloud infrastructure like GKE and GCS, provides a powerful toolkit. We encourage you to explore these "Lego blocks," adapt them to your specific needs, and continuously measure and refine your setup to achieve the best possible GoodPut for your demanding training workloads.
