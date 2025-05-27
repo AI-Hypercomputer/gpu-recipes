@@ -1,77 +1,49 @@
 # Maximizing ML Training Efficiency: A General Guide to Improving GoodPut
 
-Effective utilization of resources in large-scale machine learning (ML) training is crucial for both cost efficiency and rapid model development. A key metric for measuring this efficiency is **ML GoodPut**. As discussed in the Google Cloud blog post, "[Train AI for less: Improve ML Goodput with elastic training and optimized checkpointing](https://cloud.google.com/blog/products/ai-machine-learning/elastic-training-and-optimized-checkpointing-improve-ml-goodput)," GoodPut represents the actual productive training time, excluding time lost to various inefficiencies. Even a small percentage improvement in GoodPut can lead to significant cost savings and faster time-to-market for your models.
+Effective utilization of resources in large-scale machine learning (ML) training is crucial for both cost efficiency and rapid model development. A key metric for measuring this efficiency is **ML GoodPut**. As discussed in the Google Cloud blog post, "[Train AI for less: Improve ML Goodput with elastic training and optimized checkpointing](https://cloud.google.com/blog/products/ai-machine-learning/elastic-training-and-optimized-checkpointing-improve-ml-goodput)," GoodPut represents the actual productive training time, excluding time lost to various inefficiencies. Even a small percentage improvement in GoodPut can lead to significant cost savings and faster time-to-market for your models. For instance, consider a large training job utilizing 1024 GPUs. If this job runs for 30 days, the total available GPU hours are 1024 GPUs * 30 days * 24 hours/day = 737,280 GPU hours. If the GoodPut is only 50%, this means 368,640 GPU hours are wasted due to inefficiencies. Improving GoodPut by just 10% (from 50% to 60%) would reclaim 73,728 GPU hours, potentially saving hundreds of thousands of dollars and accelerating research by weeks.
 
-Achieving high GoodPut can be challenging due to several factors common in large distributed training environments:
-*   **Frequent Interruptions:** Hardware failures, preemptions, or other system issues can halt training, requiring restarts from the latest checkpoint and wasting valuable compute time.
-*   **Slow or Inefficient Checkpointing:** The process of saving model checkpoints can itself interrupt training or consume excessive resources if not optimized.
-*   **Limited Observability and Slow Recovery:** Difficulty in quickly detecting, diagnosing, and remediating failures or stragglers can extend downtime and further reduce GoodPut.
+Achieving high GoodPut can be challenging due to several factors common in large distributed training environments. The table below outlines the main sources of BadPut and their potential impact:
+
+| Source of BadPut                             | Description/Impact                                                                          | Potential GoodPut Loss (Example %) |
+| :------------------------------------------- | :------------------------------------------------------------------------------------------ | :--------------------------------- |
+| **Hardware Failures and System Errors**      | Causes crashes, lost progress, time to detect/reprovision/restart.                            | 5-15%                              |
+| **Preemptions and Evictions**                | Similar to hardware failures, results in lost work and restart overhead.                    | 5-10%                              |
+| **Slow Checkpoint Save and Load Times**      | GPUs idle during synchronous saves; slow loads extend downtime.                             | 3-10%                              |
+| **Suboptimal Checkpoint Frequency**          | Too infrequent leads to large work loss; too frequent causes high overhead.                 | 2-8%                               |
+| **Stragglers and Performance Bottlenecks**   | Slower nodes delay the entire job, underutilizing resources.                                | 3-7%                               |
+| **Lack of Rapid Failure Detection and Diagnosis** | Longer detection/diagnosis time increases downtime.                                         | 2-5%                               |
 
 This guide provides a general overview of techniques and tools to address these common challenges and maximize ML GoodPut. While the principles discussed are broadly applicable, we will use the [LLaMA3-1-70B pretraining recipe](https://github.com/AI-Hypercomputer/gpu-recipes/tree/main/training/a3mega/llama3-1-70b/nemo-pretraining-gke-resiliency) as a concrete case study to illustrate how these components can be implemented and customized for large-scale training workloads on Google Cloud. The goal is to showcase a "DIY" style product, where users can understand and selectively adopt these "Lego blocks" to build resilient and efficient training pipelines.
 
 ## TLDR: Recommended Lego Blocks for Your Deployment
 For customers looking to improve GoodPut on their own ML training workloads, here’s a concise guide to the key strategies discussed in this document, presented as 'Lego blocks' you can implement:
 
-1.  **Implement a Robust Supervisor System (Elastic Training):**
-    *   **Why:** This is the foundational step to make your training resilient to hardware failures, preemptions, and other interruptions. It automates detection and recovery.
-    *   **How:** Adapt or implement a supervisor system like the one detailed in the "Elastic Training" section. Focus on failure sensing, policy-based remediation (like node hot-swapping), and ensuring your training job can be controlled externally (start/stop/checkpoint). The Google Cloud Resiliency library components (Sensor, Controller, Actuator, Host Monitors) provide a strong template.
-    *   **Key for your workload:** Ensure your custom training application can gracefully handle external signals for checkpointing and resumption.
-
-2.  **Optimize Checkpointing - Start with Asynchronous Checkpointing:**
-    *   **Why:** Minimize GPU idle time by offloading checkpoint saves to CPU/background processes. This directly boosts GoodPut.
+1.  **Optimize Checkpointing - Start with Asynchronous Checkpointing:**
+    *   **Why:** Minimize GPU idle time by offloading checkpoint saves to CPU/background processes. This directly boosts GoodPut. This can directly recover a significant portion of GoodPut, potentially 3-10%, by minimizing GPU idle time during saves.
     *   **How:** Enable asynchronous checkpointing features in your training framework (e.g., `--enable-async-ckpt` in NeMo). Ensure you have sufficient CPU and memory resources on host machines for this.
     *   **Key for your workload:** Verify that your checkpointing mechanism can indeed save without halting GPU computation.
 
-3.  **Leverage Cloud Storage with FUSE for Checkpoints:**
+2.  **Leverage Cloud Storage with FUSE for Checkpoints:**
     *   **Why:** Provides durable, accessible, and scalable storage for your checkpoints, crucial for recovery across different nodes or after failures.
     *   **How:** Use a service like Google Cloud Storage (GCS) with the Cloud Storage FUSE CSI driver to mount GCS buckets as local filesystems. Configure your training job to save checkpoints to this mounted path.
     *   **Key for your workload:** Ensure appropriate permissions and regional alignment between your compute and storage. Consider enabling Hierarchical Namespace on GCS buckets for potentially better performance.
 
-4.  **Consider Distributed Checkpointing (For Very Large Models/Setups):**
+3.  **Consider Distributed Checkpointing (For Very Large Models/Setups):**
     *   **Why:** If asynchronous checkpointing is still too slow due to massive model size or a large number of distributed workers, parallelize the checkpoint save/load process itself.
     *   **How:** Utilize distributed checkpointing features within your framework (e.g., `--enable-dist-ckpt` in NeMo/PyTorch). This typically involves each worker saving its shard of the model.
     *   **Key for your workload:** This adds complexity, so evaluate if the benefits outweigh it based on your scale. Often used in conjunction with asynchronous checkpointing.
 
-5.  **Tune Checkpoint Frequency:**
+4.  **Tune Checkpoint Frequency:**
     *   **Why:** Balance the risk of lost work against the overhead of checkpointing.
     *   **How:** Configure how often checkpoints are saved (e.g., based on training steps or time). Monitor your failure rates and checkpoint durations to find an optimal balance.
     *   **Key for your workload:** There's no one-size-fits-all; this needs empirical tuning.
 
-Start with implementing a supervisor system (Step 1) as it provides the core resiliency. Then, optimize your checkpointing process (Steps 2-4), choosing the techniques most relevant to your workload's scale and characteristics. Finally, continuously tune your checkpoint frequency (Step 5) and monitor your GoodPut to measure improvements.
+5.  **Implement a Robust Supervisor System (Elastic Training):**
+    *   **Why:** This is foundational for resilience, addressing BadPut from hardware failures and preemptions, which can account for 5-15% of lost GoodPut. It automates detection and recovery.
+    *   **How:** Adapt or implement a supervisor system like the one detailed in the "Elastic Training" section. Focus on failure sensing, policy-based remediation (like node hot-swapping), and ensuring your training job can be controlled externally (start/stop/checkpoint). The Google Cloud Resiliency library components (Sensor, Controller, Actuator, Host Monitors) provide a strong template.
+    *   **Key for your workload:** Ensure your custom training application can gracefully handle external signals for checkpointing and resumption.
 
-## Understanding Sources of BadPut (Lost Efficiency)
-
-To effectively improve GoodPut, it's essential to understand the common culprits that lead to "BadPut" – the wasted time and resources during training. The previously mentioned [Google Cloud blog post](https://cloud.google.com/blog/products/ai-machine-learning/elastic-training-and-optimized-checkpointing-improve-ml-goodput) highlights several of these. In a case study referenced in the article, involving 1,024 A3 Mega GPU instances, overall ML GoodPut was improved from around 80% to over 90% by addressing these factors.
-
-Key sources of BadPut include:
-
-1.  **Hardware Failures and System Errors:**
-    *   **Impact:** These can cause sudden job crashes, leading to lost training progress since the last checkpoint. The time taken to detect the failure, reprovision resources (if necessary), and restart the job contributes significantly to BadPut.
-    *   **Example:** A GPU failing, a node becoming unresponsive, or critical system software errors.
-
-2.  **Preemptions and Evictions:**
-    *   **Impact:** In cloud environments or shared clusters, workloads might be preempted or evicted. Similar to hardware failures, this results in lost work and restart overhead.
-    *   **Example:** Spot VMs/preemptible VMs being reclaimed, or higher-priority jobs displacing lower-priority ones.
-
-3.  **Slow Checkpoint Save and Load Times:**
-    *   **Impact:** If saving checkpoints (inline/synchronous) takes a long time, the GPUs are idle, directly reducing GoodPut. Similarly, slow loading of checkpoints after a restart extends downtime.
-    *   **Example:** Saving large model states to slow storage, or inefficient serialization/deserialization of checkpoints.
-
-4.  **Suboptimal Checkpoint Frequency:**
-    *   **Impact:**
-        *   *Too infrequent:* Leads to significant loss of work if a failure occurs late in a checkpoint interval.
-        *   *Too frequent:* The cumulative time spent on checkpointing itself (even if asynchronous) can become a major overhead.
-    *   **Example:** Setting a 4-hour checkpoint interval when failures occur every 2 hours, or checkpointing every 5 minutes with a process that takes 1 minute.
-
-5.  **Stragglers and Performance Bottlenecks:**
-    *   **Impact:** Slower nodes or processes (stragglers) can delay the entire training job, especially in synchronous training paradigms. This leads to underutilization of faster resources.
-    *   **Example:** A single node with a faulty network connection slowing down data loading or gradient synchronization for all other nodes.
-
-6.  **Lack of Rapid Failure Detection and Diagnosis:**
-    *   **Impact:** The longer it takes to identify that a problem has occurred and what the root cause is, the longer the downtime and the greater the BadPut.
-    *   **Example:** A silent error corrupting data without immediate detection, or lack of clear logs making diagnosis time-consuming.
-
-The blog post further provides a table (via an image link: ![ML GoodPut Contributions](images/goodput_blog_image.jpg)) that details the specific metric improvements and ML GoodPut contributions for different techniques applied in their case study. While the visual data from the image cannot be rendered here, it underscores that a multi-faceted approach targeting these BadPut sources is key to substantial GoodPut gains.
+Begin by optimizing your checkpointing process (Steps 1-4), choosing the techniques most relevant to your workload's scale and characteristics, as this often provides the most immediate GoodPut gains. Then, implement a robust supervisor system (Step 5) to build upon this with comprehensive resilience against interruptions. Finally, continuously monitor your GoodPut to measure improvements.
 
 ## Addressing Interruptions: Elastic Training
 
@@ -193,3 +165,6 @@ Improving GoodPut is an ongoing process, and being able to measure it is critica
         *   Executing the `python3 calculator.py` script with necessary arguments, such as `--job-name <YOUR_JOB_NAME>` (which can be found using `kubectl get jobsets`), and parameters for log lookback periods (e.g., `--gcloud-logging-lookback-days 1`) and reference step times.
 
 Using this tool, or similar log analysis techniques, allows you to quantify the benefits of elastic training and optimized checkpointing, identify remaining bottlenecks, and further tune your setup for maximum efficiency.
+
+## Tying It All Together: A Holistic Approach
+Achieving and maintaining high ML GoodPut is an ongoing journey rather than a one-time setup. It demands a holistic strategy that thoughtfully combines resilient infrastructure, efficient training processes, and continuous operational diligence. The 'Lego blocks' detailed in this guide—from robust supervisor systems for elastic training to multifaceted checkpointing optimizations (asynchronous, distributed, and leveraging cloud storage)—are designed to be synergistic. By understanding how these components interact and adapting them to your specific workload and environment, you can build a truly efficient and resilient training pipeline. Remember that the strategies for minimizing BadPut and maximizing GoodPut are not static; continuous measurement, analysis (as discussed in 'Measuring Success: Goodput Analysis'), and refinement are key to unlocking sustained efficiency gains, faster model delivery, and optimized resource utilization in your large-scale ML endeavors.
