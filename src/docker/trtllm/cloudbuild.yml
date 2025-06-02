@@ -12,20 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG VLLM_VERSION="latest"
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args:
+  - 'build'
+  - '--build-arg'
+  - "TRTLLM_VERSION=${_TRTLLM_VERSION}"
+  - '--build-arg'
+  - "TRITON_SERVER_VERSION=${_TRITON_SERVER_VERSION}"
+  - '--tag=${_ARTIFACT_REGISTRY}/${_TRTLLM_IMAGE}:${_TRTLLM_VERSION}'
+  - '--file=trtllm.Dockerfile'
+  - '.'
+  automapSubstitutions: true
 
-FROM docker.io/vllm/vllm-openai:${VLLM_VERSION}
-ARG VLLM_VERSION
-
-WORKDIR /workspace
-COPY ray_init.sh /workspace/ray_init.sh
-
-COPY requirements.txt /workspace/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
-
-RUN echo "Cloning vLLM version: ${VLLM_VERSION}" && \
-    git clone -b ${VLLM_VERSION} https://github.com/vllm-project/vllm.git && \
-    cd vllm && \
-    mv vllm vllm_1
-
-ENTRYPOINT [ "/bin/bash" ]
+images:
+- '${_ARTIFACT_REGISTRY}/${_TRTLLM_IMAGE}:${_TRTLLM_VERSION}'

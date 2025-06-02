@@ -204,8 +204,11 @@ To execute the job with the default settings, run the following command from you
 ```bash
 cd $RECIPE_ROOT
 helm install -f values.yaml \
+  --set-file workload_launcher=$REPO_ROOT/src/launchers/grl-nemo-20-launcher.sh \
+  --set-file workload_config=$RECIPE_ROOT/train.py \
+  --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
   $USER-rt \
-  $REPO_ROOT/src/helm-charts/a3mega/nemo-training-resiliency
+  $REPO_ROOT/src/helm-charts/a3mega/jobset
 ```
 
 

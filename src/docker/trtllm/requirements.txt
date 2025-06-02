@@ -106,9 +106,9 @@ filelock==3.18.0 \
     --hash=sha256:adbc88eabb99d2fec8c9c1b229b171f18afa655400173ddc653d5d01501fb9f2 \
     --hash=sha256:c401f4f8377c4464e6db25fff06205fd89bdd83b65eb0488ed1b160f780e21de
     # via huggingface-hub
-fsspec==2025.3.2 \
-    --hash=sha256:2daf8dc3d1dfa65b6aa37748d112773a7a08416f6c70d96b264c96476ecaf711 \
-    --hash=sha256:e52c77ef398680bbd6a98c0e628fbc469491282981209907bbc8aea76a04fdc6
+fsspec==2025.5.1 \
+    --hash=sha256:24d3a2e663d5fc735ab256263c4075f374a174c3410c0b25e5bd1970bceaa462 \
+    --hash=sha256:2e55e47a540b91843b755e83ded97c6e897fa0942b11490113f09e9c443c2475
     # via huggingface-hub
 hf-transfer==0.1.9 \
     --hash=sha256:035572865dab29d17e783fbf1e84cf1cb24f3fcf8f1b17db1cfc7fdf139f02bf \

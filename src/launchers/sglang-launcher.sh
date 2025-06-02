@@ -12,20 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG VLLM_VERSION="latest"
+#!/bin/bash
 
-FROM docker.io/vllm/vllm-openai:${VLLM_VERSION}
-ARG VLLM_VERSION
+set -eux # Exit immediately if a command exits with a non-zero status.
 
-WORKDIR /workspace
-COPY ray_init.sh /workspace/ray_init.sh
+echo "SGLang server arguments received:"
+echo "  $@"
+echo ""
 
-COPY requirements.txt /workspace/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+echo "Launching SGLang server"
 
-RUN echo "Cloning vLLM version: ${VLLM_VERSION}" && \
-    git clone -b ${VLLM_VERSION} https://github.com/vllm-project/vllm.git && \
-    cd vllm && \
-    mv vllm vllm_1
+export HF_HOME=/ssd
 
-ENTRYPOINT [ "/bin/bash" ]
+# MODEL_NAME should be passed as an environment variable from deployment
+if [ -z "$MODEL_NAME" ]; then
+  echo "Error: MODEL_NAME environment variable is not set."
+  exit 1
+fi
+echo "Using MODEL_NAME: $MODEL_NAME"
+
+# Launch the server
+python3 -m sglang.launch_server \
+  --model "$MODEL_NAME" \
+  "$@"
+
+echo "Server bringup is complete. SGLang server command finished."

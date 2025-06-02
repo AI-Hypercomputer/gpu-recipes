@@ -1,0 +1,6 @@
+tp: 8
+trust-remote-code: true
+mem-fraction-static: 0.7
+attention-backend: flashinfer
+context-length: 1000000
+port: 8000

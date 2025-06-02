@@ -1,0 +1,63 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+queue:
+
+dwsSettings:
+  maxRunDurationSeconds:
+
+huggingface:
+  secretName: hf-secret
+  secretData:
+    token: "hf_api_token"
+
+volumes:
+  gcsVolumes: true
+  ssdMountPath: "/ssd"
+  gcsMounts:
+    - bucketName:
+      mountPath: "/gcs"
+
+service:
+  type: ClusterIP
+  ports:
+    http: 8000
+
+workload:
+  model:
+    name:
+  gpus: 8
+  image:
+  framework:
+  configFile: serving-args.yaml
+  configPath: /workload/configs
+  envs:
+    - name: HF_HUB_ENABLE_HF_TRANSFER
+      value: "1"
+    - name: LAUNCHER_SCRIPT
+      value: "/workload/launcher/launch-workload.sh"
+    - name: SERVER_ARGS_FILE
+      value: "/workload/configs/serving-args.yaml"
+  benchmarks:
+    experiments:
+      - isl: 128
+        osl: 128
+        num_requests: 30000
+
+network:
+  subnetworks[]:
+  gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:v1.0.3
+  ncclSettings:
+    - name: NCCL_DEBUG
+      value: "VERSION"

@@ -12,20 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG VLLM_VERSION="latest"
+#!/bin/bash
 
-FROM docker.io/vllm/vllm-openai:${VLLM_VERSION}
-ARG VLLM_VERSION
+set -eux # Exit immediately if a command exits with a non-zero status.
 
-WORKDIR /workspace
-COPY ray_init.sh /workspace/ray_init.sh
+echo "vLLM server arguments received:"
+echo "  $@"
+echo ""
 
-COPY requirements.txt /workspace/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+echo "Launching vLLM server"
 
-RUN echo "Cloning vLLM version: ${VLLM_VERSION}" && \
-    git clone -b ${VLLM_VERSION} https://github.com/vllm-project/vllm.git && \
-    cd vllm && \
-    mv vllm vllm_1
+# MODEL_NAME should be passed as an environment variable from deployment
+if [ -z "$MODEL_NAME" ]; then
+  echo "Error: MODEL_NAME environment variable is not set."
+  exit 1
+fi
+echo "Using MODEL_NAME: $MODEL_NAME"
 
-ENTRYPOINT [ "/bin/bash" ]
+# Launch the server
+vllm serve "$MODEL_NAME" \
+  "$@"
+
+echo "Server bringup is complete. vLLM server command finished."

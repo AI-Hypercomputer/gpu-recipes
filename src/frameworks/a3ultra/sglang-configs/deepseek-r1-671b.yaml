@@ -1,0 +1,6 @@
+tp: 8
+trust-remote-code: true
+enable-dp-attention: true
+attention-backend: fa3
+dp-size: 4
+port: 8000

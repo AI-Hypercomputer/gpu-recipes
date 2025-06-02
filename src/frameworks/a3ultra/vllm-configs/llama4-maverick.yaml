@@ -1,0 +1,4 @@
+tensor-parallel-size: 8
+max-model-len: 1000000
+trust-remote-code: true
+gpu_memory_utilization: 0.95

@@ -33,7 +33,7 @@ spec:
   suspend: true
   {{- end }}
   failurePolicy:
-    maxRestarts: 0
+    maxRestarts: {{ default 0 $root.Values.workload.max_workload_restarts }}
   replicatedJobs:
   - name: workload
     replicas: 1

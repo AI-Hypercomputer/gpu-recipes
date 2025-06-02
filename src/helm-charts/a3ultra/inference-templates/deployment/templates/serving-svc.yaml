@@ -12,20 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG VLLM_VERSION="latest"
-
-FROM docker.io/vllm/vllm-openai:${VLLM_VERSION}
-ARG VLLM_VERSION
-
-WORKDIR /workspace
-COPY ray_init.sh /workspace/ray_init.sh
-
-COPY requirements.txt /workspace/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
-
-RUN echo "Cloning vLLM version: ${VLLM_VERSION}" && \
-    git clone -b ${VLLM_VERSION} https://github.com/vllm-project/vllm.git && \
-    cd vllm && \
-    mv vllm vllm_1
-
-ENTRYPOINT [ "/bin/bash" ]
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-svc
+spec:
+  selector:
+    app: {{ .Release.Name }}-serving
+  ports:
+    - name: http
+      port: {{ .Values.service.ports.http }}
+      targetPort: {{ .Values.service.ports.http }}
+  type: {{ .Values.service.type }}
