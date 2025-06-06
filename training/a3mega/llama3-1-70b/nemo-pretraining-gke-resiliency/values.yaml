@@ -36,15 +36,16 @@ volumes:
 
 workload:
   gpus: 128
-  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250521
+  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250605
   gcsSidecarImage: gcr.io/gke-release/gcs-fuse-csi-driver-sidecar-mounter@sha256:698fb0a9fe7c19adff792256a478963d1596faf4f7ceb8d516a5c85787c66606
   max_workload_restarts: 20
   defaultArguments:
-  - "--model=${MODEL_SIZE}"
+  # - "--global-bs=512"
   - "--num-nodes=${NNODES}"
   - "--tokenizer-path=tokenizer.model"
   - "--max-runtime=86400"
   - "--log-dir=${LOG_DIR_PREFIX}"
+  - "--ckpt-dir=${CKPT_DIR_PREFIX}"
   - "--job-name=${JOB_IDENTIFIER}"
   - "--max-steps=500"
   - "--topk-ckpt=-1"
@@ -66,6 +67,8 @@ workload:
   - name: NEMO_CONFIG_NAME
     value: "train_custom.py"
   - name: LOG_DIR_PREFIX
+    value: "/job-logs/nemo-experiments"
+  - name: CKPT_DIR_PREFIX
     value: "/checkpoints/nemo-experiments"
   - name: MODEL_SIZE
     value: "70B"

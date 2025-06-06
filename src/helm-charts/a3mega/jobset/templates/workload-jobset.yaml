@@ -17,12 +17,14 @@
 {{ $jobuuid := uuidv4 }}
 {{ $nodes := div .Values.workload.gpus 8 | max 1 }}
 {{ $gpusPerNode := min .Values.workload.gpus 8 }}
+{{ $jobName := printf "%s-%s" .Release.Name $jobSuffix }}
+
 {{- $root := . -}}
 
 apiVersion: jobset.x-k8s.io/v1alpha2
 kind: JobSet
 metadata:
-  name: "{{ .Release.Name }}"
+  name: "{{ $jobName }}"
   namespace: default
   labels:
   {{- if $root.Values.queue }}
@@ -90,7 +92,8 @@ spec:
                 [
                   {"interfaceName":"eth0","network":"default"},
                   {{- range  $i := until 8 }}
-                  {"interfaceName":"eth{{ add 1 $i }}","network":"vpc{{ $i }}"}{{ eq $i 7 | ternary "" ","}}
+
+                  {"interfaceName":"eth{{ add 1 $i }}","network":"vpc{{ add 1 $i }}"}{{ eq $i 7 | ternary "" ","}}
                   {{- end }}
                 ]
               {{- end }}
@@ -100,7 +103,6 @@ spec:
             hostNetwork: true
             dnsPolicy: ClusterFirstWithHostNet
             {{- end }}
-            subdomain: "{{.Release.Name}}"
             restartPolicy: Never
             {{ if $root.Values.targetNodes }}
             affinity:
@@ -180,13 +182,16 @@ spec:
               volumeMounts:
               - name: nccl-plugin-volume
                 mountPath: /usr/local/nccl-plugin
+              env:
+                - name: NCCL_BUILD_TYPE
+                  value: "{{ $root.Values.network.ncclBuildType | default 222 }}"
               command:
               - /bin/sh
               - -c
               - |
                 set -ex
                 chmod 755 /scripts/container_entry.sh
-                /scripts/container_entry.sh install --install-nccl --nccl-buildtype=223
+                /scripts/container_entry.sh install --install-nccl --nccl-buildtype=${NCCL_BUILD_TYPE}
                 cp -r /var/lib/tcpxo/* /usr/local/nccl-plugin/
                 echo "Installed NCCL plugin to pod-wide, shared NCCL plug-in volume"
                 echo "Contents (mounted at /usr/local/nccl-plugin/lib64):"
@@ -257,7 +262,7 @@ spec:
               {{- end }}
               env:
               - name: JOB_IDENTIFIER
-                value: "{{ .Release.Name }}-{{ $timestamp }}"
+                value: "{{ $jobName }}"
               - name: JOB_TIMESTAMP
                 value: "{{ $timestamp }}"
               - name: JOB_UUID
@@ -270,18 +275,16 @@ spec:
                 valueFrom:
                   fieldRef:
                     fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
-              - name: NODE_RANK
+              - name: REPLICATED_JOB_NAME
                 valueFrom:
                   fieldRef:
-                    fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
-              - name: RANK_0_FQDN
-                value: "{{.Release.Name}}-workload-0-0.{{.Release.Name}}.default.svc.cluster.local"
-              - name: HOSTNAME_PREFIX
-                value: "{{.Release.Name}}-workload-"
-              - name: DOMAIN_NAME
-                value: "{{.Release.Name}}.default.svc.cluster.local"
+                    fieldPath: metadata.annotations['jobset.sigs.k8s.io/replicatedjob-name']
+              - name: JOBSET_NAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.annotations['jobset.sigs.k8s.io/jobset-name']
               - name: MASTER_ADDR
-                value: "{{.Release.Name}}-workload-0-0.{{.Release.Name}}.default.svc.cluster.local"
+                value: "{{$jobName}}-workload-0-0.{{$jobName}}"
               - name: MASTER_PORT
                 value: "6002"
               - name: WORLD_SIZE
@@ -302,6 +305,8 @@ spec:
               - name: NCCL_PLUGIN_PATH
                 value: /usr/local/nvidia/lib64
               {{ end }}
+              - name: NCCL_FASTRAK_LLCM_DEVICE_DIRECTORY
+                value: "/dev/aperture_devices"
 
 
               {{ if $root.Values.network.ncclSettings }}
@@ -359,6 +364,9 @@ spec:
 
                 - name: shared-memory
                   mountPath: /dev/shm
+
+                - name: aperture-devices
+                  mountPath: /dev/aperture_devices
 
                 {{- range $pvc := $root.Values.volumes.pvcMounts }}
                 - name: "{{ $pvc.claimName }}"

@@ -13,26 +13,22 @@
 # limitations under the License.
 
 actuator:
-  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250521
-  # image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250422
+  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250605
   port: 60080
   command: "resiliency/supervisor/actuator.py"
 
 sensor:
-  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250521
-  # image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250422
+  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250605
   port: 60081
   command: "resiliency/supervisor/sensor.py"
 
 controller:
-  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250521
-  # image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250422
+  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250605
   port: 60082
   command: "resiliency/supervisor/controller.py"
 
 host_daemon:
-  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250521
-  # image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250422
+  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250605
   port: 60010
   command: "resiliency/supervisor/host_daemon.py"
 
@@ -55,7 +51,7 @@ job_namespace: "default"
 workers_per_host: 8
 num_nodes_per_dp: 4
 num_dp_replicas: 4
-pod_termination_threshold_s: 30
+pod_termination_threshold_s: 60
 jobset_downtime_threshold_s: 180
 replicated_job_name: "workload" # This value musth match the spec.replicatedJobs.name in the workload yaml
 workload_container_name: "workload" # This value must match the name of the maincontainer in the workload yaml

@@ -14,7 +14,7 @@ metadata:
 rules:
 - apiGroups: ["", "jobset.x-k8s.io"]
   resources: ["pods", "nodes", "jobsets"]
-  verbs: ["get", "list", "delete", "deletecollection", "patch", "create"]
+  verbs: ["get", "list", "delete", "deletecollection", "patch", "create", "update"]
 
 ---
 

@@ -55,6 +55,55 @@ Replace the following:
 - `CLUSTER_REGION`: the region where you cluster is located
 - `ZONE`: the zone where your cluster's A3 Mega node pool is located. It is recommended that the CPU node pool is in the same zone as the A3 Mega node pool
 
+### Enable Topology Aware Scheduling for Kueue
+
+While the Cluster Toolkit blueprint in the [GKE environment setup guide](../../../../docs/configuring-environment-gke-a3-mega.md) installs and configures Kueue, it does not enable Topology Aware Scheduling (TAS).
+
+To enable TAS, run the following command:
+
+```bash
+kubectl -n kueue-system patch deployment kueue-controller-manager \
+  --type json \
+  -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--feature-gates=TopologyAwareScheduling=true"}]'
+```
+
+### Setup All-or-nothing with ready Pods
+
+
+Training jobs require all pods to run simultaneously. By default, the [all-or-nothing scheduling in Kueue]((https://kueue.sigs.k8s.io/docs/tasks/manage/setup_wait_for_pods_ready/), which is optimal for these jobs, is not configured.
+
+To configure all-or-nothing scheduling execute the following commands:
+
+1. Patch the `kueue-manager-config`
+    ```bash
+    kubectl patch configmap kueue-manager-config \
+      -n kueue-system \
+      --type merge \
+      --patch-file kueue-merge-patch.yaml
+    ```
+
+2.  Restart the controller Pod
+
+    ```bash
+    kubectl rollout restart deployment/kueue-controller-manager -n kueue-system
+    ```
+
+3.  Check the new configuration
+
+    You can check the new configuration by running: `bash kubectl get configmap
+    kueue-manager-config -n kueue-system -o yaml`
+
+    In the output, you should see the `waitForPodsReady` section updated in the
+    `controller_manager_config.yaml` data field, looking like this:
+
+    ```yaml
+    ...
+        waitForPodsReady:
+          enable: true
+          timeout: 1m
+          recoveryTimeout: 1m
+    ...
+    ```
 
 ## Training dataset
 
@@ -62,14 +111,6 @@ The recipe uses a mock pretraining dataset provided by the NeMo framework.
 
 
 ## Run the recipe
-
-It's recommended to use Cloud Shell as your client to complete the steps.
-Cloud Shell comes pre-installed with the necessary utilities, including
-`kubectl`, `the Google Cloud SDK`, and `Helm`.
-
-### Launch Cloud Shell
-
-In the Google Cloud console, start a [Cloud Shell Instance](https://console.cloud.google.com/?cloudshell=true).
 
 ### Configure environment settings
 
@@ -82,6 +123,7 @@ From your client, complete the following steps:
   export CLUSTER_REGION=<CLUSTER_REGION>
   export CLUSTER_NAME=<CLUSTER_NAME>
   export GCS_BUCKET=<GCS_BUCKET>
+  export KUEUE_NAME=<KUEUE_NAME>
   ```
   Replace the following values:
 
@@ -89,6 +131,7 @@ From your client, complete the following steps:
   - `<CLUSTER_REGION>`: the region where your cluster is located
   - `<CLUSTER_NAME>`: the name of your GKE cluster
   - `<GCS_BUCKET>`: the name of your Cloud Storage bucket with hierarchical namespace enabled. Don't include the `gs://` prefix
+  - `<KUEUE_NAME>`: the name of the Kueue local queue configured for TAS.  The default queue created by the cluster toolkit is `a3-mega`. Make sure to verify the name of the local queue in your cluster.
 
 2. Set the default project:
 
@@ -202,8 +245,7 @@ By default the training job will run 500 steps and generate a checkpoint every 2
 To execute the job with the default settings, run the following command from your client:
 
 ```bash
-cd $RECIPE_ROOT
-helm install -f values.yaml \
+helm install -f $RECIPE_ROOT/values.yaml \
   --set-file workload_launcher=$REPO_ROOT/src/launchers/grl-nemo-20-launcher.sh \
   --set-file workload_config=$RECIPE_ROOT/train.py \
   --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
@@ -211,6 +253,18 @@ helm install -f values.yaml \
   $REPO_ROOT/src/helm-charts/a3mega/jobset
 ```
 
+In case you have Kueue-Topology Aware Scheduling on your cluster, you can run
+the following command from your client:
+
+```bash
+helm install -f $RECIPE_ROOT/values.yaml \
+  --set-file workload_launcher=$REPO_ROOT/src/launchers/grl-nemo-20-launcher.sh \
+  --set-file workload_config=$RECIPE_ROOT/train.py \
+  --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+  --set queue=${KUEUE_NAME} \
+  $USER-rt \
+  $REPO_ROOT/src/helm-charts/a3mega/jobset
+```
 
 #### Monitor the training job
 
@@ -253,17 +307,17 @@ python3 -m pip install --upgrade pip
 pip3 install -r requirements.txt
 ```
 2. Run the [`calculator.py`](../../../../src/utils/resiliency_metrics/calculator.py)
-   script, specifying the <JOB_NAME>
+   script, specifying the <JOBSET_NAME>
 
 ```bash
-python3 calculator.py --job-name <JOB_NAME> \
+python3 calculator.py --job-name <JOBSET_NAME> \
   --export mymetrics.json \
   --gcloud-logging-lookback-days 1 \
   --verbose \
   --reference-step-time=8
 ```
 
-To get the <JOB_NAME> you can run:
+To get the <JOBSET_NAME> you can run:
 ```
 kubectl get jobsets
 ```

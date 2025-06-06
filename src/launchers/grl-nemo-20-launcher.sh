@@ -40,6 +40,17 @@ parse_args() {
   config_overrides="${config_overrides[*]}"
 }
 
+echo "JOB settings:"
+echo "  JOB_IDENTIFIER: $JOB_IDENTIFIER"
+echo "  JOB_TIMESTAMP: $JOB_TIMESTAMP"
+echo "  JOB_UUID: $JOB_UUID"
+echo "  JOB_ORCHESTRATOR: $JOB_ORCHESTRATOR"
+echo "  JOB_COMPLETION_INDEX: $JOB_COMPLETION_INDEX"
+echo "  REPLICATED_JOB_NAME: $REPLICATED_JOB_NAME"
+echo "  JOBSET_NAME: $JOBSET_NAME"
+echo "  MASTER_ADDR: $MASTER_ADDR"
+echo "  MASTER_PORT: $MASTER_PORT"
+
 config_overrides=()
 parse_args "$@"
 
@@ -62,7 +73,7 @@ ldconfig $LD_LIBRARY_PATH
 echo "Added $LD_LIBRARY_PATH to ldconfig:"
 ldconfig -p | grep libcuda | sed 's/^/  /'
 echo ""
-
+export NCCL_DEBUG=VERSION
 echo "Launching Torch distributed on the node rank $JOB_COMPLETION_INDEX out of $NNODES nodes"
 
 CMD="exec python3 resiliency/launcher.py --use-supervisor \
@@ -70,7 +81,7 @@ CMD="exec python3 resiliency/launcher.py --use-supervisor \
 --ft-param-rank_heartbeat_timeout="${FT_PARAM_RANK_HEARTBEAT_TIMEOUT}" \
 --nproc-per-node="${GPUS_PER_NODE}" \
 --nnodes="${NNODES}" \
---node_rank="${NODE_RANK}" \
+--node_rank="${JOB_COMPLETION_INDEX}" \
 --rdzv_id="${JOB_IDENTIFIER}" \
 --master_addr="${MASTER_ADDR}" \
 --master_port="${MASTER_PORT}" \
