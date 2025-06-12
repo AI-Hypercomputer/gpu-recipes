@@ -1,0 +1,1112 @@
+Pod on gke-gke-a4-sbrg1-a4-highgpu-8g-a4-hig-03548386-kr37.us-east4-b.c.supercomputer-testing.internal is running
+Pod is assigned job index of 0
+Job ID is t-llama3-8b-8gpu-fp8-sq1-tp1-pp1-cp1-vp1-gbs128-mbs1-1749686361-sfqp
+The following GPUs are visible via nvidia-smi:
+GPU 0: NVIDIA B200 (UUID: GPU-f07d0061-98d4-2812-11b5-bc4d3b16f6d6)
+GPU 1: NVIDIA B200 (UUID: GPU-5eaf3bb7-ddbf-25e1-a179-970f9ba971d4)
+GPU 2: NVIDIA B200 (UUID: GPU-947f2083-f9f0-8efc-1c9d-ce2ac6bdfbf5)
+GPU 3: NVIDIA B200 (UUID: GPU-2409f3ef-2ae3-5dc3-54a6-f2370ce74584)
+GPU 4: NVIDIA B200 (UUID: GPU-3a9b0c53-aac9-280b-ed1b-a929909d7fb9)
+GPU 5: NVIDIA B200 (UUID: GPU-aadbd340-c7b5-2360-75eb-892c1f313de0)
+GPU 6: NVIDIA B200 (UUID: GPU-c0ca6bea-3906-62a0-2999-eaeb0a536e92)
+GPU 7: NVIDIA B200 (UUID: GPU-d67bedd7-a8c9-c2f3-9794-29e64c6b423d)
+The following GPUs are visible via nvidia-smi:
+GPU 0: NVIDIA B200 (UUID: GPU-f07d0061-98d4-2812-11b5-bc4d3b16f6d6)
+GPU 1: NVIDIA B200 (UUID: GPU-5eaf3bb7-ddbf-25e1-a179-970f9ba971d4)
+GPU 2: NVIDIA B200 (UUID: GPU-947f2083-f9f0-8efc-1c9d-ce2ac6bdfbf5)
+GPU 3: NVIDIA B200 (UUID: GPU-2409f3ef-2ae3-5dc3-54a6-f2370ce74584)
+GPU 4: NVIDIA B200 (UUID: GPU-3a9b0c53-aac9-280b-ed1b-a929909d7fb9)
+GPU 5: NVIDIA B200 (UUID: GPU-aadbd340-c7b5-2360-75eb-892c1f313de0)
+GPU 6: NVIDIA B200 (UUID: GPU-c0ca6bea-3906-62a0-2999-eaeb0a536e92)
+GPU 7: NVIDIA B200 (UUID: GPU-d67bedd7-a8c9-c2f3-9794-29e64c6b423d)
+Local SSD contents (path /ssd):
+  containerd
+  hello-from-gke-gke-a4-sbrg1-a4-highgpu-8g-a4-hig-03548386-kr37.txt
+  kubelet
+  log_pods
+  lost+found
+Contents (mounted at /usr/local/nccl-plugin/):
+Warning: Set LD_LIBRARY_PATH=/usr/local/gib/lib64:/usr/local/nvidia/lib64:/usr/local/mpi/lib:/usr/local/lib/python3.12/dist-packages/torch/lib:/usr/local/lib/python3.12/dist-packages/torch_tensorrt/lib:/usr/local/cuda/compat/lib:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64:/usr/local/tensorrt/lib to override the NCCL library
+/usr/local/gib/scripts/set_nccl_env.sh: line 16: lspci: command not found
+/usr/local/gib/scripts/set_nccl_env.sh: line 17: lspci: command not found
+/sbin/ldconfig.real: /usr/local/nvidia/lib64/libnccl-net.so is not a symbolic link
+
+Added /usr/local/nvidia/lib64/ to ldconfig:
+  	libcudart.so.12 (libc6,x86-64) => /usr/local/cuda/targets/x86_64-linux/lib/libcudart.so.12
+  	libcudart.so (libc6,x86-64) => /usr/local/cuda/targets/x86_64-linux/lib/libcudart.so
+  	libcudadebugger.so.1 (libc6,x86-64) => /usr/local/nvidia/lib64/libcudadebugger.so.1
+  	libcuda_wrapper.so.0 (libc6,x86-64) => /opt/hpcx/clusterkit/lib/libcuda_wrapper.so.0
+  	libcuda_wrapper.so (libc6,x86-64) => /opt/hpcx/clusterkit/lib/libcuda_wrapper.so
+  	libcuda.so.1 (libc6,x86-64) => /usr/local/nvidia/lib64/libcuda.so.1
+  	libcuda.so (libc6,x86-64) => /usr/local/nvidia/lib64/libcuda.so
+Got request to JIT mount GCS bucket benchmark-artifacts via 'gcsfuse' to /gcs:
+{"timestamp":{"seconds":1749686367,"nanos":52513361},"severity":"INFO","message":"Start gcsfuse/2.12.2 (Go version go1.24.0) for app \"\" using mount point: /gcs\n"}
+{"timestamp":{"seconds":1749686367,"nanos":52578324},"severity":"INFO","message":"GCSFuse config","config":{"AppName":"","CacheDir":"","Debug":{"ExitOnInvariantViolation":false,"Fuse":false,"Gcs":false,"LogMutex":false},"DisableAutoconfig":true,"EnableAtomicRenameObject":false,"EnableHns":true,"EnableNewReader":false,"FileCache":{"CacheFileForRangeRead":false,"DownloadChunkSizeMb":200,"EnableCrc":false,"EnableODirect":false,"EnableParallelDownloads":false,"ExperimentalParallelDownloadsDefaultOn":true,"MaxParallelDownloads":448,"MaxSizeMb":-1,"ParallelDownloadsPerFile":16,"WriteBufferSize":4194304},"FileSystem":{"DirMode":"755","DisableParallelDirops":false,"FileMode":"644","FuseOptions":[],"Gid":-1,"IgnoreInterrupts":true,"KernelListCacheTtlSecs":0,"PreconditionErrors":true,"RenameDirLimit":0,"TempDir":"","Uid":-1},"Foreground":false,"GcsAuth":{"AnonymousAccess":false,"KeyFile":"","ReuseTokenFromUrl":true,"TokenUrl":""},"GcsConnection":{"BillingProject":"","ClientProtocol":"http2","CustomEndpoint":"","ExperimentalEnableJsonRead":false,"GrpcConnPoolSize":1,"HttpClientTimeout":0,"LimitBytesPerSec":-1,"LimitOpsPerSec":-1,"MaxConnsPerHost":0,"MaxIdleConnsPerHost":100,"SequentialReadSizeMb":200},"GcsRetries":{"ChunkTransferTimeoutSecs":10,"MaxRetryAttempts":0,"MaxRetrySleep":30000000000,"Multiplier":2,"ReadStall":{"Enable":false,"InitialReqTimeout":20000000000,"MaxReqTimeout":1200000000000,"MinReqTimeout":1500000000,"ReqIncreaseRate":15,"ReqTargetPercentile":0.99}},"ImplicitDirs":false,"List":{"EnableEmptyManagedFolders":false},"Logging":{"FilePath":"","Format":"json","LogRotate":{"BackupFileCount":10,"Compress":true,"MaxFileSizeMb":512},"Severity":"INFO"},"MachineType":"","MetadataCache":{"DeprecatedStatCacheCapacity":20460,"DeprecatedStatCacheTtl":60000000000,"DeprecatedTypeCacheTtl":60000000000,"EnableNonexistentTypeCache":false,"ExperimentalMetadataPrefetchOnMount":"disabled","NegativeTtlSecs":5,"StatCacheMaxSizeMb":32,"TtlSecs":60,"TypeCacheMaxSizeMb":4},"Metrics":{"CloudMetricsExportIntervalSecs":0,"PrometheusPort":0,"StackdriverExportInterval":0,"UseNewNames":false},"Monitoring":{"ExperimentalTracingMode":"","ExperimentalTracingSamplingRatio":0},"OnlyDir":"","Write":{"BlockSizeMb":33554432,"CreateEmptyFile":false,"EnableStreamingWrites":false,"GlobalMaxBlocks":9223372036854775807,"MaxBlocksPerFile":1}}}
+{"timestamp":{"seconds":1749686367,"nanos":235118543},"severity":"INFO","message":"File system has been successfully mounted."}
+Downloading GPT vocabulary files
+--2025-06-11 23:59:27--  https://s3.amazonaws.com/models.huggingface.co/bert/gpt2-vocab.json
+Resolving s3.amazonaws.com (s3.amazonaws.com)... 16.15.185.20, 16.15.176.141, 52.217.100.214, ...
+Connecting to s3.amazonaws.com (s3.amazonaws.com)|16.15.185.20|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 1042301 (1018K) [application/json]
+Saving to: ‘gpt2-vocab.json’
+
+     0K .......... .......... .......... .......... ..........  4% 11.9M 0s
+    50K .......... .......... .......... .......... ..........  9% 23.0M 0s
+   100K .......... .......... .......... .......... .......... 14% 11.8M 0s
+   150K .......... .......... .......... .......... .......... 19% 12.3M 0s
+   200K .......... .......... .......... .......... .......... 24% 21.1M 0s
+   250K .......... .......... .......... .......... .......... 29% 12.8M 0s
+   300K .......... .......... .......... .......... .......... 34%  146M 0s
+   350K .......... .......... .......... .......... .......... 39% 24.5M 0s
+   400K .......... .......... .......... .......... .......... 44% 25.9M 0s
+   450K .......... .......... .......... .......... .......... 49%  146M 0s
+   500K .......... .......... .......... .......... .......... 54% 24.0M 0s
+   550K .......... .......... .......... .......... .......... 58% 30.2M 0s
+   600K .......... .......... .......... .......... .......... 63% 82.3M 0s
+   650K .......... .......... .......... .......... .......... 68% 23.1M 0s
+   700K .......... .......... .......... .......... .......... 73%  330M 0s
+   750K .......... .......... .......... .......... .......... 78% 23.4M 0s
+   800K .......... .......... .......... .......... .......... 83% 24.9M 0s
+   850K .......... .......... .......... .......... .......... 88%  245M 0s
+   900K .......... .......... .......... .......... .......... 93% 23.3M 0s
+   950K .......... .......... .......... .......... .......... 98%  411M 0s
+  1000K .......... .......                                    100% 18.3M=0.04s
+
+2025-06-11 23:59:27 (25.5 MB/s) - ‘gpt2-vocab.json’ saved [1042301/1042301]
+
+--2025-06-11 23:59:27--  https://s3.amazonaws.com/models.huggingface.co/bert/gpt2-merges.txt
+Resolving s3.amazonaws.com (s3.amazonaws.com)... 54.231.171.128, 16.15.217.193, 54.231.224.136, ...
+Connecting to s3.amazonaws.com (s3.amazonaws.com)|54.231.171.128|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 456318 (446K) [text/plain]
+Saving to: ‘gpt2-merges.txt’
+
+     0K .......... .......... .......... .......... .......... 11% 11.4M 0s
+    50K .......... .......... .......... .......... .......... 22%  276M 0s
+   100K .......... .......... .......... .......... .......... 33% 23.2M 0s
+   150K .......... .......... .......... .......... .......... 44%  209M 0s
+   200K .......... .......... .......... .......... .......... 56%  549M 0s
+   250K .......... .......... .......... .......... .......... 67% 21.3M 0s
+   300K .......... .......... .......... .......... .......... 78%  466M 0s
+   350K .......... .......... .......... .......... .......... 89%  482M 0s
+   400K .......... .......... .......... .......... .....     100%  431M=0.009s
+
+2025-06-11 23:59:27 (45.9 MB/s) - ‘gpt2-merges.txt’ saved [456318/456318]
+
+NeMo configuration file:
+| 
+| run:
+|   name: llama3_8b_8GPU_TP1_PP1_CP1_VP1_GBS128_MBS2
+|   results_dir: ${base_results_dir}/${.name}
+|   time_limit: "0-02:30:00"
+|   dependency: "singleton"
+| trainer:
+|   devices: 8
+|   accelerator: gpu
+|   precision: bf16
+|   logger: false # logger provided by exp_manager
+|   enable_checkpointing: false
+|   use_distributed_sampler: false
+|   max_epochs: null
+|   max_steps: 20 # consumed_samples = global_step * global_batch_size
+|   max_time: "05:23:30:00" # days:hours:minutes:seconds
+|   log_every_n_steps: 1
+|   val_check_interval: null
+|   limit_val_batches: 0.0
+|   limit_test_batches: 5
+|   accumulate_grad_batches: 1
+|   gradient_clip_val: 1.0
+| exp_manager:
+|   exp_dir: null
+|   name: megatron_llama
+|   create_wandb_logger: false
+|   wandb_logger_kwargs:
+|     project: nemo_llama_pretrain
+|     name: ${run.name}
+|   create_dllogger_logger: True
+|   dllogger_logger_kwargs:
+|     verbose: True
+|     stdout: True
+|     json_file: "./dllogger.json"     
+|   resume_if_exists: false
+|   resume_ignore_no_checkpoint: true
+|   create_checkpoint_callback: false
+|   checkpoint_callback_params:
+|     monitor: val_loss
+|     save_top_k: 10
+|     mode: min
+|     always_save_nemo: False # saves nemo file during validation, not implemented for model parallel
+|     save_nemo_on_train_end: False # not recommended when training large models on clusters with short time limits
+|     filename: 'megatron_llama--{val_loss:.2f}-{step}-{consumed_samples}'
+|     model_parallel_size: ${multiply:${model.tensor_model_parallel_size}, ${model.pipeline_model_parallel_size}}
+|   log_step_timing: true
+|   step_timing_kwargs:
+|     sync_cuda: true
+|     buffer_size: 5
+|   seconds_to_sleep: 60
+| model:
+|   tp_only_amax_red: true
+|   mcore_gpt: true
+|   micro_batch_size: 2
+|   global_batch_size: 128
+|   rampup_batch_size: null
+|   tensor_model_parallel_size: 1
+|   pipeline_model_parallel_size: 1
+|   virtual_pipeline_model_parallel_size: null
+|   context_parallel_size: 1
+|   encoder_seq_length: 8192
+|   max_position_embeddings: 8192
+|   num_layers: 32
+|   hidden_size: 4096
+|   ffn_hidden_size: 14336
+|   num_attention_heads: 32
+|   num_query_groups: 8
+|   init_method_std: 0.01
+|   use_scaled_init_method: true
+|   hidden_dropout: 0.0
+|   attention_dropout: 0.0
+|   ffn_dropout: 0.0
+|   kv_channels: null
+|   apply_query_key_layer_scaling: true
+|   normalization: rmsnorm
+|   layernorm_epsilon: 1.0e-05
+|   do_layer_norm_weight_decay: false
+|   make_vocab_size_divisible_by: 128
+|   pre_process: true
+|   post_process: true
+|   persist_layer_norm: true
+|   bias: false
+|   activation: fast-swiglu
+|   headscale: false
+|   transformer_block_type: pre_ln
+|   openai_gelu: false
+|   normalize_attention_scores: true
+|   position_embedding_type: rope
+|   rotary_percentage: 1.0
+|   apply_rope_fusion: true
+|   attention_type: multihead
+|   share_embeddings_and_output_weights: false
+|   scale_positional_embedding: true
+|   tokenizer:
+|     library: 'megatron'
+|     type: 'GPT2BPETokenizer'
+|     model: null
+|     delimiter: null  # only used for tabular tokenizer
+|     vocab_file: gpt2-vocab.json
+|     merge_file: gpt2-merges.txt     
+|   native_amp_init_scale: 4294967296
+|   native_amp_growth_interval: 1000
+|   hysteresis: 2
+|   fp32_residual_connection: false
+|   fp16_lm_cross_entropy: false
+|   megatron_amp_O2: true
+|   grad_allreduce_chunk_size_mb: 125
+|   grad_div_ar_fusion: true
+|   gradient_accumulation_fusion: true
+|   cross_entropy_loss_fusion: true
+|   bias_activation_fusion: true
+|   bias_dropout_add_fusion: true
+|   masked_softmax_fusion: true
+|   seed: 1234
+|   resume_from_checkpoint: null
+|   use_cpu_initialization: false
+|   onnx_safe: false
+|   apex_transformer_log_level: 30
+|   gradient_as_bucket_view: true
+|   sync_batch_comm: false
+|   activations_checkpoint_granularity: null
+|   activations_checkpoint_method: null
+|   activations_checkpoint_num_layers: null
+|   num_micro_batches_with_partial_activation_checkpoints: null
+|   activations_checkpoint_layers_per_pipeline: null
+|   sequence_parallel: false
+|   defer_embedding_wgrad_compute: false
+|   wgrad_deferral_limit: 50
+|   deterministic_mode: false
+| 
+|   ## Transformer Engine
+|   transformer_engine: true
+|   fp8: true # enables fp8 in TransformerLayer forward  
+|   fp8_e4m3: False # sets fp8_format = recipe.Format.E4M3
+|   fp8_hybrid: true # sets fp8_format = recipe.Format.HYBRID
+|   fp8_margin: 0 # scaling margin
+|   fp8_interval: 1 # scaling update interval
+|   fp8_amax_history_len: 1024 # Number of steps for which amax history is recorded per tensor
+|   fp8_amax_compute_algo: max # 'most_recent' or 'max'. Algorithm for computing amax from history
+|   fp8_params: true
+|   ub_tp_comm_overlap: true
+|   ub_tp_comm_overlap_cfg:
+| # # B200 bf16
+| #     fc1_dgrad:
+| #       cga_size: 2
+| #       method: bulk
+| #       num_sm: 2
+| #       set_sm_margin: 0
+| #     fc1_fprop:
+| #       aggregate: 0
+| #       method: ring_exchange
+| #       num_sm: 1
+| #       set_sm_margin: 0
+| #     fc1_wgrad:
+| #       cga_size: 2
+| #       method: bulk
+| #       num_sm: 8
+| #       set_sm_margin: 0
+| #     fc2_dgrad:
+| #       aggregate: 0
+| #       method: ring_exchange
+| #       num_sm: 1
+| #       set_sm_margin: 0
+| #     fc2_fprop:
+| #       aggregate: 1
+| #       method: ring_exchange
+| #       num_sm: 1
+| #       set_sm_margin: 1
+| #     proj_dgrad:
+| #       aggregate: 0
+| #       method: ring_exchange
+| #       num_sm: 1
+| #       set_sm_margin: 0
+| #     proj_fprop:
+| #       aggregate: 1
+| #       method: ring_exchange
+| #       num_sm: 1
+| #       set_sm_margin: 1
+| #     qkv_dgrad:
+| #       cga_size: 2
+| #       method: bulk
+| #       num_sm: 8
+| #       set_sm_margin: 0
+| #     qkv_fprop:
+| #       aggregate: 0
+| #       method: ring_exchange
+| #       num_sm: 1
+| #       set_sm_margin: 0
+| #     qkv_wgrad:
+| #       cga_size: 2
+| #       method: bulk
+| #       num_sm: 32
+| #       set_sm_margin: 0
+|   
+| # B200 fp8
+|     fc1_dgrad:
+|       cga_size: 2
+|       method: bulk
+|       num_sm: 2
+|       set_sm_margin: 0
+|     fc1_fprop:
+|       aggregate: 0
+|       method: ring_exchange
+|       num_sm: 1
+|       set_sm_margin: 0
+|     fc1_wgrad:
+|       cga_size: 2
+|       method: bulk
+|       num_sm: 4
+|       set_sm_margin: 0
+|     fc2_dgrad:
+|       aggregate: 0
+|       method: ring_exchange
+|       num_sm: 1
+|       set_sm_margin: 0
+|     fc2_fprop:
+|       aggregate: 1
+|       method: ring_exchange
+|       num_sm: 1
+|       set_sm_margin: 1
+|     proj_dgrad:
+|       aggregate: 0
+|       method: ring_exchange
+|       num_sm: 1
+|       set_sm_margin: 0
+|     proj_fprop:
+|       aggregate: 1
+|       method: ring_exchange
+|       num_sm: 1
+|       set_sm_margin: 1
+|     qkv_dgrad:
+|       cga_size: 2
+|       method: bulk
+|       num_sm: 4
+|       set_sm_margin: 0
+|     qkv_fprop:
+|       aggregate: 0
+|       method: ring_exchange
+|       num_sm: 1
+|       set_sm_margin: 0
+|     qkv_wgrad:
+|       cga_size: 2
+|       method: bulk
+|       num_sm: 24
+|       set_sm_margin: 0
+| 
+|   use_flash_attention: true
+|   overlap_p2p_comm: true
+|   batch_p2p_comm: false
+|   gc_interval: 100
+|   nsys_profile:
+|     enabled: false
+|     trace: [nvtx,cuda]
+|     start_step: 25  # Global batch to start profiling
+|     end_step: 30 # Global batch to end profiling
+|     ranks: [0] 
+|     gen_shape: False # Generate model and kernel details including input shapes
+|   optim:
+|     name: distributed_fused_adam
+|     # name: mcore_distributed_optim
+|     lr: 0.00015
+|     weight_decay: 0.1
+|     betas:
+|     - 0.9
+|     - 0.95
+|     bucket_cap_mb: 125
+|     overlap_grad_sync: true
+|     overlap_param_sync: true
+|     contiguous_grad_buffer: true
+|     contiguous_param_buffer: true
+|     grad_sync_dtype: bf16
+|     sched:
+|       name: CosineAnnealing
+|       warmup_steps: 2000
+|       constant_steps: 11873
+|       min_lr: 1.0e-05
+|   data:
+|     # data_impl: mmap
+|     data_impl: mock
+|     splits_string: 99990,8,2
+|     seq_length: 8192
+|     skip_warmup: true
+|     num_workers: 2
+|     dataloader_type: single
+|     reset_position_ids: false
+|     reset_attention_mask: false
+|     eod_mask_loss: false
+|     index_mapping_dir: null
+Detected the following additional workload arguments:
+  +exp_manager.explicit_log_dir=/nemo-experiments/results
+  +model.data.index_mapping_dir=/gcs/index_mapping_dir
+  +model.data.data_prefix=[1.0,/ssd/.cache/wikipedia-tokenized-for-gpt2]
+  +exp_manager.exp_dir=/nemo-experiments/
+Checking for presence of nsys:
+/usr/local/cuda/bin/nsys
+NeMo job artifacts will go to /gcs/nemo-experiments/t-llama3-8b-8gpu-fp8-sq1-tp1-pp1-cp1-vp1-gbs128-mbs1-1749686361-sfqp/
+Launching Torch distributed as node rank 0 out of 1 nodes
+Launched rank 0 with PID 99
+Launched rank 1 with PID 100
+Launched rank 2 with PID 101
+Launched rank 3 with PID 102
+Launched rank 4 with PID 103
+Launched rank 5 with PID 104
+Launched rank 6 with PID 105
+Launched rank 7 with PID 106
+Waiting on Torch PID 99
+WARNING: Device-side CUDA Event completion trace is currently enabled.
+         This may increase runtime overhead and the likelihood of false
+         dependencies across CUDA Streams. If you wish to avoid this, please
+         disable the feature with --cuda-event-trace=false.
+WARNING: Device-side CUDA Event completion trace is currently enabled.
+         This may increase runtime overhead and the likelihood of false
+         dependencies across CUDA Streams. If you wish to avoid this, please
+         disable the feature with --cuda-event-trace=false.
+WARNING: Device-side CUDA Event completion trace is currently enabled.
+         This may increase runtime overhead and the likelihood of false
+         dependencies across CUDA Streams. If you wish to avoid this, please
+         disable the feature with --cuda-event-trace=false.
+WARNING: Device-side CUDA Event completion trace is currently enabled.
+         This may increase runtime overhead and the likelihood of false
+         dependencies across CUDA Streams. If you wish to avoid this, please
+         disable the feature with --cuda-event-trace=false.
+WARNING: Device-side CUDA Event completion trace is currently enabled.
+         This may increase runtime overhead and the likelihood of false
+         dependencies across CUDA Streams. If you wish to avoid this, please
+         disable the feature with --cuda-event-trace=false.
+WARNING: Device-side CUDA Event completion trace is currently enabled.
+         This may increase runtime overhead and the likelihood of false
+         dependencies across CUDA Streams. If you wish to avoid this, please
+         disable the feature with --cuda-event-trace=false.
+WARNING: Device-side CUDA Event completion trace is currently enabled.
+         This may increase runtime overhead and the likelihood of false
+         dependencies across CUDA Streams. If you wish to avoid this, please
+         disable the feature with --cuda-event-trace=false.
+WARNING: Device-side CUDA Event completion trace is currently enabled.
+         This may increase runtime overhead and the likelihood of false
+         dependencies across CUDA Streams. If you wish to avoid this, please
+         disable the feature with --cuda-event-trace=false.
+The cache for model files in Transformers v4.22.0 has been updated. Migrating your old cache. This is a one-time only operation. You can interrupt this and resume the migration later on by calling `transformers.utils.move_cache()`.
+
+0it [00:00, ?it/s]
+0it [00:00, ?it/s]
+[NeMo W 2025-06-12 00:00:11 nemo_logging:405] /usr/local/lib/python3.12/dist-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+      warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+    
+[NeMo I 2025-06-12 00:00:12 nemo_logging:393] 
+    
+    ************** Experiment configuration ***********
+[NeMo I 2025-06-12 00:00:12 nemo_logging:393] 
+    run:
+      name: llama3_8b_8GPU_TP1_PP1_CP1_VP1_GBS128_MBS2
+      results_dir: ${base_results_dir}/${.name}
+      time_limit: 0-02:30:00
+      dependency: singleton
+    trainer:
+      devices: 8
+      accelerator: gpu
+      precision: bf16
+      logger: false
+      enable_checkpointing: false
+      use_distributed_sampler: false
+      max_epochs: null
+      max_steps: 20
+      max_time: 05:23:30:00
+      log_every_n_steps: 1
+      val_check_interval: null
+      limit_val_batches: 0.0
+      limit_test_batches: 5
+      accumulate_grad_batches: 1
+      gradient_clip_val: 1.0
+      num_nodes: 1
+    exp_manager:
+      exp_dir: /nemo-experiments/
+      name: megatron_llama
+      create_wandb_logger: false
+      wandb_logger_kwargs:
+        project: nemo_llama_pretrain
+        name: ${run.name}
+      create_dllogger_logger: true
+      dllogger_logger_kwargs:
+        verbose: true
+        stdout: true
+        json_file: ./dllogger.json
+      resume_if_exists: false
+      resume_ignore_no_checkpoint: true
+      create_checkpoint_callback: false
+      checkpoint_callback_params:
+        monitor: val_loss
+        save_top_k: 10
+        mode: min
+        always_save_nemo: false
+        save_nemo_on_train_end: false
+        filename: megatron_llama--{val_loss:.2f}-{step}-{consumed_samples}
+        model_parallel_size: ${multiply:${model.tensor_model_parallel_size}, ${model.pipeline_model_parallel_size}}
+      log_step_timing: true
+      step_timing_kwargs:
+        sync_cuda: true
+        buffer_size: 5
+      seconds_to_sleep: 60
+      version: t-llama3-8b-8gpu-fp8-sq1-tp1-pp1-cp1-vp1-gbs128-mbs1-1749686361-sfqp
+      explicit_log_dir: /nemo-experiments/results
+    model:
+      tp_only_amax_red: true
+      mcore_gpt: true
+      micro_batch_size: 2
+      global_batch_size: 128
+      rampup_batch_size: null
+      tensor_model_parallel_size: 1
+      pipeline_model_parallel_size: 1
+      virtual_pipeline_model_parallel_size: null
+      context_parallel_size: 1
+      encoder_seq_length: 8192
+      max_position_embeddings: 8192
+      num_layers: 32
+      hidden_size: 4096
+      ffn_hidden_size: 14336
+      num_attention_heads: 32
+      num_query_groups: 8
+      init_method_std: 0.01
+      use_scaled_init_method: true
+      hidden_dropout: 0.0
+      attention_dropout: 0.0
+      ffn_dropout: 0.0
+      kv_channels: null
+      apply_query_key_layer_scaling: true
+      normalization: rmsnorm
+      layernorm_epsilon: 1.0e-05
+      do_layer_norm_weight_decay: false
+      make_vocab_size_divisible_by: 128
+      pre_process: true
+      post_process: true
+      persist_layer_norm: true
+      bias: false
+      activation: fast-swiglu
+      headscale: false
+      transformer_block_type: pre_ln
+      openai_gelu: false
+      normalize_attention_scores: true
+      position_embedding_type: rope
+      rotary_percentage: 1.0
+      apply_rope_fusion: true
+      attention_type: multihead
+      share_embeddings_and_output_weights: false
+      scale_positional_embedding: true
+      tokenizer:
+        library: megatron
+        type: GPT2BPETokenizer
+        model: null
+        delimiter: null
+        vocab_file: gpt2-vocab.json
+        merge_file: gpt2-merges.txt
+      native_amp_init_scale: 4294967296
+      native_amp_growth_interval: 1000
+      hysteresis: 2
+      fp32_residual_connection: false
+      fp16_lm_cross_entropy: false
+      megatron_amp_O2: true
+      grad_allreduce_chunk_size_mb: 125
+      grad_div_ar_fusion: true
+      gradient_accumulation_fusion: true
+      cross_entropy_loss_fusion: true
+      bias_activation_fusion: true
+      bias_dropout_add_fusion: true
+      masked_softmax_fusion: true
+      seed: 1234
+      resume_from_checkpoint: null
+      use_cpu_initialization: false
+      onnx_safe: false
+      apex_transformer_log_level: 30
+      gradient_as_bucket_view: true
+      sync_batch_comm: false
+      activations_checkpoint_granularity: null
+      activations_checkpoint_method: null
+      activations_checkpoint_num_layers: null
+      num_micro_batches_with_partial_activation_checkpoints: null
+      activations_checkpoint_layers_per_pipeline: null
+      sequence_parallel: false
+      defer_embedding_wgrad_compute: false
+      wgrad_deferral_limit: 50
+      deterministic_mode: false
+      transformer_engine: true
+      fp8: true
+      fp8_e4m3: false
+      fp8_hybrid: true
+      fp8_margin: 0
+      fp8_interval: 1
+      fp8_amax_history_len: 1024
+      fp8_amax_compute_algo: max
+      fp8_params: true
+      ub_tp_comm_overlap: true
+      ub_tp_comm_overlap_cfg:
+        fc1_dgrad:
+          cga_size: 2
+          method: bulk
+          num_sm: 2
+          set_sm_margin: 0
+        fc1_fprop:
+          aggregate: 0
+          method: ring_exchange
+          num_sm: 1
+          set_sm_margin: 0
+        fc1_wgrad:
+          cga_size: 2
+          method: bulk
+          num_sm: 4
+          set_sm_margin: 0
+        fc2_dgrad:
+          aggregate: 0
+          method: ring_exchange
+          num_sm: 1
+          set_sm_margin: 0
+        fc2_fprop:
+          aggregate: 1
+          method: ring_exchange
+          num_sm: 1
+          set_sm_margin: 1
+        proj_dgrad:
+          aggregate: 0
+          method: ring_exchange
+          num_sm: 1
+          set_sm_margin: 0
+        proj_fprop:
+          aggregate: 1
+          method: ring_exchange
+          num_sm: 1
+          set_sm_margin: 1
+        qkv_dgrad:
+          cga_size: 2
+          method: bulk
+          num_sm: 4
+          set_sm_margin: 0
+        qkv_fprop:
+          aggregate: 0
+          method: ring_exchange
+          num_sm: 1
+          set_sm_margin: 0
+        qkv_wgrad:
+          cga_size: 2
+          method: bulk
+          num_sm: 24
+          set_sm_margin: 0
+      use_flash_attention: true
+      overlap_p2p_comm: true
+      batch_p2p_comm: false
+      gc_interval: 100
+      nsys_profile:
+        enabled: false
+        trace:
+        - nvtx
+        - cuda
+        start_step: 25
+        end_step: 30
+        ranks:
+        - 0
+        gen_shape: false
+      optim:
+        name: distributed_fused_adam
+        lr: 0.00015
+        weight_decay: 0.1
+        betas:
+        - 0.9
+        - 0.95
+        bucket_cap_mb: 125
+        overlap_grad_sync: true
+        overlap_param_sync: true
+        contiguous_grad_buffer: true
+        contiguous_param_buffer: true
+        grad_sync_dtype: bf16
+        sched:
+          name: CosineAnnealing
+          warmup_steps: 2000
+          constant_steps: 11873
+          min_lr: 1.0e-05
+      data:
+        data_impl: mock
+        splits_string: 99990,8,2
+        seq_length: 8192
+        skip_warmup: true
+        num_workers: 2
+        dataloader_type: single
+        reset_position_ids: false
+        reset_attention_mask: false
+        eod_mask_loss: false
+        index_mapping_dir: /gcs/index_mapping_dir
+        data_prefix:
+        - 1.0
+        - /ssd/.cache/wikipedia-tokenized-for-gpt2
+    
+[NeMo W 2025-06-12 00:00:12 nemo_logging:405] /usr/local/lib/python3.12/dist-packages/lightning/pytorch/_graveyard/precision.py:49: The `MixedPrecisionPlugin` is deprecated. Use `lightning.pytorch.plugins.precision.MixedPrecision` instead.
+    
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+HPU available: False, using: 0 HPUs
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] ExpManager schema
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] {'explicit_log_dir': None, 'exp_dir': None, 'name': None, 'version': None, 'use_datetime_version': True, 'resume_if_exists': False, 'resume_past_end': False, 'resume_ignore_no_checkpoint': False, 'resume_from_checkpoint': None, 'create_tensorboard_logger': True, 'summary_writer_kwargs': None, 'create_wandb_logger': False, 'wandb_logger_kwargs': None, 'create_mlflow_logger': False, 'mlflow_logger_kwargs': {'experiment_name': None, 'tracking_uri': None, 'tags': None, 'save_dir': './mlruns', 'prefix': '', 'artifact_location': None, 'run_id': None, 'log_model': False}, 'create_dllogger_logger': False, 'dllogger_logger_kwargs': {'verbose': False, 'stdout': False, 'json_file': './dllogger.json'}, 'create_clearml_logger': False, 'clearml_logger_kwargs': {'project': None, 'task': None, 'connect_pytorch': False, 'model_name': None, 'tags': None, 'log_model': False, 'log_cfg': False, 'log_metrics': False}, 'create_neptune_logger': False, 'neptune_logger_kwargs': None, 'create_checkpoint_callback': True, 'checkpoint_callback_params': {'filepath': None, 'dirpath': None, 'filename': None, 'monitor': 'val_loss', 'verbose': True, 'save_last': True, 'save_top_k': 3, 'save_weights_only': False, 'mode': 'min', 'auto_insert_metric_name': True, 'every_n_epochs': 1, 'every_n_train_steps': None, 'train_time_interval': None, 'prefix': None, 'postfix': '.nemo', 'save_best_model': False, 'always_save_nemo': False, 'save_nemo_on_train_end': True, 'model_parallel_size': None, 'save_on_train_epoch_end': False, 'async_save': False, 'save_last_n_optim_states': -1}, 'create_early_stopping_callback': False, 'early_stopping_callback_params': {'monitor': 'val_loss', 'mode': 'min', 'min_delta': 0.001, 'patience': 10, 'verbose': True, 'strict': True, 'check_finite': True, 'stopping_threshold': None, 'divergence_threshold': None, 'check_on_train_epoch_end': None, 'log_rank_zero_only': False}, 'create_preemption_callback': True, 'files_to_copy': None, 'log_step_timing': True, 'log_delta_step_timing': False, 'step_timing_kwargs': {'reduction': 'mean', 'sync_cuda': False, 'buffer_size': 1}, 'log_local_rank_0_only': False, 'log_global_rank_0_only': False, 'disable_validation_on_resume': True, 'ema': {'enable': False, 'decay': 0.999, 'cpu_offload': False, 'validate_original_weights': False, 'every_n_steps': 1}, 'max_time_per_run': None, 'seconds_to_sleep': 5.0, 'create_straggler_detection_callback': False, 'straggler_detection_params': {'report_time_interval': 300.0, 'calc_relative_gpu_perf': True, 'calc_individual_gpu_perf': True, 'num_gpu_perf_scores_to_log': 5, 'gpu_relative_perf_threshold': 0.7, 'gpu_individual_perf_threshold': 0.7, 'stop_if_detected': False}, 'create_fault_tolerance_callback': False, 'fault_tolerance': {'workload_check_interval': 5.0, 'initial_rank_heartbeat_timeout': 3600.0, 'rank_heartbeat_timeout': 2700.0, 'calculate_timeouts': True, 'safety_factor': 5.0, 'rank_termination_signal': <Signals.SIGKILL: 9>, 'log_level': 'INFO', 'max_rank_restarts': 0, 'max_subsequent_job_failures': 0, 'additional_ft_launcher_args': '', 'simulated_fault': None}, 'log_tflops_per_sec_per_gpu': True}
+[NeMo E 2025-06-12 00:00:13 nemo_logging:417] exp_manager received explicit_log_dir: /nemo-experiments/results and at least one of exp_dir: /nemo-experiments/, or version: t-llama3-8b-8gpu-fp8-sq1-tp1-pp1-cp1-vp1-gbs128-mbs1-1749686361-sfqp. Please note that exp_dir, name, and version will be ignored.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] Exp_manager is logging to /nemo-experiments/results, but it already exists.
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] Experiments will be logged at /nemo-experiments/results
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] TensorboardLogger has been set up
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] DLLogger has been set up
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] TFLOPs per sec per GPU will be calculated, conditioned on supported models. Defaults to -1 upon failure.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: pipeline_model_parallel_comm_backend in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: hierarchical_context_parallel_sizes in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: expert_model_parallel_size in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: expert_tensor_parallel_size in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_extended_tp in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: finalize_model_grads_func in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: use_te_rng_tracker in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_bulk_wgrad in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_bulk_dgrad in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_overlap_ag in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_overlap_rs in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_overlap_rs_dgrad in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_split_ag in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_atomic_ag in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_split_rs in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_atomic_rs in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: cross_entropy_fusion_impl in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_overlap_disable_qkv in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_overlap_disable_fc1 in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: pipeline_model_parallel_split_rank in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: overlap_p2p_comm_warmup_flush in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: microbatch_group_size_per_vp_stage in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: cpu_offloading in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: cpu_offloading_num_layers in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: _cpu_offloading_context in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: cpu_offloading_activations in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: cpu_offloading_weights in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: barrier_with_L1_time in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] Rank 0 has data parallel group : [0, 1, 2, 3, 4, 5, 6, 7]
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] Rank 0 has combined group of data parallel and context parallel : [0, 1, 2, 3, 4, 5, 6, 7]
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] All data parallel group ranks with context parallel combined: [[0, 1, 2, 3, 4, 5, 6, 7]]
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] Ranks 0 has data parallel rank: 0
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] Rank 0 has context parallel group: [0]
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] All context parallel group ranks: [[0], [1], [2], [3], [4], [5], [6], [7]]
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] Ranks 0 has context parallel rank: 0
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] Rank 0 has model parallel group: [0]
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] All model parallel group ranks: [[0], [1], [2], [3], [4], [5], [6], [7]]
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] Rank 0 has tensor model parallel group: [0]
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] All tensor model parallel group ranks: [[0], [1], [2], [3], [4], [5], [6], [7]]
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] Rank 0 has tensor model parallel rank: 0
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] Rank 0 has pipeline model parallel group: [0]
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] Rank 0 has embedding group: [0]
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] All pipeline model parallel group ranks: [[0], [1], [2], [3], [4], [5], [6], [7]]
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] Rank 0 has pipeline model parallel rank 0
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] All embedding group ranks: [[0], [1], [2], [3], [4], [5], [6], [7]]
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] Rank 0 has embedding rank: 0
+[NeMo I 2025-06-12 00:00:13 num_microbatches_calculator:228] setting number of microbatches to constant 8
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] Pipelined tensor-parallel communication overlap is available with sequence-parallelism.Setting `ub_tp_comm_overlap` to False.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: pipeline_model_parallel_comm_backend in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: hierarchical_context_parallel_sizes in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: expert_model_parallel_size in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: expert_tensor_parallel_size in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_extended_tp in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: finalize_model_grads_func in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: use_te_rng_tracker in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_bulk_wgrad in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_bulk_dgrad in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_overlap_ag in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_overlap_rs in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_overlap_rs_dgrad in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_split_ag in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_atomic_ag in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_split_rs in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_atomic_rs in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: cross_entropy_fusion_impl in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_overlap_disable_qkv in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_overlap_disable_fc1 in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: pipeline_model_parallel_split_rank in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: overlap_p2p_comm_warmup_flush in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: microbatch_group_size_per_vp_stage in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: cpu_offloading in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: cpu_offloading_num_layers in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: _cpu_offloading_context in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: cpu_offloading_activations in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: cpu_offloading_weights in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: barrier_with_L1_time in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:13 nemo_logging:405] You tried to register an artifact under config key=tokenizer.vocab_file but an artifact for it has already been registered.
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] Getting Megatron tokenizer for pretrained model name: megatron-gpt-345m, custom vocab file: /app/training/gpt2-vocab.json, and merges file: /app/training/gpt2-merges.txt
+[NeMo I 2025-06-12 00:00:13 nemo_logging:393] Getting HuggingFace AutoTokenizer with pretrained_model_name: gpt2, vocab_file: /app/training/gpt2-vocab.json, merges_files: /app/training/gpt2-merges.txt, special_tokens_dict: {}, and use_fast: False
+[NeMo I 2025-06-12 00:00:14 nemo_logging:393] Padded vocab_size: 50304, original vocab_size: 50257, dummy tokens: 47.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: pipeline_model_parallel_comm_backend in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: hierarchical_context_parallel_sizes in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: expert_model_parallel_size in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: expert_tensor_parallel_size in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_extended_tp in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: finalize_model_grads_func in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: use_te_rng_tracker in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_bulk_wgrad in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_bulk_dgrad in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_overlap_ag in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_overlap_rs in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_overlap_rs_dgrad in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_split_ag in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_atomic_ag in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_split_rs in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_atomic_rs in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: cross_entropy_fusion_impl in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_overlap_disable_qkv in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: tp_comm_overlap_disable_fc1 in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: pipeline_model_parallel_split_rank in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: overlap_p2p_comm_warmup_flush in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: microbatch_group_size_per_vp_stage in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: cpu_offloading in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: cpu_offloading_num_layers in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: _cpu_offloading_context in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: cpu_offloading_activations in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: cpu_offloading_weights in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: barrier_with_L1_time in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] apply_query_key_layer_scaling is only enabled when using FP16, setting it to False and setting NVTE_APPLY_QK_LAYER_SCALING=0
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: use_te_rng_tracker in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: mtp_num_layers in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: mtp_loss_scaling_factor in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: num_layers_in_first_pipeline_stage in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: num_layers_in_last_pipeline_stage in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: softmax_scale in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: activation_func_fp8_input_store in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: num_moe_experts in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: window_size in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: qk_layernorm in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: test_mode in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: calculate_per_token_loss in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: multi_latent_attention in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: init_model_with_meta_device in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: disable_bf16_reduced_precision_matmul in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: memory_efficient_layer_norm in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: recompute_modules in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: fp8_recipe in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: fp8_param in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: fp8_wgrad in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: fp8_dot_product_attention in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: fp8_multi_head_attention in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: first_last_layers_bf16 in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: num_layers_at_start_in_bf16 in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: num_layers_at_end_in_bf16 in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_shared_expert_intermediate_size in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_shared_expert_overlap in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_layer_freq in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_ffn_hidden_size in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_router_load_balancing_type in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_router_topk in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_router_topk_limited_devices in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_router_num_groups in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_router_group_topk in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_router_pre_softmax in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_router_topk_scaling_factor in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_router_score_function in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_router_dtype in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_router_enable_expert_bias in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_router_bias_update_rate in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_grouped_gemm in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_use_legacy_grouped_gemm in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_aux_loss_coeff in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_z_loss_coeff in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_input_jitter_eps in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_token_dropping in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_token_dispatcher_type in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_enable_deepep in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_per_layer_logging in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_expert_capacity_factor in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_pad_expert_input_to_capacity in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_token_drop_policy in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_layer_recompute in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_permute_fusion in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: moe_apply_probs_on_input in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: cp_comm_type in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: enable_cuda_graph in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: cuda_graph_use_single_mempool in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: cuda_graph_retain_backward_graph in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: cuda_graph_warmup_steps in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: external_cuda_graph in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: cuda_graph_scope in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: clone_scatter_output_in_embedding in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: disable_parameter_transpose_cache in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: config_logger_dir in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: flash_decode in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: inference_rng_tracker in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: mrope_section in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: is_hybrid_model in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: mamba_state_dim in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: mamba_head_dim in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: mamba_num_groups in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] The model: MegatronGPTModel() does not have field.name: heterogeneous_block_specs in its cfg. Add this key to cfg or config_mapping to make to make it configurable.
+apply rope scaling ...
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] /usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/configuration_validator.py:161: You have overridden `MegatronGPTModel.configure_sharded_model` which is deprecated. Please override the `configure_model` hook instead. Instantiation with the newer hook will be created on the device right away and have the right data type depending on the precision setting in the Trainer.
+    
+[NeMo W 2025-06-12 00:00:14 nemo_logging:405] /usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/configuration_validator.py:143: You are using the `dataloader_iter` step flavor. If you consume the iterator more than once per step, the `batch_idx` argument in any hook that takes it will not match with the batch index of the last batch consumed. This might have unforeseen effects on callbacks or code that expects to get the correct index. This will also not work well with gradient accumulation. This feature is very experimental and subject to change. Here be dragons.
+    
+Initializing distributed: GLOBAL_RANK: 0, MEMBER: 1/8
+apply rope scaling ...
+Initializing distributed: GLOBAL_RANK: 1, MEMBER: 2/8
+apply rope scaling ...
+Initializing distributed: GLOBAL_RANK: 6, MEMBER: 7/8
+apply rope scaling ...
+Initializing distributed: GLOBAL_RANK: 3, MEMBER: 4/8
+apply rope scaling ...
+Initializing distributed: GLOBAL_RANK: 4, MEMBER: 5/8
+apply rope scaling ...
+Initializing distributed: GLOBAL_RANK: 2, MEMBER: 3/8
+apply rope scaling ...
+Initializing distributed: GLOBAL_RANK: 5, MEMBER: 6/8
+apply rope scaling ...
+Initializing distributed: GLOBAL_RANK: 7, MEMBER: 8/8
+----------------------------------------------------------------------------------------------------
+distributed_backend=nccl
+All distributed processes registered. Starting with 8 processes
+----------------------------------------------------------------------------------------------------
+
+[NeMo I 2025-06-12 00:01:19 nemo_logging:393] Pipeline model parallel rank: 0, Tensor model parallel rank: 0, Number of model parameters on device: 7.39e+09. Number of precise model parameters on device: 7391678464.
+[NeMo I 2025-06-12 00:01:19 nemo_logging:393] Building GPT datasets.
+[NeMo I 2025-06-12 00:01:19 utils:532] Let mock = True, as both blend and blend_per_split are None
+[NeMo I 2025-06-12 00:01:19 utils:532] Let split = 1,1,1, an arbitrarily even split, as mock is True
+[NeMo I 2025-06-12 00:01:19 utils:532] Let split_matrix = [(0, 0.3333333333333333), (0.3333333333333333, 0.6666666666666666), (0.6666666666666666, 1.0)]
+[NeMo I 2025-06-12 00:01:19 utils:532] Building MockGPTDataset splits with sizes=[2560, None, 640] and config=GPTDatasetConfig(random_seed=1234, sequence_length=8192, blend=None, blend_per_split=None, split='1,1,1', split_matrix=[(0, 0.3333333333333333), (0.3333333333333333, 0.6666666666666666), (0.6666666666666666, 1.0)], num_dataset_builder_threads=1, path_to_cache='/gcs/index_mapping_dir', mmap_bin_files=True, mock=True, tokenizer=<nemo.collections.common.tokenizers.huggingface.auto_tokenizer.AutoTokenizer object at 0x7a6a1b897980>, reset_position_ids=False, reset_attention_mask=False, eod_mask_loss=False, create_attention_mask=False, drop_last_partial_validation_sequence=True, add_extra_token_to_sequence=True, s3_cache_path=None)
+[NeMo I 2025-06-12 00:01:19 utils:532] Load the MockGPTDataset train indices
+[NeMo I 2025-06-12 00:01:19 utils:532] 	Load the document index from 40df8b53bb8c2a8bb9fd2dba94dc761b-MockGPTDataset-train-document_index.npy
+[NeMo I 2025-06-12 00:01:19 utils:532] 	Load the sample index from 40df8b53bb8c2a8bb9fd2dba94dc761b-MockGPTDataset-train-sample_index.npy
+[NeMo I 2025-06-12 00:01:19 utils:532] 	Load the shuffle index from 40df8b53bb8c2a8bb9fd2dba94dc761b-MockGPTDataset-train-shuffle_index.npy
+[NeMo I 2025-06-12 00:01:19 utils:532] > total number of samples: 8324
+[NeMo I 2025-06-12 00:01:20 utils:532] Load the MockGPTDataset valid indices
+[NeMo I 2025-06-12 00:01:20 utils:532] 	Load the document index from 32fbcc21f5c1205dcf1c8e7b9b7304e2-MockGPTDataset-valid-document_index.npy
+[NeMo I 2025-06-12 00:01:20 utils:532] 	Load the sample index from 32fbcc21f5c1205dcf1c8e7b9b7304e2-MockGPTDataset-valid-sample_index.npy
+[NeMo I 2025-06-12 00:01:20 utils:532] 	Load the shuffle index from 32fbcc21f5c1205dcf1c8e7b9b7304e2-MockGPTDataset-valid-shuffle_index.npy
+[NeMo I 2025-06-12 00:01:20 utils:532] > total number of samples: 8320
+[NeMo I 2025-06-12 00:01:20 utils:532] Load the MockGPTDataset test indices
+[NeMo I 2025-06-12 00:01:20 utils:532] 	Load the document index from 3e9ef6891cda52cf504a70b21f77d8bd-MockGPTDataset-test-document_index.npy
+[NeMo I 2025-06-12 00:01:20 utils:532] 	Load the sample index from 3e9ef6891cda52cf504a70b21f77d8bd-MockGPTDataset-test-sample_index.npy
+[NeMo I 2025-06-12 00:01:20 utils:532] 	Load the shuffle index from 3e9ef6891cda52cf504a70b21f77d8bd-MockGPTDataset-test-shuffle_index.npy
+[NeMo I 2025-06-12 00:01:20 utils:532] > total number of samples: 8335
+[NeMo I 2025-06-12 00:01:20 nemo_logging:393] Length of train dataset: 8324
+[NeMo I 2025-06-12 00:01:20 nemo_logging:393] Length of val dataset: 8320
+[NeMo I 2025-06-12 00:01:20 nemo_logging:393] Length of test dataset: 8335
+[NeMo I 2025-06-12 00:01:20 nemo_logging:393] Finished building GPT datasets.
+[NeMo I 2025-06-12 00:01:20 nemo_logging:393] Setting up train dataloader with len(len(self._train_ds)): 8324 and consumed samples: 0
+[NeMo I 2025-06-12 00:01:20 nemo_logging:393] Building dataloader with consumed samples: 0
+[NeMo I 2025-06-12 00:01:20 nemo_logging:393] Instantiating MegatronPretrainingSampler with total_samples: 8324 and consumed_samples: 0
+[NeMo I 2025-06-12 00:01:20 nemo_logging:393] Setting up validation dataloader with len(len(self._validation_ds)): 8320 and consumed samples: 0
+[NeMo I 2025-06-12 00:01:20 nemo_logging:393] Building dataloader with consumed samples: 0
+[NeMo I 2025-06-12 00:01:20 nemo_logging:393] Instantiating MegatronPretrainingSampler with total_samples: 8320 and consumed_samples: 0
+[NeMo I 2025-06-12 00:01:20 nemo_logging:393] Setting up test dataloader with len(len(self._test_ds)): 8335 and consumed samples: 0
+[NeMo I 2025-06-12 00:01:20 nemo_logging:393] Building dataloader with consumed samples: 0
+[NeMo I 2025-06-12 00:01:20 nemo_logging:393] Instantiating MegatronPretrainingSampler with total_samples: 8335 and consumed_samples: 0
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0,1,2,3,4,5,6,7]
+LOCAL_RANK: 3 - CUDA_VISIBLE_DEVICES: [0,1,2,3,4,5,6,7]
+LOCAL_RANK: 7 - CUDA_VISIBLE_DEVICES: [0,1,2,3,4,5,6,7]
+LOCAL_RANK: 2 - CUDA_VISIBLE_DEVICES: [0,1,2,3,4,5,6,7]
+LOCAL_RANK: 5 - CUDA_VISIBLE_DEVICES: [0,1,2,3,4,5,6,7]
+LOCAL_RANK: 4 - CUDA_VISIBLE_DEVICES: [0,1,2,3,4,5,6,7]
+LOCAL_RANK: 6 - CUDA_VISIBLE_DEVICES: [0,1,2,3,4,5,6,7]
+LOCAL_RANK: 1 - CUDA_VISIBLE_DEVICES: [0,1,2,3,4,5,6,7]
+[NeMo I 2025-06-12 00:01:21 nemo_logging:393] Optimizer config = MegatronDistributedFusedAdam (
+    Parameter Group 0
+        betas: [0.9, 0.95]
+        bias_correction: True
+        eps: 1e-08
+        is_expert: False
+        lr: 0.00015
+        weight_decay: 0.1
+    adam_w_mode: True
+    amsgrad: False
+    dtype: torch.float32
+    grad_sync_dtype: torch.bfloat16
+    param_sync_dtype: torch.bfloat16
+    device: cuda:0
+    process_group: 0x7a6a189f4570, world size 8
+    distributed_process_group: 0x7a6a189f4570, world size 8
+    redundant_process_group: None
+    average_grad_sync: True
+    overlap_grad_sync: True
+    overlap_param_sync: True
+    bucket_cap_mb: 125
+    pipeline_size: 2
+    contiguous_param_buffer: True
+    contiguous_grad_buffer: True
+    store_params: True
+    store_param_remainders: False
+    with_scaled_states: False
+    nccl_ub: False
+    capturable: False
+    )
+[NeMo I 2025-06-12 00:01:21 nemo_logging:393] Scheduler "<nemo.core.optim.lr_scheduler.CosineAnnealing object at 0x7a6a1893bbc0>" 
+    will be used during training (effective maximum steps = 20) - 
+    Parameters : 
+    (warmup_steps: 2000
+    constant_steps: 11873
+    min_lr: 1.0e-05
+    max_steps: 20
+    )
+
+  | Name  | Type          | Params | Mode 
+------------------------------------------------
+0 | model | Float16Module | 7.4 B  | train
+------------------------------------------------
+7.4 B     Trainable params
+0         Non-trainable params
+7.4 B     Total params
+29,566.714Total estimated model params size (MB)
+650       Modules in train mode
+0         Modules in eval mode
+DLL 2025-06-12 00:01:21.170306 - PARAMETER cfg/tp_only_amax_red : True  cfg/mcore_gpt : True  cfg/micro_batch_size : 2  cfg/global_batch_size : 128  cfg/rampup_batch_size : None  cfg/tensor_model_parallel_size : 1  cfg/pipeline_model_parallel_size : 1  cfg/virtual_pipeline_model_parallel_size : None  cfg/context_parallel_size : 1  cfg/encoder_seq_length : 8192  cfg/max_position_embeddings : 8192  cfg/num_layers : 32  cfg/hidden_size : 4096  cfg/ffn_hidden_size : 14336  cfg/num_attention_heads : 32  cfg/num_query_groups : 8  cfg/init_method_std : 0.01  cfg/use_scaled_init_method : True  cfg/hidden_dropout : 0.0  cfg/attention_dropout : 0.0  cfg/ffn_dropout : 0.0  cfg/kv_channels : None  cfg/apply_query_key_layer_scaling : True  cfg/normalization : rmsnorm  cfg/layernorm_epsilon : 1e-05  cfg/do_layer_norm_weight_decay : False  cfg/make_vocab_size_divisible_by : 128  cfg/pre_process : True  cfg/post_process : True  cfg/persist_layer_norm : True  cfg/bias : False  cfg/activation : fast-swiglu  cfg/headscale : False  cfg/transformer_block_type : pre_ln  cfg/openai_gelu : False  cfg/normalize_attention_scores : True  cfg/position_embedding_type : rope  cfg/rotary_percentage : 1.0  cfg/apply_rope_fusion : True  cfg/attention_type : multihead  cfg/share_embeddings_and_output_weights : False  cfg/scale_positional_embedding : True  cfg/tokenizer/library : megatron  cfg/tokenizer/type : GPT2BPETokenizer  cfg/tokenizer/model : None  cfg/tokenizer/delimiter : None  cfg/tokenizer/vocab_file : gpt2-vocab.json  cfg/tokenizer/merge_file : gpt2-merges.txt  cfg/native_amp_init_scale : 4294967296  cfg/native_amp_growth_interval : 1000  cfg/hysteresis : 2  cfg/fp32_residual_connection : False  cfg/fp16_lm_cross_entropy : False  cfg/megatron_amp_O2 : True  cfg/grad_allreduce_chunk_size_mb : 125  cfg/grad_div_ar_fusion : True  cfg/gradient_accumulation_fusion : True  cfg/cross_entropy_loss_fusion : True  cfg/bias_activation_fusion : True  cfg/bias_dropout_add_fusion : True  cfg/masked_softmax_fusion : True  cfg/seed : 1234  cfg/resume_from_checkpoint : None  cfg/use_cpu_initialization : False  cfg/onnx_safe : False  cfg/apex_transformer_log_level : 30  cfg/gradient_as_bucket_view : True  cfg/sync_batch_comm : False  cfg/activations_checkpoint_granularity : None  cfg/activations_checkpoint_method : None  cfg/activations_checkpoint_num_layers : None  cfg/num_micro_batches_with_partial_activation_checkpoints : None  cfg/activations_checkpoint_layers_per_pipeline : None  cfg/sequence_parallel : False  cfg/defer_embedding_wgrad_compute : False  cfg/wgrad_deferral_limit : 50  cfg/deterministic_mode : False  cfg/transformer_engine : True  cfg/fp8 : True  cfg/fp8_e4m3 : False  cfg/fp8_hybrid : True  cfg/fp8_margin : 0  cfg/fp8_interval : 1  cfg/fp8_amax_history_len : 1024  cfg/fp8_amax_compute_algo : max  cfg/fp8_params : True  cfg/ub_tp_comm_overlap : True  cfg/ub_tp_comm_overlap_cfg/fc1_dgrad/cga_size : 2  cfg/ub_tp_comm_overlap_cfg/fc1_dgrad/method : bulk  cfg/ub_tp_comm_overlap_cfg/fc1_dgrad/num_sm : 2  cfg/ub_tp_comm_overlap_cfg/fc1_dgrad/set_sm_margin : 0  cfg/ub_tp_comm_overlap_cfg/fc1_fprop/aggregate : 0  cfg/ub_tp_comm_overlap_cfg/fc1_fprop/method : ring_exchange  cfg/ub_tp_comm_overlap_cfg/fc1_fprop/num_sm : 1  cfg/ub_tp_comm_overlap_cfg/fc1_fprop/set_sm_margin : 0  cfg/ub_tp_comm_overlap_cfg/fc1_wgrad/cga_size : 2  cfg/ub_tp_comm_overlap_cfg/fc1_wgrad/method : bulk  cfg/ub_tp_comm_overlap_cfg/fc1_wgrad/num_sm : 4  cfg/ub_tp_comm_overlap_cfg/fc1_wgrad/set_sm_margin : 0  cfg/ub_tp_comm_overlap_cfg/fc2_dgrad/aggregate : 0  cfg/ub_tp_comm_overlap_cfg/fc2_dgrad/method : ring_exchange  cfg/ub_tp_comm_overlap_cfg/fc2_dgrad/num_sm : 1  cfg/ub_tp_comm_overlap_cfg/fc2_dgrad/set_sm_margin : 0  cfg/ub_tp_comm_overlap_cfg/fc2_fprop/aggregate : 1  cfg/ub_tp_comm_overlap_cfg/fc2_fprop/method : ring_exchange  cfg/ub_tp_comm_overlap_cfg/fc2_fprop/num_sm : 1  cfg/ub_tp_comm_overlap_cfg/fc2_fprop/set_sm_margin : 1  cfg/ub_tp_comm_overlap_cfg/proj_dgrad/aggregate : 0  cfg/ub_tp_comm_overlap_cfg/proj_dgrad/method : ring_exchange  cfg/ub_tp_comm_overlap_cfg/proj_dgrad/num_sm : 1  cfg/ub_tp_comm_overlap_cfg/proj_dgrad/set_sm_margin : 0  cfg/ub_tp_comm_overlap_cfg/proj_fprop/aggregate : 1  cfg/ub_tp_comm_overlap_cfg/proj_fprop/method : ring_exchange  cfg/ub_tp_comm_overlap_cfg/proj_fprop/num_sm : 1  cfg/ub_tp_comm_overlap_cfg/proj_fprop/set_sm_margin : 1  cfg/ub_tp_comm_overlap_cfg/qkv_dgrad/cga_size : 2  cfg/ub_tp_comm_overlap_cfg/qkv_dgrad/method : bulk  cfg/ub_tp_comm_overlap_cfg/qkv_dgrad/num_sm : 4  cfg/ub_tp_comm_overlap_cfg/qkv_dgrad/set_sm_margin : 0  cfg/ub_tp_comm_overlap_cfg/qkv_fprop/aggregate : 0  cfg/ub_tp_comm_overlap_cfg/qkv_fprop/method : ring_exchange  cfg/ub_tp_comm_overlap_cfg/qkv_fprop/num_sm : 1  cfg/ub_tp_comm_overlap_cfg/qkv_fprop/set_sm_margin : 0  cfg/ub_tp_comm_overlap_cfg/qkv_wgrad/cga_size : 2  cfg/ub_tp_comm_overlap_cfg/qkv_wgrad/method : bulk  cfg/ub_tp_comm_overlap_cfg/qkv_wgrad/num_sm : 24  cfg/ub_tp_comm_overlap_cfg/qkv_wgrad/set_sm_margin : 0  cfg/use_flash_attention : True  cfg/overlap_p2p_comm : True  cfg/batch_p2p_comm : False  cfg/gc_interval : 100  cfg/nsys_profile/enabled : False  cfg/nsys_profile/trace : ['nvtx', 'cuda']  cfg/nsys_profile/start_step : 25  cfg/nsys_profile/end_step : 30  cfg/nsys_profile/ranks : [0]  cfg/nsys_profile/gen_shape : False  cfg/optim/name : distributed_fused_adam  cfg/optim/lr : 0.00015  cfg/optim/weight_decay : 0.1  cfg/optim/betas : [0.9, 0.95]  cfg/optim/bucket_cap_mb : 125  cfg/optim/overlap_grad_sync : True  cfg/optim/overlap_param_sync : True  cfg/optim/contiguous_grad_buffer : True  cfg/optim/contiguous_param_buffer : True  cfg/optim/grad_sync_dtype : bf16  cfg/optim/sched/name : CosineAnnealing  cfg/optim/sched/warmup_steps : 2000  cfg/optim/sched/constant_steps : 11873  cfg/optim/sched/min_lr : 1e-05  cfg/data/data_impl : mock  cfg/data/splits_string : 99990,8,2  cfg/data/seq_length : 8192  cfg/data/skip_warmup : True  cfg/data/num_workers : 2  cfg/data/dataloader_type : single  cfg/data/reset_position_ids : False  cfg/data/reset_attention_mask : False  cfg/data/eod_mask_loss : False  cfg/data/index_mapping_dir : /gcs/index_mapping_dir  cfg/data/data_prefix : [1.0, '/ssd/.cache/wikipedia-tokenized-for-gpt2']  cfg/precision : bf16-mixed 
+[NeMo W 2025-06-12 00:01:35 nemo_logging:405] /usr/local/lib/python3.12/dist-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+      warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+    
+[NeMo W 2025-06-12 00:01:48 nemo_logging:405] /usr/local/lib/python3.12/dist-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+      warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+    
+
+Training: |          | 0/? [00:00<?, ?it/s]
+Training:   0%|          | 0/20 [00:00<?]  
+Epoch 0: :   0%|          | 0/20 [00:00<?]
+Epoch 0: :   5%|▌         | 1/20 [00:21<06:46]
+Epoch 0: :   5%|▌         | 1/20 [00:21<06:46, v_num=None, reduced_train_loss=11.00, global_step=0.000, consumed_samples=128.0, train_step_timing in s=21.40]DLL 2025-06-12 00:02:13.549782 - 0 reduced_train_loss : 11.026606559753418  lr : 0.0  global_step : 0.0  consumed_samples : 128.0  train_backward_timing in s : 4.267692565917969e-05  grad_norm : 8.775321006774902  train_step_timing in s : 21.367358684539795  epoch : 0 
+
+Epoch 0: :  10%|█         | 2/20 [00:25<03:50, v_num=None, reduced_train_loss=11.00, global_step=0.000, consumed_samples=128.0, train_step_timing in s=21.40]
+Epoch 0: :  10%|█         | 2/20 [00:25<03:50, v_num=None, reduced_train_loss=11.00, global_step=1.000, consumed_samples=256.0, train_step_timing in s=12.80]DLL 2025-06-12 00:02:17.820969 - 1 reduced_train_loss : 11.026390075683594  lr : 7.500000265281415e-08  global_step : 1.0  consumed_samples : 256.0  train_backward_timing in s : 4.982948303222656e-05  grad_norm : 13.45233154296875  train_step_timing in s : 12.817503690719604  epoch : 0 
+
+Epoch 0: :  15%|█▌        | 3/20 [00:29<02:49, v_num=None, reduced_train_loss=11.00, global_step=1.000, consumed_samples=256.0, train_step_timing in s=12.80]
+Epoch 0: :  15%|█▌        | 3/20 [00:29<02:49, v_num=None, reduced_train_loss=10.40, global_step=2.000, consumed_samples=384.0, train_step_timing in s=9.980]DLL 2025-06-12 00:02:22.127812 - 2 reduced_train_loss : 10.35219669342041  lr : 1.500000053056283e-07  global_step : 2.0  consumed_samples : 384.0  train_backward_timing in s : 4.871686299641927e-05  grad_norm : 14.717040061950684  train_step_timing in s : 9.97948416074117  epoch : 0 
+
+Epoch 0: :  20%|██        | 4/20 [00:34<02:17, v_num=None, reduced_train_loss=10.40, global_step=2.000, consumed_samples=384.0, train_step_timing in s=9.980]
+Epoch 0: :  20%|██        | 4/20 [00:34<02:17, v_num=None, reduced_train_loss=10.30, global_step=3.000, consumed_samples=512.0, train_step_timing in s=8.560]DLL 2025-06-12 00:02:26.444616 - 3 reduced_train_loss : 10.315330505371094  lr : 2.2499999374758772e-07  global_step : 3.0  consumed_samples : 512.0  train_backward_timing in s : 4.845857620239258e-05  grad_norm : 15.021897315979004  train_step_timing in s : 8.563039004802704  epoch : 0 
+
+Epoch 0: :  25%|██▌       | 5/20 [00:38<01:55, v_num=None, reduced_train_loss=10.30, global_step=3.000, consumed_samples=512.0, train_step_timing in s=8.560]
+Epoch 0: :  25%|██▌       | 5/20 [00:38<01:55, v_num=None, reduced_train_loss=10.30, global_step=4.000, consumed_samples=640.0, train_step_timing in s=7.710]DLL 2025-06-12 00:02:30.767250 - 4 reduced_train_loss : 10.269079208374023  lr : 3.000000106112566e-07  global_step : 4.0  consumed_samples : 640.0  train_backward_timing in s : 4.8494338989257814e-05  grad_norm : 15.459893226623535  train_step_timing in s : 7.71432933807373  epoch : 0 
+
+Epoch 0: :  30%|███       | 6/20 [00:42<01:40, v_num=None, reduced_train_loss=10.30, global_step=4.000, consumed_samples=640.0, train_step_timing in s=7.710]
+Epoch 0: :  30%|███       | 6/20 [00:42<01:40, v_num=None, reduced_train_loss=10.20, global_step=5.000, consumed_samples=768.0, train_step_timing in s=4.310]DLL 2025-06-12 00:02:35.093370 - 5 reduced_train_loss : 10.226990699768066  lr : 3.7500001326407073e-07  global_step : 5.0  consumed_samples : 768.0  train_backward_timing in s : 4.7540664672851564e-05  grad_norm : 15.597942352294922  train_step_timing in s : 4.305385780334473  epoch : 0 
+
+Epoch 0: :  35%|███▌      | 7/20 [00:47<01:27, v_num=None, reduced_train_loss=10.20, global_step=5.000, consumed_samples=768.0, train_step_timing in s=4.310]
+Epoch 0: :  35%|███▌      | 7/20 [00:47<01:27, v_num=None, reduced_train_loss=10.20, global_step=6.000, consumed_samples=896.0, train_step_timing in s=4.320]DLL 2025-06-12 00:02:39.428365 - 6 reduced_train_loss : 10.164199829101562  lr : 4.4999998749517545e-07  global_step : 6.0  consumed_samples : 896.0  train_backward_timing in s : 4.553794860839844e-05  grad_norm : 15.73976993560791  train_step_timing in s : 4.318275308609008  epoch : 0 
+
+Epoch 0: :  40%|████      | 8/20 [00:51<01:17, v_num=None, reduced_train_loss=10.20, global_step=6.000, consumed_samples=896.0, train_step_timing in s=4.320]
+Epoch 0: :  40%|████      | 8/20 [00:51<01:17, v_num=None, reduced_train_loss=10.10, global_step=7.000, consumed_samples=1024.0, train_step_timing in s=4.320]DLL 2025-06-12 00:02:43.756900 - 7 reduced_train_loss : 10.079761505126953  lr : 5.25000018569699e-07  global_step : 7.0  consumed_samples : 1024.0  train_backward_timing in s : 4.84466552734375e-05  grad_norm : 16.249774932861328  train_step_timing in s : 4.322663450241089  epoch : 0 
+
+Epoch 0: :  45%|████▌     | 9/20 [00:55<01:08, v_num=None, reduced_train_loss=10.10, global_step=7.000, consumed_samples=1024.0, train_step_timing in s=4.320]
+Epoch 0: :  45%|████▌     | 9/20 [00:55<01:08, v_num=None, reduced_train_loss=9.930, global_step=8.000, consumed_samples=1152.0, train_step_timing in s=4.330]DLL 2025-06-12 00:02:48.097223 - 8 reduced_train_loss : 9.926094055175781  lr : 6.000000212225132e-07  global_step : 8.0  consumed_samples : 1152.0  train_backward_timing in s : 4.6825408935546876e-05  grad_norm : 16.9432315826416  train_step_timing in s : 4.327331018447876  epoch : 0 
+
+Epoch 0: :  50%|█████     | 10/20 [01:00<01:00, v_num=None, reduced_train_loss=9.930, global_step=8.000, consumed_samples=1152.0, train_step_timing in s=4.330]
+Epoch 0: :  50%|█████     | 10/20 [01:00<01:00, v_num=None, reduced_train_loss=9.820, global_step=9.000, consumed_samples=1280.0, train_step_timing in s=4.330]DLL 2025-06-12 00:02:52.428333 - 9 reduced_train_loss : 9.818368911743164  lr : 6.750000238753273e-07  global_step : 9.0  consumed_samples : 1280.0  train_backward_timing in s : 4.487037658691406e-05  grad_norm : 17.497478485107422  train_step_timing in s : 4.329082870483399  epoch : 0 
+
+Epoch 0: :  55%|█████▌    | 11/20 [01:04<00:52, v_num=None, reduced_train_loss=9.820, global_step=9.000, consumed_samples=1280.0, train_step_timing in s=4.330]
+Epoch 0: :  55%|█████▌    | 11/20 [01:04<00:52, v_num=None, reduced_train_loss=9.700, global_step=10.00, consumed_samples=1408.0, train_step_timing in s=4.330]DLL 2025-06-12 00:02:56.762446 - 10 reduced_train_loss : 9.696205139160156  lr : 7.500000265281415e-07  global_step : 10.0  consumed_samples : 1408.0  train_backward_timing in s : 4.4918060302734376e-05  grad_norm : 18.053630828857422  train_step_timing in s : 4.330724477767944  epoch : 0 
+
+Epoch 0: :  60%|██████    | 12/20 [01:08<00:45, v_num=None, reduced_train_loss=9.700, global_step=10.00, consumed_samples=1408.0, train_step_timing in s=4.330]
+Epoch 0: :  60%|██████    | 12/20 [01:08<00:45, v_num=None, reduced_train_loss=9.420, global_step=11.00, consumed_samples=1536.0, train_step_timing in s=4.330]DLL 2025-06-12 00:03:01.092988 - 11 reduced_train_loss : 9.420161247253418  lr : 8.249999723375367e-07  global_step : 11.0  consumed_samples : 1536.0  train_backward_timing in s : 4.3058395385742186e-05  grad_norm : 19.467134475708008  train_step_timing in s : 4.3298194885253904  epoch : 0 
+
+Epoch 0: :  65%|██████▌   | 13/20 [01:13<00:39, v_num=None, reduced_train_loss=9.420, global_step=11.00, consumed_samples=1536.0, train_step_timing in s=4.330]
+Epoch 0: :  65%|██████▌   | 13/20 [01:13<00:39, v_num=None, reduced_train_loss=9.250, global_step=12.00, consumed_samples=1664.0, train_step_timing in s=4.330]DLL 2025-06-12 00:03:05.424552 - 12 reduced_train_loss : 9.250472068786621  lr : 8.999999749903509e-07  global_step : 12.0  consumed_samples : 1664.0  train_backward_timing in s : 3.933906555175781e-05  grad_norm : 20.279172897338867  train_step_timing in s : 4.330455493927002  epoch : 0 
+
+Epoch 0: :  70%|███████   | 14/20 [01:17<00:33, v_num=None, reduced_train_loss=9.250, global_step=12.00, consumed_samples=1664.0, train_step_timing in s=4.330]
+Epoch 0: :  70%|███████   | 14/20 [01:17<00:33, v_num=None, reduced_train_loss=9.080, global_step=13.00, consumed_samples=1792.0, train_step_timing in s=4.330]DLL 2025-06-12 00:03:09.755595 - 13 reduced_train_loss : 9.078815460205078  lr : 9.75000034486584e-07  global_step : 13.0  consumed_samples : 1792.0  train_backward_timing in s : 3.972053527832031e-05  grad_norm : 21.111074447631836  train_step_timing in s : 4.328724098205567  epoch : 0 
+
+Epoch 0: :  75%|███████▌  | 15/20 [01:21<00:27, v_num=None, reduced_train_loss=9.080, global_step=13.00, consumed_samples=1792.0, train_step_timing in s=4.330]
+Epoch 0: :  75%|███████▌  | 15/20 [01:21<00:27, v_num=None, reduced_train_loss=8.870, global_step=14.00, consumed_samples=1920.0, train_step_timing in s=4.330]DLL 2025-06-12 00:03:14.081955 - 14 reduced_train_loss : 8.874346733093262  lr : 1.050000037139398e-06  global_step : 14.0  consumed_samples : 1920.0  train_backward_timing in s : 3.938674926757812e-05  grad_norm : 22.2976016998291  train_step_timing in s : 4.3277629852294925  epoch : 0 
+
+Epoch 0: :  80%|████████  | 16/20 [01:26<00:21, v_num=None, reduced_train_loss=8.870, global_step=14.00, consumed_samples=1920.0, train_step_timing in s=4.330]
+Epoch 0: :  80%|████████  | 16/20 [01:26<00:21, v_num=None, reduced_train_loss=8.550, global_step=15.00, consumed_samples=2048.0, train_step_timing in s=4.330]DLL 2025-06-12 00:03:18.423089 - 15 reduced_train_loss : 8.546858787536621  lr : 1.1250000397922122e-06  global_step : 15.0  consumed_samples : 2048.0  train_backward_timing in s : 4.0912628173828124e-05  grad_norm : 23.740238189697266  train_step_timing in s : 4.329154348373413  epoch : 0 
+
+Epoch 0: :  85%|████████▌ | 17/20 [01:30<00:15, v_num=None, reduced_train_loss=8.550, global_step=15.00, consumed_samples=2048.0, train_step_timing in s=4.330]
+Epoch 0: :  85%|████████▌ | 17/20 [01:30<00:15, v_num=None, reduced_train_loss=8.220, global_step=16.00, consumed_samples=2176.0, train_step_timing in s=4.330]DLL 2025-06-12 00:03:22.747544 - 16 reduced_train_loss : 8.221803665161133  lr : 1.2000000424450263e-06  global_step : 16.0  consumed_samples : 2176.0  train_backward_timing in s : 4.329681396484375e-05  grad_norm : 25.453601837158203  train_step_timing in s : 4.327939653396607  epoch : 0 
+
+Epoch 0: :  90%|█████████ | 18/20 [01:34<00:10, v_num=None, reduced_train_loss=8.220, global_step=16.00, consumed_samples=2176.0, train_step_timing in s=4.330]
+Epoch 0: :  90%|█████████ | 18/20 [01:34<00:10, v_num=None, reduced_train_loss=8.000, global_step=17.00, consumed_samples=2304.0, train_step_timing in s=4.330]DLL 2025-06-12 00:03:27.069531 - 17 reduced_train_loss : 8.004594802856445  lr : 1.2750000450978405e-06  global_step : 17.0  consumed_samples : 2304.0  train_backward_timing in s : 4.444122314453125e-05  grad_norm : 25.8365535736084  train_step_timing in s : 4.3260338306427  epoch : 0 
+
+Epoch 0: :  95%|█████████▌| 19/20 [01:39<00:05, v_num=None, reduced_train_loss=8.000, global_step=17.00, consumed_samples=2304.0, train_step_timing in s=4.330]
+Epoch 0: :  95%|█████████▌| 19/20 [01:39<00:05, v_num=None, reduced_train_loss=7.760, global_step=18.00, consumed_samples=2432.0, train_step_timing in s=4.330]DLL 2025-06-12 00:03:31.410664 - 18 reduced_train_loss : 7.760562419891357  lr : 1.3500000477506546e-06  global_step : 18.0  consumed_samples : 2432.0  train_backward_timing in s : 4.611015319824219e-05  grad_norm : 27.141515731811523  train_step_timing in s : 4.327929973602295  epoch : 0 
+
+Epoch 0: : 100%|██████████| 20/20 [01:43<00:00, v_num=None, reduced_train_loss=7.760, global_step=18.00, consumed_samples=2432.0, train_step_timing in s=4.330]
+Epoch 0: : 100%|██████████| 20/20 [01:43<00:00, v_num=None, reduced_train_loss=7.470, global_step=19.00, consumed_samples=2560.0, train_step_timing in s=4.330]DLL 2025-06-12 00:03:35.740568 - 19 reduced_train_loss : 7.468292236328125  lr : 1.4250000504034688e-06  global_step : 19.0  consumed_samples : 2560.0  train_backward_timing in s : 4.649162292480469e-05  grad_norm : 28.077587127685547  train_step_timing in s : 4.32860221862793  epoch : 0 
+`Trainer.fit` stopped: `max_steps=20` reached.
+
+Epoch 0: : 100%|██████████| 20/20 [01:43<00:00, v_num=None, reduced_train_loss=7.470, global_step=19.00, consumed_samples=2560.0, train_step_timing in s=4.330]
+Epoch 0: : 100%|██████████| 20/20 [01:43<00:00, v_num=None, reduced_train_loss=7.470, global_step=19.00, consumed_samples=2560.0, train_step_timing in s=4.330]
+[NeMo I 2025-06-12 00:03:35 nemo_logging:393] train_step_timing in s: [21.37, 12.82, 9.98, 8.56, 7.71, 4.31, 4.32, 4.32, 4.33, 4.33, 4.33, 4.33, 4.33, 4.33, 4.33, 4.33, 4.33, 4.33, 4.33, 4.33]
+[NeMo I 2025-06-12 00:03:35 nemo_logging:393] TFLOPs per sec per GPU=1753.06
+NCCL version 2.25.1+cuda12.8
+NCCL version 2.25.1+cuda12.8
+NCCL version 2.25.1+cuda12.8
+NCCL version 2.25.1+cuda12.8
+NCCL version 2.25.1+cuda12.8
+NCCL version 2.25.1+cuda12.8
+NCCL version 2.25.1+cuda12.8
+NCCL version 2.25.1+cuda12.8
+Processing events...
+Generated:
+	No reports were generated
+Processing events...
+Generated:
+	No reports were generated
+Processing events...
+Generated:
+	No reports were generated
+Processing events...
+Generated:
+	No reports were generated
+Processing events...
+Generated:
+	No reports were generated
+Processing events...
+Generated:
+	No reports were generated
+Processing events...
+Generated:
+	No reports were generated
+Waiting on Torch PID 100
+Processing events...
+Generated:
+	No reports were generated
+Waiting on Torch PID 101
+Waiting on Torch PID 102
+Waiting on Torch PID 103
+Waiting on Torch PID 104
+Waiting on Torch PID 105
+Waiting on Torch PID 106
+Pod on gke-gke-a4-sbrg1-a4-highgpu-8g-a4-hig-03548386-kr37.us-east4-b.c.supercomputer-testing.internal is exiting
