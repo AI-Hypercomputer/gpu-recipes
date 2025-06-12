@@ -41,7 +41,7 @@ Select the recipe and override the files in helm-context.
 ```bash
 export RECIPE_ROOT=$(pwd)
 cd ${RECIPE_ROOT}
-export RECIPE_NAME=qwen2-5-32b-16gpu-sptrue-tp2-pp2-cp1-vp32-gbs512-mbs1
+export RECIPE_NAME=qwen2-5-32b-16gpu-sptrue-tp1-pp2-cp1-vp32-gbs512-mbs1
 cp ./recipes/${RECIPE_NAME}.yaml ./helm_context/selected-configuration.yaml
 cp ./recipes/values-${RECIPE_NAME}.yaml ./helm_context/values.yaml
 ```

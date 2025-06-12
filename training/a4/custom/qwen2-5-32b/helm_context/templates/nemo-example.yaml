@@ -360,8 +360,8 @@ spec:
         echo "The following GPUs are visible via nvidia-smi:"
         nvidia-smi --list-gpus
 
-        echo "The following GPUs are visible via nvidia-smi:"
-        nvidia-smi --list-gpus
+        echo "nvidia-smi:"
+        nvidia-smi
 
         # Note: Including this prevented some past errors. It might become deprecated in future.
         mount /tmp -o remount,exec 
@@ -401,7 +401,7 @@ spec:
         for workload_argument in "${workload_arguments[@]}"; do                 
           echo "  $workload_argument"                                           
         done 
-
+       
         sleep 10 # <- Hack to allow some time for service to boot
 
         echo "Checking for presence of nsys:"                                   
@@ -409,6 +409,13 @@ spec:
 
         echo "NeMo job artifacts will go to /gcs/nemo-experiments/$JOB_IDENTIFIER/"
         mkdir -p /gcs/nemo-experiments/$JOB_IDENTIFIER/
+
+        # apt -y update && apt -y install gdb python3.10-dbg
+        # nsys profile -s none -t nvtx,cuda --capture-range=cudaProfilerApi --capture-range-end=stop \
+        #   -o /gcs/nemo-experiments/$JOB_IDENTIFIER/rank-$RANK \
+        #   --session-new "nemo-rank$RANK" \
+
+        apt -y update && apt -y install gdb python3-dbg
 
         export NODE_RANK=$JOB_COMPLETION_INDEX                                  
         if [ "$NODE_RANK" -eq "0" ] && { ! [ -z ${EMBEDDED_TENSORBOARD_TARGET} ]; }; then
@@ -427,7 +434,7 @@ spec:
             nsys profile -s none -t nvtx,cuda --capture-range=cudaProfilerApi --capture-range-end=stop \
             -o /gcs/nemo-experiments/$JOB_IDENTIFIER/rank-$RANK \
             --force-overwrite true --session-new "nsys-$JOB_IDENTIFIER-$RANK" \
-            python $TORCH_DISTRIBUTED_TARGET \
+            python3-dbg $TORCH_DISTRIBUTED_TARGET \
             --config-path="/etc/workload-configuration" \
             --config-name="nemo-configuration.yaml" \
             +trainer.num_nodes="$NNODES" \
@@ -439,10 +446,10 @@ spec:
         done  
 
         if [ "$NODE_RANK" -eq "1" ]; then
-            echo "Launching nvidia-smi in daemon mode with (20 sec delay)"
-            nvidia-smi dmon -d 20 -s pum &
+           echo "Launching nvidia-smi in daemon mode with (20 sec delay)"
+           nvidia-smi dmon -d 20 -s pum &
         fi
-
+        
         if [ "$NODE_RANK" -eq "0" ] && { ! [ -z ${EMBEDDED_TENSORBOARD_TARGET} ]; }; then
           echo "Launching an embedded Tensorboard against log directory $EMBEDDED_TENSORBOARD_TARGET"
           tensorboard --logdir $EMBEDDED_TENSORBOARD_TARGET &
@@ -476,9 +483,9 @@ spec:
           mountPath: /tmp
         {{ end }}
         - name: workload-terminated-volume
-          mountPath: /semaphore
+          mountPath: /semaphore   
         - name: workload-configuration
-          mountPath: /etc/workload-configuration
+          mountPath: /etc/workload-configuration  
         - name: shared-memory
           mountPath: /dev/shm 
         - name: local-ssd
