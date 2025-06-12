@@ -30,17 +30,17 @@ cp ./recipes/values-${RECIPE_NAME}.yaml ./helm_context/values.yaml
 
 # 4. Helm install the workload and get the log
 export RECIPE_ROOT=$(pwd)
-export WORKLOAD_NAME=nemo2504-qwen25-32b-16gpu-sq1-tp2-pp2-vp32-gbs512
+export WORKLOAD_NAME=nemo2504-qwen25-32b-16gpu-sq1-tp1-pp2-vp32-gbs512
 cd ${RECIPE_ROOT}
 helm install $WORKLOAD_NAME --set workload.image=$IMAGE helm_context/
 
 # List Kubernetes pods and filter for those containing the WORKLOAD_NAME
 kubectl get pods | grep $WORKLOAD_NAME
 
-kubectl logs -f nemo2504-qwen25-32b-16gpu-sq1-tp2-pp2-vp32-gbs512-0-89fpt
+kubectl logs -f nemo2504-qwen25-32b-16gpu-sq1-tp1-pp2-vp32-gbs512-0-89fpt
 
 # Fetch the full logs from a specific pod and save them to a file in the ./logs directory
-kubectl logs nemo2504-qwen25-32b-16gpu-sq1-tp2-pp2-vp32-gbs512-0-mn96v > ./logs/nemo2504-qwen25-32b-16gpu-sq1-tp2-pp2-vp32-gbs512-full-logs
+kubectl logs nemo2504-qwen25-32b-16gpu-sq1-tp1-pp2-vp32-gbs512-0-mn96v > ./logs/nemo2504-qwen25-32b-16gpu-sq1-tp1-pp2-vp32-gbs512-full-logs
 
 # Uninstall the Helm release associated with the WORKLOAD_NAME
 helm uninstall $WORKLOAD_NAME

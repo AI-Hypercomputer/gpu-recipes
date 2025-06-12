@@ -1,9 +1,9 @@
 # Note: The only choice is 'gke' or custom k8s + debian (else condition)
 targetPlatform: "gke"
-# tasSettings:
-#   useLegacyTAS: false
-#   topologyRequest:
-#     kueue.x-k8s.io/podset-preferred-topology: "cloud.google.com/gce-topology-block"
+tasSettings:
+  useLegacyTAS: false
+  topologyRequest:
+    kueue.x-k8s.io/podset-preferred-topology: "cloud.google.com/gce-topology-block"
 
 
 # When using Kueue
