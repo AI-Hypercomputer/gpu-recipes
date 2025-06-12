@@ -1,0 +1,63 @@
+# Note: The only choice is 'gke' or custom k8s + debian (else condition)
+targetPlatform: "gke"
+# tasSettings:
+#   useLegacyTAS: false
+#   topologyRequest:
+#     kueue.x-k8s.io/podset-preferred-topology: "cloud.google.com/gce-topology-block"
+
+
+# When using Kueue
+# queue: "multislice-queue"
+
+volumes:
+  # The VM host path for SSDs is assumed at /mnt/stateful_partition/kube-ephemeral-ssd
+  ssdMountPath: "/ssd"
+  jitGcsMount:
+    bucketName: "benchmark-artifacts"
+    mountPath: "/gcs"
+
+gcsDownload: # downloads or synchronizes contents of a GCS bucket folder on initialization
+  source: "gs://nemo-megatron-demo/training-data/tokenized/bpe2gpt/wikipedia/" 
+  target: "/ssd/.cache/"
+
+workload:
+  # The file is built into the container image
+  torchDistributedTarget: "/app/training/run.py"
+
+  gpus: 16 # This should be one of: {<= 8, multiple of 8}
+  arguments:
+  # The argument name will be prefixed with '+' (see https://hydra.cc/docs/advanced/override_grammar/basic/)
+  - name: "exp_manager.explicit_log_dir"
+    value: "/nemo-experiments/results" 
+  - name: "exp_manager.exp_dir"
+    value: "/nemo-experiments/"
+  - name: "model.data.data_prefix"
+    value: "[1.0,/ssd/.cache/wikipedia-tokenized-for-gpt2]"
+  - name: "model.data.index_mapping_dir"
+    value: "/gcs/index_mapping_dir"
+
+  # Enable Nsight profiling, Austin profiling triggers, and Python debug version.
+  # Note: This is NOT fully implemented yet
+  profilingMode: true
+  profilingRanks: "all" # one of {"none", "one", "all"}
+
+  # If not 'null', launches a Tensorboard server on first node. By design, the job will then not exit on first node.
+  # This is primarly intended for debugging purposes, when a shared file-system or external Tensorboard is unavailable.  
+  embeddedTensorboardTarget: null
+
+network:
+  stack: "gib" # one of {"tcp", "tcpx", "tcpxo", "gib"}
+  pluginVersion: "us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:v1.0.5"
+
+  ncclSettings:
+  # Note: If you need to debug, using NCCL_DEBUG=INFO and NCCL_DEBUG_SUBSYS=INIT,NET are a good idea. You can look up other options.
+  - name: NCCL_DEBUG
+    value: "VERSION"
+  # - name: NCCL_DEBUG_SUBSYS
+  #   value: "INIT,NET"
+  - name: NCCL_ALGO
+    value: "Ring,Tree"
+
+  # The following NCCL settings are recommended for TCPxo only (but tunable):
+  - name: NCCL_MIN_NCHANNELS
+    value: "4"
