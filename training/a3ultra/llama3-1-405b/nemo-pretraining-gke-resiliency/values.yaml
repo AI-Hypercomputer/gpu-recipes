@@ -1,0 +1,96 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+queue:
+
+dwsSettings:
+  maxRunDurationSeconds:
+
+tasSettings:
+  topologyRequest:
+    kueue.x-k8s.io/podset-preferred-topology: "kubernetes.io/hostname"
+
+volumes:
+  gcsVolumes: true
+  psVolumes: false
+  gcsMounts:
+  - bucketName:
+    mountPath: "/job-logs"
+  - bucketName: cloud-samples-data
+    mountPath: "/artifacts"
+    mountOptions: "implicit-dirs"
+  pvcMounts:
+  - claimName: "gcs-checkpoints-pvc"
+    mountPath: "/checkpoints"
+
+workload:
+  gpus: 432
+  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250605
+  gcsSidecarImage: gcr.io/gke-release/gcs-fuse-csi-driver-sidecar-mounter@sha256:698fb0a9fe7c19adff792256a478963d1596faf4f7ceb8d516a5c85787c66606
+  max_workload_restarts: 20
+
+  defaultArguments:
+  - "--num-nodes=${NNODES}"
+  - "--tokenizer-path=tokenizer.model"
+  - "--max-runtime=86400"
+  - "--log-dir=${LOG_DIR_PREFIX}"
+  - "--ckpt-dir=${CKPT_DIR_PREFIX}"
+  - "--job-name=${JOB_IDENTIFIER}"
+  - "--max-steps=500"
+  - "--topk-ckpt=-1"
+  - "--checkpoint-interval=20"
+  - "--ckpt-threads-per-rank=1"
+  - "--enable-dist-ckpt"
+  - "--enable-gc"
+  - "--enable-async-ckpt"
+  - "--enable-fault-tolerance"
+  - "--enable-optimized-async-ckpt"
+
+  arguments[]:
+
+  configFile: train.py
+  configPath: /workspace/resiliency/workload
+  envs:
+  - name: NEMO_CONFIG_PATH
+    value: "resiliency/workload"
+  - name: NEMO_CONFIG_NAME
+    value: "train.py"
+  - name: LOG_DIR_PREFIX
+    value: "/job-logs/nemo-experiments"
+  - name: CKPT_DIR_PREFIX
+    value: "/checkpoints/nemo-experiments"
+  - name: FT_PARAM_INITIAL_RANK_HEARTBEAT_TIMEOUT
+    value: "1800"
+  - name: FT_PARAM_RANK_HEARTBEAT_TIMEOUT
+    value: "1800"
+  - name: HOST_DAEMON_PORT
+    value: "60010"
+  - name: MAX_IN_JOB_RESTARTS
+    value: "0"
+  - name: NVTE_FWD_LAYERNORM_SM_MARGIN
+    value: "8"
+  - name: NVTE_BWD_LAYERNORM_SM_MARGIN
+    value: "8"
+  - name: GLOO_SOCKET_IFNAME
+    value: "eth0"
+
+network:
+  hostNetwork: true
+  subnetworks[]:
+  gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:v1.0.5
+  ncclSettings:
+  - name: NCCL_DEBUG
+    value: "VERSION"
+  - name: NCCL_WORK_FIFO_DEPTH
+    value: "4194304"

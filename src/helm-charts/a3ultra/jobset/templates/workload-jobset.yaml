@@ -17,12 +17,13 @@
 {{ $jobuuid := uuidv4 }}
 {{ $nodes := div .Values.workload.gpus 8 | max 1 }}
 {{ $gpusPerNode := min .Values.workload.gpus 8 }}
+{{ $jobName := printf "%s-%s" .Release.Name $jobSuffix }}
 {{- $root := . -}}
 
 apiVersion: jobset.x-k8s.io/v1alpha2
 kind: JobSet
 metadata:
-  name: "{{ .Release.Name }}"
+  name: "{{ $jobName }}"
   namespace: default
   labels:
   {{- if $root.Values.queue }}
@@ -50,9 +51,9 @@ spec:
               kubectl.kubernetes.io/default-container: workload
               {{- if $root.Values.volumes.gcsVolumes }}
               gke-gcsfuse/volumes: "true"
-              gke-gcsfuse/cpu-limit: "500m"
-              gke-gcsfuse/memory-limit: "1Ti"
-              gke-gcsfuse/ephemeral-storage-limit: "2Ti"
+              gke-gcsfuse/cpu-limit: "0"
+              gke-gcsfuse/memory-limit: "0"
+              gke-gcsfuse/ephemeral-storage-limit: "0"
               {{- end }}
               {{- if $root.Values.volumes.psVolumes }}
               gke-parallelstore/volumes: "true"
@@ -89,7 +90,6 @@ spec:
             hostNetwork: true
             dnsPolicy: ClusterFirstWithHostNet
             {{- end }}
-            subdomain: "{{.Release.Name}}"
             restartPolicy: Never
             {{ if $root.Values.targetNodes }}
             affinity:
@@ -195,7 +195,7 @@ spec:
               {{- end }}
               env:
               - name: JOB_IDENTIFIER
-                value: "{{ .Release.Name }}-{{ $timestamp }}"
+                value: "{{ $jobName }}"
               - name: JOB_TIMESTAMP
                 value: "{{ $timestamp }}"
               - name: JOB_UUID
@@ -208,14 +208,16 @@ spec:
                 valueFrom:
                   fieldRef:
                     fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
-              - name: RANK_0_FQDN
-                value: "{{.Release.Name}}-workload-0-0.{{.Release.Name}}.default.svc.cluster.local"
-              - name: HOSTNAME_PREFIX
-                value: "{{.Release.Name}}-workload-"
-              - name: DOMAIN_NAME
-                value: "{{.Release.Name}}.default.svc.cluster.local"
+              - name: REPLICATED_JOB_NAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.annotations['jobset.sigs.k8s.io/replicatedjob-name']
+              - name: JOBSET_NAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.annotations['jobset.sigs.k8s.io/jobset-name']
               - name: MASTER_ADDR
-                value: "{{.Release.Name}}-workload-0-0.{{.Release.Name}}.default.svc.cluster.local"
+                value: "{{$jobName}}-workload-0-0.{{$jobName}}"
               - name: MASTER_PORT
                 value: "6002"
               - name: WORLD_SIZE

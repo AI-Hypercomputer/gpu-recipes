@@ -1,0 +1,65 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+actuator:
+  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250605
+  port: 60080
+  command: "resiliency/supervisor/actuator.py"
+
+sensor:
+  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250605
+  port: 60081
+  command: "resiliency/supervisor/sensor.py"
+
+controller:
+  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250605
+  port: 60082
+  command: "resiliency/supervisor/controller.py"
+
+host_daemon:
+  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250605
+  port: 60010
+  command: "resiliency/supervisor/host_daemon.py"
+
+# Cluster parameters
+project:
+useA3high:
+
+# Supervisor configuration
+namespace: "supervisor"
+heartbeat_polling_period_s: 15
+heartbeat_timeout_s: 30
+
+max_in_job_restarts: 0 # Set to 0 to disable NVRX in-job restarts
+max_workload_restarts: 0 # Set to 0 to hot-swap faulty nodes without first attempting to restart the workload
+enable_workload_scaling: true # set to true to enable scale up/down of workload data replicas
+
+
+# Workload level configuration
+job_namespace: "default"
+workers_per_host: 8
+num_nodes_per_dp: 18
+num_dp_replicas: 3
+pod_termination_threshold_s: 60
+jobset_downtime_threshold_s: 180
+replicated_job_name: "workload" # This value musth match the spec.replicatedJobs.name in the workload yaml
+workload_container_name: "workload" # This value must match the name of the maincontainer in the workload yaml
+
+# Per node fault injection configuration
+enable_fault_injection: false
+fault_injection_period_s: 9600 # Failure every 10 minutes for 16 nodes
+
+# Logging configuration
+log_to_stderr: "1"
+verbosity: "2"
