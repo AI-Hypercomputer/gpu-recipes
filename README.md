@@ -75,6 +75,7 @@ Models            | GPU Machine Type                                            
 Models            | GPU Machine Type                                                                                          | Framework | Workload Type | Orchestrator | Link to the recipe
 ----------------- | --------------------------------------------------------------------------------------------------------- | --------- | ------------- | ------------ | ------------------
 **Llama-3.1-70B** | [A3 Mega (NVIDIA H100)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-mega-vms) | NeMo      | Pre-training using  the Google Cloud Resiliency library  | GKE          | [Link](./training/a3mega/llama3-1-70b/nemo-pretraining-gke-resiliency/README.md)
+**Llama-3.1-405B** | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) | NeMo      | Pre-training using  the Google Cloud Resiliency library  | GKE          | [Link](./training/a3ultra/llama3-1-405b/nemo-pretraining-gke-resiliency/README.md)
 
 ## Repository structure
 
