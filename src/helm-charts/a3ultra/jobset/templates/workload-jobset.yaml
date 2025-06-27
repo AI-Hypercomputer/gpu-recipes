@@ -130,7 +130,7 @@ spec:
             - name: shared-memory
               emptyDir:
                 medium: "Memory"
-                sizeLimit: 250Gi
+                sizeLimit: 500Gi
 
             {{- range $pvc := $root.Values.volumes.pvcMounts }}
             - name: "{{ $pvc.claimName }}"

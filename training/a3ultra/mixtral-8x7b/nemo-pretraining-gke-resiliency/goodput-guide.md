@@ -26,7 +26,7 @@ Achieving high GoodPut can be challenging due to several factors common in large
 | **Stragglers and Performance Bottlenecks**   | Slower nodes delay the entire job, underutilizing resources.                                | 3-7%                               |
 | **Lack of Rapid Failure Detection and Diagnosis** | Longer detection/diagnosis time increases downtime.                                         | 2-5%                               |
 
-This guide provides a general overview of techniques and tools to address these common challenges and maximize ML GoodPut. While the principles discussed are broadly applicable, we will use the [Llama 3.1 405B pretraining recipe](https://github.com/AI-Hypercomputer/gpu-recipes/tree/main/training/a3ultra/llama3-1-405b/nemo-pretraining-gke-resiliency) as a concrete case study to illustrate how these components can be implemented and customized for large-scale training workloads on Google Cloud. The goal is to showcase a "DIY" style product, where users can understand and selectively adopt these "Lego blocks" to build resilient and efficient training pipelines.
+This guide provides a general overview of techniques and tools to address these common challenges and maximize ML GoodPut. While the principles discussed are broadly applicable, we will use the [Mixtral 8x7B pretraining recipe](https://github.com/AI-Hypercomputer/gpu-recipes/tree/main/training/a3ultra/mixtral-8x7b/nemo-pretraining-gke-resiliency) as a concrete case study to illustrate how these components can be implemented and customized for large-scale training workloads on Google Cloud. The goal is to showcase a "DIY" style product, where users can understand and selectively adopt these "Lego blocks" to build resilient and efficient training pipelines.
 
 ## TLDR: Recommended Lego Blocks for Your Deployment
 For customers looking to improve GoodPut on their own ML training workloads, here’s a concise guide to the key strategies discussed in this document, presented as 'Lego blocks' you can implement:
@@ -55,7 +55,7 @@ Begin by optimizing your checkpointing process (options 1-4 above), choosing the
 
 ## Minimizing Downtime: Optimized Checkpointing
 
-Checkpointing is vital for fault tolerance, allowing training to resume from a saved state. However, the checkpointing process itself can consume valuable time and, if not optimized, reduce GoodPut. The Llama 3.1 405B recipe, as an example, incorporates several strategies for optimized checkpointing, aligning with principles from the [Google Cloud blog post](https://cloud.google.com/blog/products/ai-machine-learning/elastic-training-and-optimized-checkpointing-improve-ml-goodput).
+Checkpointing is vital for fault tolerance, allowing training to resume from a saved state. However, the checkpointing process itself can consume valuable time and, if not optimized, reduce GoodPut. The LLaMA3-1-70B recipe, as an example, incorporates several strategies for optimized checkpointing, aligning with principles from the [Google Cloud blog post](https://cloud.google.com/blog/products/ai-machine-learning/elastic-training-and-optimized-checkpointing-improve-ml-goodput).
 
 Choosing the right checkpointing strategy, or combination of strategies, is crucial for both minimizing training disruption and ensuring robust recovery. The methods described below—asynchronous, distributed, and multi-tier storage—can be seen as complementary building blocks. Your choice will depend on factors like model size, training scale, and infrastructure characteristics.
 
@@ -71,7 +71,7 @@ These strategies can often be combined. For instance, a large distributed traini
 
 ### 1. Asynchronous Checkpointing
 
-To prevent training pauses during checkpoint saves, this recipe (Llama 3.1 405B resiliency recipe that can be found in this repository) leverages asynchronous checkpointing. This means the training process (e.g., GPU computation) can continue while checkpoints are being written to storage in the background. This is typically achieved by first copying the checkpoint data from GPU memory to host CPU memory, which is a fast operation, and then the host CPU handles the slower write to persistent storage.
+To prevent training pauses during checkpoint saves, this recipe (Mixtral 8x7B resiliency recipe that can be found in this repository) leverages asynchronous checkpointing. This means the training process (e.g., GPU computation) can continue while checkpoints are being written to storage in the background. This is typically achieved by first copying the checkpoint data from GPU memory to host CPU memory, which is a fast operation, and then the host CPU handles the slower write to persistent storage.
 
 *   This capability is enabled in the recipe via flags in the main `workload.flags` section of [values.yaml](values.yaml):
     *   `--enable-async-ckpt`: Enables the basic asynchronous checkpointing feature.
@@ -80,7 +80,7 @@ To prevent training pauses during checkpoint saves, this recipe (Llama 3.1 405B 
 
 ### 2. Multi-Tier Checkpointing Strategy (Leveraging GCS with FUSE)
 
-[Our blog post](https://cloud.google.com/blog/products/ai-machine-learning/elastic-training-and-optimized-checkpointing-improve-ml-goodput?e=48754805) describes an ideal multi-tiered approach (local node storage, peer node storage, cloud storage) for balancing speed and resilience. The Llama 3.1 405B recipe prominently features Google Cloud Storage (GCS) as a robust and scalable tier for durable checkpoint storage, accessed via the [Cloud Storage FUSE CSI driver](https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/cloud-storage-fuse-csi-driver).
+[Our blog post](https://cloud.google.com/blog/products/ai-machine-learning/elastic-training-and-optimized-checkpointing-improve-ml-goodput?e=48754805) describes an ideal multi-tiered approach (local node storage, peer node storage, cloud storage) for balancing speed and resilience. The Mixtral 8x7B recipe prominently features Google Cloud Storage (GCS) as a robust and scalable tier for durable checkpoint storage, accessed via the [Cloud Storage FUSE CSI driver](https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/cloud-storage-fuse-csi-driver).
 
 *   **GCS for Checkpoints:**
     *   The [values-gcs.yaml](values-gcs.yaml) file defines the GCS bucket to be used (e.g., `gcs-checkpoints`). Users should ensure this GCS bucket is provisioned in the same region as their GKE cluster, has appropriate write/read permissions for the training job's service account, and has Hierarchical Namespace enabled for potentially better performance, as detailed in the main recipe [README.md](README.md).
@@ -108,7 +108,7 @@ The optimal frequency for saving checkpoints is a balance: too infrequent, and y
 
 Elastic training is a core strategy for improving ML GoodPut by making training workloads resilient to interruptions. Instead of a job failing entirely when an issue occurs, elastic training allows the job to adapt to the changing environment. This could involve recovering from a transient error, transparently moving to different hardware, or adjusting the job size to continue training on available resources.
 
-The Llama 3.1 405B recipe, as a case study, implements these elastic training principles through the **Google Cloud Resiliency library**. This library is designed to work with GKE and leverages the [NVIDIA Resiliency Extension (NVRx)](https://github.com/NVIDIA/nvidia-resiliency-ext) for certain low-level hardware interactions and failure signaling.
+The Llama 3.1 70B recipe, as a case study, implements these elastic training principles through the **Google Cloud Resiliency library**. This library is designed to work with GKE and leverages the [NVIDIA Resiliency Extension (NVRx)](https://github.com/NVIDIA/nvidia-resiliency-ext) for certain low-level hardware interactions and failure signaling.
 
 Key components and concepts include:
 
@@ -127,7 +127,7 @@ A sophisticated supervisor system is deployed to monitor the health of the train
 This entire Supervisor system (Sensor, Controller, Actuator, and Host Monitor DaemonSets) is designed as a modular 'Lego block'. While showcased here with NeMo, its components and principles can be adapted for other training frameworks by customizing the interaction points, primarily through the Actuator's remediation scripts and the policies defined in [values-supervisor.yaml](values-supervisor.yaml).
 
 #### Using the Supervisor with Your Custom Model
-This Supervisor system can be integrated with your custom training frameworks or models beyond the Llama 3.1 405B NeMo example. Here's a general guide:
+This Supervisor system can be integrated with your custom training frameworks or models beyond the Mixtral 8x7B NeMo example. Here's a general guide:
 
 *   **Deployment:** The Supervisor system (Supervisor Controller and Host Monitor DaemonSets) is deployed via its dedicated Helm chart, found at [src/helm-charts/resiliency/supervisor-chart/](../../../../src/helm-charts/resiliency/supervisor-chart/).
 *   **Configuration:** Crucially, you'll need to customize the [values-supervisor.yaml](values-supervisor.yaml) file. This includes:
@@ -165,7 +165,7 @@ Improving GoodPut is an ongoing process, and being able to measure it is critica
 
 *   **Resiliency Metrics Tool:**
     *   Located in the [src/utils/resiliency_metrics/](../../../../src/utils/resiliency_metrics/) directory (relative to the root of the `gpu-recipes` repository), the [calculator.py](../../../../src/utils/resiliency_metrics/calculator.py) script is designed to analyze training job logs and calculate various metrics, including the overall GoodPut percentage.
-    *   The main [README.md](README.md#goodput-analysis-for-the-job) for the Llama 3.1 405B recipe includes detailed instructions on how to set up and run this tool (see the [Goodput Analysis for the job](README.md#goodput-analysis-for-the-job) section). Generally, using the tool involves these key steps:
+    *   The main [README.md](README.md#goodput-analysis-for-the-job) for the Mixtral 8x7B recipe includes detailed instructions on how to set up and run this tool (see the [Goodput Analysis for the job](README.md#goodput-analysis-for-the-job) section). Generally, using the tool involves these key steps:
         *   Navigating to the [src/utils/resiliency_metrics/](../../../../src/utils/resiliency_metrics/) directory.
         *   Creating a Python virtual environment and installing required packages from [requirements.txt](../../../../src/utils/resiliency_metrics/requirements.txt).
         *   Executing the `python3 calculator.py` script with necessary arguments, such as `--job-name <YOUR_JOB_NAME>` (which can be found using `kubectl get jobsets`), and parameters for log lookback periods (e.g., `--gcloud-logging-lookback-days 1`) and reference step times.

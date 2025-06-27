@@ -26,7 +26,7 @@ Achieving high GoodPut can be challenging due to several factors common in large
 | **Stragglers and Performance Bottlenecks**   | Slower nodes delay the entire job, underutilizing resources.                                | 3-7%                               |
 | **Lack of Rapid Failure Detection and Diagnosis** | Longer detection/diagnosis time increases downtime.                                         | 2-5%                               |
 
-This guide provides a general overview of techniques and tools to address these common challenges and maximize ML GoodPut. While the principles discussed are broadly applicable, we will use the [LLaMA3-1-70B pretraining recipe](https://github.com/AI-Hypercomputer/gpu-recipes/tree/main/training/a3mega/llama3-1-70b/nemo-pretraining-gke-resiliency) as a concrete case study to illustrate how these components can be implemented and customized for large-scale training workloads on Google Cloud. The goal is to showcase a "DIY" style product, where users can understand and selectively adopt these "Lego blocks" to build resilient and efficient training pipelines.
+This guide provides a general overview of techniques and tools to address these common challenges and maximize ML GoodPut. While the principles discussed are broadly applicable, we will use the [Llama 3.1 70B pretraining recipe](https://github.com/AI-Hypercomputer/gpu-recipes/tree/main/training/a3mega/llama3-1-70b/nemo-pretraining-gke-resiliency) as a concrete case study to illustrate how these components can be implemented and customized for large-scale training workloads on Google Cloud. The goal is to showcase a "DIY" style product, where users can understand and selectively adopt these "Lego blocks" to build resilient and efficient training pipelines.
 
 ## TLDR: Recommended Lego Blocks for Your Deployment
 For customers looking to improve GoodPut on their own ML training workloads, here’s a concise guide to the key strategies discussed in this document, presented as 'Lego blocks' you can implement:
@@ -55,7 +55,7 @@ Begin by optimizing your checkpointing process (options 1-4 above), choosing the
 
 ## Minimizing Downtime: Optimized Checkpointing
 
-Checkpointing is vital for fault tolerance, allowing training to resume from a saved state. However, the checkpointing process itself can consume valuable time and, if not optimized, reduce GoodPut. The LLaMA3-1-70B recipe, as an example, incorporates several strategies for optimized checkpointing, aligning with principles from the [Google Cloud blog post](https://cloud.google.com/blog/products/ai-machine-learning/elastic-training-and-optimized-checkpointing-improve-ml-goodput).
+Checkpointing is vital for fault tolerance, allowing training to resume from a saved state. However, the checkpointing process itself can consume valuable time and, if not optimized, reduce GoodPut. The Llama 3.1 70B recipe, as an example, incorporates several strategies for optimized checkpointing, aligning with principles from the [Google Cloud blog post](https://cloud.google.com/blog/products/ai-machine-learning/elastic-training-and-optimized-checkpointing-improve-ml-goodput).
 
 Choosing the right checkpointing strategy, or combination of strategies, is crucial for both minimizing training disruption and ensuring robust recovery. The methods described below—asynchronous, distributed, and multi-tier storage—can be seen as complementary building blocks. Your choice will depend on factors like model size, training scale, and infrastructure characteristics.
 
@@ -71,7 +71,7 @@ These strategies can often be combined. For instance, a large distributed traini
 
 ### 1. Asynchronous Checkpointing
 
-To prevent training pauses during checkpoint saves, this recipe (Llama3.1 resiliency recipe that can be found in this repository) leverages asynchronous checkpointing. This means the training process (e.g., GPU computation) can continue while checkpoints are being written to storage in the background. This is typically achieved by first copying the checkpoint data from GPU memory to host CPU memory, which is a fast operation, and then the host CPU handles the slower write to persistent storage.
+To prevent training pauses during checkpoint saves, this recipe (Llama 3.1 70B resiliency recipe that can be found in this repository) leverages asynchronous checkpointing. This means the training process (e.g., GPU computation) can continue while checkpoints are being written to storage in the background. This is typically achieved by first copying the checkpoint data from GPU memory to host CPU memory, which is a fast operation, and then the host CPU handles the slower write to persistent storage.
 
 *   This capability is enabled in the recipe via flags in the main `workload.flags` section of [values.yaml](values.yaml):
     *   `--enable-async-ckpt`: Enables the basic asynchronous checkpointing feature.
@@ -128,7 +128,7 @@ A sophisticated supervisor system is deployed to monitor the health of the train
 This entire Supervisor system (Sensor, Controller, Actuator, and Host Monitor DaemonSets) is designed as a modular 'Lego block'. While showcased here with NeMo, its components and principles can be adapted for other training frameworks by customizing the interaction points, primarily through the Actuator's remediation scripts and the policies defined in [values-supervisor.yaml](values-supervisor.yaml).
 
 #### Using the Supervisor with Your Custom Model
-This Supervisor system can be integrated with your custom training frameworks or models beyond the LLaMA3-1-70B NeMo example. Here's a general guide:
+This Supervisor system can be integrated with your custom training frameworks or models beyond the Llama 3.1 70B NeMo example. Here's a general guide:
 
 *   **Deployment:** The Supervisor system (Supervisor Controller and Host Monitor DaemonSets) is deployed via its dedicated Helm chart, found at [src/helm-charts/resiliency/supervisor-chart/](../../../../src/helm-charts/resiliency/supervisor-chart/).
 *   **Configuration:** Crucially, you'll need to customize the [values-supervisor.yaml](values-supervisor.yaml) file. This includes:
@@ -166,9 +166,99 @@ Improving GoodPut is an ongoing process, and being able to measure it is critica
 
 *   **Resiliency Metrics Tool:**
     *   Located in the [src/utils/resiliency_metrics/](../../../../src/utils/resiliency_metrics/) directory (relative to the root of the `gpu-recipes` repository), the [calculator.py](../../../../src/utils/resiliency_metrics/calculator.py) script is designed to analyze training job logs and calculate various metrics, including the overall GoodPut percentage.
-    *   The main [README.md](README.md#goodput-analysis-for-the-job) for the LLaMA3-1-70B recipe includes detailed instructions on how to set up and run this tool (see the [Goodput Analysis for the job](README.md#goodput-analysis-for-the-job) section). Generally, using the tool involves these key steps:
+    *   The main [README.md](README.md#goodput-analysis-for-the-job) for the Llama 3.1 70B recipe includes detailed instructions on how to set up and run this tool (see the [Goodput Analysis for the job](README.md#goodput-analysis-for-the-job) section). Generally, using the tool involves these key steps:
         *   Navigating to the [src/utils/resiliency_metrics/](../../../../src/utils/resiliency_metrics/) directory.
         *   Creating a Python virtual environment and installing required packages from [requirements.txt](../../../../src/utils/resiliency_metrics/requirements.txt).
         *   Executing the `python3 calculator.py` script with necessary arguments, such as `--job-name <YOUR_JOB_NAME>` (which can be found using `kubectl get jobsets`), and parameters for log lookback periods (e.g., `--gcloud-logging-lookback-days 1`) and reference step times.
 
 Using this tool, or similar log analysis techniques, allows you to quantify the benefits of elastic training and optimized checkpointing, identify remaining bottlenecks, and further tune your setup for maximum efficiency.
+
+
+## Installation and Callback
+
+In order to fully integrate our recipe and make use of the provided recipe
+customization flags, please add callbacks to your training code by
+replacing existing Lightning checkpoint callbacks with the ones provided in our library.
+
+Our library provides five types of callbacks, namely `autocheckpoint`, `comm_overlap`, `logging`, `model_checkpoint`, and `profile`, for users to freely make use of. 
+
+Regarding more details on how to make use of our auto checkpointing and model checkpointing callbacks, please refer to other sections of this guide and [the ReadMe file in our open-source Google Cloud Resiliency Library](https://github.com/AI-Hypercomputer/resiliency/blob/main/README.md).
+
+Logging provides functionality of logging of memory, steps, TPS of steps and/or Tensorboard.
+
+You can refer to all the callback functions and features in [the callback scripts of our open-source Google Cloud Resiliency Library](https://github.com/AI-Hypercomputer/resiliency/tree/main/resiliency/callbacks)
+
+Below is an example of a `model_checkpoint` callback. Please ensure to install our library before attempting to use resiliency callbacks.
+
+```
+from resiliency.plugins._ckpt_utils import get_is_checkpoint_file_handler, find_latest_checkpoint_path
+from resiliency.callbacks import model_checkpoint
+callbacks=[]
+callbacks.append(
+	model_checkpoint.ModelCheckpoint(
+		dirpath=f"{log_dir}/checkpoint",
+		save_last=False,
+		monitor="step",
+		save_top_k=1,
+		mode="max",
+		save_weights_only=False,
+		every_n_train_steps=5,
+		save_on_train_epoch_end=True,
+		save_optim_on_train_ends=True,
+		always_save_context=False,
+		filename="{step}",
+		enable_version_counter=False,
+		use_in_cluster_local_ckpts=None,
+		enable_high_scale_ckpt=False,
+		preprocess_files=True,
+	}
+)
+```
+
+## Summary Tables of Configurable Flags Provided by Google Cloud Resiliency Library and Recipe
+
+| workload.flags on workload yaml file | Description | Type | Default |  |
+|---|---|---|---|---|
+| **_Checkpointing_** |  |  |  |  |
+| --enable-async-ckpt  | Enable asynchronous checkpointing to offload the actual checkpointing threads to CPU. | bool | False |  |
+| --enable-dist-ckpt | Enable distributed checkpointing for saving and loading checkpoints across multiple ranks in parallel. | bool | False |  |
+| --enable-optimized-async-ckpt | Enable our optimized async checkpointing solution that offloads both the checkpointing preparation threads and the actual checkpointing threads to CPU. | bool | False |  |
+| --enable-in-cluster-local-ckpt | Enable in-cluster in-node local checkpointing for the local layer in multi-tier checkpointing (MTC). | bool | False |  |
+| --enable-high-scale-ckpt | Enable high scale checkpointing for the local layer in multi-tier checkpointing (MTC). `--local-ckpt-dir` must be set. | bool | False |  |
+| --enable-ckpt-load-replication | Enable checkpoint load replication. `--local-ckpt-dir` must be set and `--num-optimizer-replicas` must be >= `2` | bool | False |  |
+| --profile-ckpt-interval | Number of steps in between checkpoint profiling. For example, `10` means every 10th step.  | int | None |  |
+| --ckpt-threads-per-rank | Number of threads used for writing checkpoint files per rank. | int | 2 |  |
+| **_Training parameters_** |  |  |  |  |
+| --job-name | Name of the training job. | str | "test_job" |  |
+| --model | Optional field for defining model size. Possible options are `"36M"`, `"2B"`, `"8B"`, `"70B"`, `"405B"`. | str | "36M" |  |
+| --num-nodes | Number of GPU nodes used in the training. | int | 1 |  |
+| --num-gpus | Number of GPU chips used in the training. | int | 8 |  |
+| --max-steps | Number of training steps. | int | 1_000_000 |  |
+| --global-bs | Source of truth for global batch size (GBS). | int | None |  |
+| --topk-ckpt | Number of top checkpoints to keep. | int | 10 | |
+| --tokenizer-path | Path of the tokenizer file.  | str | "tokenizer.model" |  |
+| --val-check-interval | Number of steps of the validation check interval. | int | 40 |  |
+| --limit-val-batches | Number of batches to be used for validation. | int | 10 |  |
+| --enable-comm-overlap | Enable communication overlap for improving MFU. | bool | False |  |
+| --enable-gc | Enable garbage collection. | bool | False |  |
+| --enable-fault-tolerance | Enable NVRx fault tolerance. | bool | False |  |
+| --num-optimizer-replicas | Number of optimizer replicas. | int | 1 |  |
+| --sim-fault-desc | Description of a fault to be simulated. Format: `"<fault_type>,<base_delay>"` Example: `"random,120"`| str | "" |  |
+|  **_Logging_** |  |  |  |  |
+| --log-dir | Directory for log output. | str | "/log/" |  |
+| --log-to-remote-storage | Enable logging to remote storage log directory; otherwise, it logs to `"/tmp/"` folder | bool | False |  |
+|  |  |  |  |  |
+| --log-level | Log level. Logs above this level will be outputted. Options are `"DEBUG"`, `"INFO"`, `"WARNING"`, `"ERROR"`, `"CRITICAL"`. | str | "INFO" |  |
+| **_Some other key variables on workload yaml file_** | Description | Type | Default |  |
+| workload.checkpointing.local_ckpt_dir | Directory for the checkpointing local storage such as SSD or ramdisk. If you do not want to save checkpoints on the local layer, omit this flag and omit `workload.checkpointing.local_ckpt_interval`. | str |  |  |
+| workload.checkpointing.local_ckpt_interval | Number of steps in between saving checkpoints in the local in-node layer such as SSD or ramdisk. For example, `10` means every 10th step. Must be used with `workload.checkpointing.local_ckpt_dir`. | int |  |  |
+| workload.checkpointing.persistent_ckpt_dir | Directory for the checkpointing persistent storage such as GCS. If you do not want to save checkpoints on the persistent storage layer, omit this flag and omit `workload.checkpointing.persistent_ckpt_interval`.  | str |  |  |
+| workload.checkpointing.persistent_ckpt_interval | Number of steps in between saving checkpoints in the persistent storage layer such as GCS. For example, `10` means every 10th step. Must be used with `workload.checkpointing.persistent_ckpt_dir`. | int |  |  |
+| workload.enable_tensorboard | Enable Tensorboard logging. | bool |  |  |
+| infrastructure.use_supervisor | Use our supervisor from our Google Cloud Resiliency Library. | bool |  |  |
+| infrastructure.enable_gcsfuse | Enable GCSFuse as storage solution. GCSFuse mounts and accesses GCS buckets as flattened local file systems for faster read and write. Official docs | bool |  |  |
+| infrastructure.gcsfuse_bucket | Path to GCSFuse bucket. | str |  |  |
+| infrastructure.pvc | Name of persistent volume claim (PVC). We provided an example pvc.yaml for reference. | str |  |  |
+| infrastructure.host_daemon_port | Host daemon port number. `60060` or `61000` is used in our recipe examples. | int |  |  |
+| infrastructure.max_workload_restarts | Maximum number of workload restarts before Jobset is considered failed. Set to 0 to hot-swap faulty nodes without first attempting to restart the workload. | int |  |  |
+| infrastructure.max_in_job_restarts | Maximum number of NVRx in-job restarts. Set to 0 to disable it. After the maximum number of NVRx in-job restarts is reached, workload will restart instead. | int |  |  |

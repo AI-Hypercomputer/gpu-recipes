@@ -63,6 +63,13 @@ Models             | GPU Machine Type                                           
 | **DeepSeek R1 671B**     | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms)    | SGLang  | Inference   | GKE          | [Link](./inference/a3ultra/single-host-serving/sglang/README.md#serving-deepseek-r1-671b-model)
 | **DeepSeek R1 671B**     | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms)    | vLLM  | Inference   | GKE          | [Link](./inference/a3ultra/single-host-serving/vllm/README.md#serving-deepseek-r1-671b-model)
 
+### Inference benchmarks A4
+
+| Models           | GPU Machine Type | Framework | Workload Type       | Orchestrator | Link to the recipe |
+| ---------------- | ---------------- | --------- | ------------------- | ------------ | ------------------ |
+| **DeepSeek R1 671B**     | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)    | vLLM  | Inference   | GKE          | [Link](./inference/a4/single-host-serving/vllm/README.md)
+| **DeepSeek R1 671B**     | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)    | SGLang  | Inference   | GKE          | [Link](./inference/a4/single-host-serving/sglang/README.md)
+
 ### Checkpointing benchmarks
 
 Models            | GPU Machine Type                                                                                          | Framework | Workload Type | Orchestrator | Link to the recipe

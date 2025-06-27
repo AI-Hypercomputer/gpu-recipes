@@ -12,22 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG VLLM_VERSION="latest"
-
-FROM docker.io/vllm/vllm-openai:${VLLM_VERSION}
-ARG VLLM_VERSION
-
-WORKDIR /workspace
-COPY ray_init.sh /workspace/ray_init.sh
-
-RUN apt-get update && apt-get install -y --no-install-recommends pciutils
-
-COPY requirements.txt /workspace/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
-
-RUN echo "Cloning vLLM version: ${VLLM_VERSION}" && \
-    git clone -b ${VLLM_VERSION} https://github.com/vllm-project/vllm.git && \
-    cd vllm && \
-    mv vllm vllm_1
-
-ENTRYPOINT [ "/bin/bash" ]
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Release.Name }}-config"
+data:
+  serving-configuration: |-
+{{- if .Values.serving_config  }}
+{{ .Values.serving_config | nindent 4 }}
+{{- else }}
+{{ "config: null" | nindent 4 }}
+{{- end }}
