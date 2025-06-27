@@ -48,6 +48,8 @@ spec:
         ttlSecondsAfterFinished: 43200
         template:
           metadata:
+            labels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
             annotations:
               kubectl.kubernetes.io/default-container: workload
               {{- if $root.Values.volumes.gcsVolumes }}
@@ -173,8 +175,82 @@ spec:
               hostPath:
                 path: /mnt/stateful_partition/kube-ephemeral-ssd
             {{- end }}
+            {{- if $root.Values.volumes.mtcMountPath }}
+            - name: mtc-volume
+              csi:
+                driver: multitier-checkpoint.csi.storage.gke.io
+            {{- end }}
 
             initContainers:
+            {{- if and $root.Values.workload.enable_ckpt_cleaner $root.Values.workload.local_ckpt_dir }}
+            - command:
+              - bash
+              - -c
+              - |
+                echo "Starting checkpoint cleaner."
+                bash resiliency/scripts/rm_old_ckpts.sh &
+                while [ ! -e "/semaphore/workload-terminated" ]; do
+                  sleep 10
+                done
+                pkill -e "^"rm_old_ckpts.sh || true
+                sleep 15
+                echo "Checkpoint cleaner terminated."
+              env:
+              - name: JOB_IDENTIFIER
+                value: {{ $jobName }}
+              - name: CHECKPOINT_DIR_PREFIX
+                value: {{ $root.Values.workload.local_ckpt_dir }}
+              - name: NODE_RANK
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
+              image: "{{ $root.Values.workload.image }}"
+              imagePullPolicy: Always
+              name: ckpt-cleaner
+              restartPolicy: Always
+              volumeMounts:
+              {{- if $root.Values.volumes.ssdMountPath }}
+                - name: local-ssd
+                  mountPath: "{{ $root.Values.volumes.ssdMountPath }}"
+              {{- end }}
+              {{- if $root.Values.volumes.mtcMountPath }}
+                - name: mtc-volume
+                  mountPath: "{{ $root.Values.volumes.mtcMountPath }}"
+              {{- end }}
+            {{- end }}
+            {{- if $root.Values.gcsDownload }}
+            - name: training-data-downloader
+              image: gcr.io/google.com/cloudsdktool/google-cloud-cli
+              volumeMounts:
+              - name: local-ssd
+                mountPath: "{{ $root.Values.volumes.ssdMountPath }}"
+              {{- range $pvc := $root.Values.volumes.pvcMounts }}
+              - name: "{{ $pvc.name }}"
+                mountPath: "{{ $pvc.mountPath }}"
+              {{- end }}
+              {{- range $gcs := $root.Values.volumes.gcsMounts }}
+              - name: "{{ $gcs.bucketName }}"
+                mountPath: "{{ $gcs.mountPath }}"
+              {{- end }}
+              env:
+              - name: GCS_DATA_SOURCE
+                value: "{{ $root.Values.gcsDownload.source }}"
+              - name: GCS_DATA_TARGET
+                value: "{{ $root.Values.gcsDownload.target }}"
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  echo "Caching training data from $GCS_DATA_SOURCE to $GCS_DATA_TARGET"
+                  mkdir -p $GCS_DATA_TARGET
+
+                  SECONDS=0
+                  gcloud storage rsync \
+                    --recursive \
+                    $GCS_DATA_SOURCE $GCS_DATA_TARGET
+                  duration=$SECONDS
+                  echo "Transferred or synchronized $GCS_DATA_SOURCE to $GCS_DATA_TARGET in $duration seconds."
+            {{- end }}
             {{- if $root.Values.network.pluginVersion }}
             - name: nccl-plugin-installer
               image: "{{ $root.Values.network.pluginVersion }}"
@@ -269,6 +345,8 @@ spec:
                 value: "{{ $jobuuid }}"
               - name: JOB_ORCHESTRATOR
                 value: "gke"
+              - name: SSD_MOUNT_PATH
+                value: "{{ $root.Values.volumes.ssdMountPath }}"
               # Add RANK based on the pod's index provided by the Indexed Job
               # This is crucial for torch.distributed initialization.
               - name: JOB_COMPLETION_INDEX
@@ -381,6 +459,12 @@ spec:
                 {{- if $root.Values.volumes.ssdMountPath }}
                 - name: local-ssd
                   mountPath: "{{ $root.Values.volumes.ssdMountPath }}"
+                {{- end }}
+
+
+                {{- if $root.Values.volumes.mtcMountPath }}
+                - name: mtc-volume
+                  mountPath: "{{ $root.Values.volumes.mtcMountPath }}"
                 {{- end }}
 
               resources:

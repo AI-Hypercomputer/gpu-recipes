@@ -13,10 +13,15 @@
 # limitations under the License.
 
 apiVersion: v1
-kind: Service
+kind: ConfigMap
 metadata:
-  name: "{{ .Release.Name }}"
-spec:
-  clusterIP: None
-  selector:
-    job-name: "{{ .Release.Name }}"
+  name: "{{ .Release.Name }}-launcher"
+data:
+  launch-workload.sh: |-
+{{- if .Values.workload_launcher }}
+{{ .Values.workload_launcher | nindent 4 }}
+{{- else }}
+    #!/bin/bash
+    echo "No workload launcher specified"
+    exit 1
+{{- end }}

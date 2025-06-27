@@ -1,0 +1,410 @@
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+{{ $timestamp := now | date "2006-01-02-15-04-05" }}
+{{ $jobSuffix := randAlphaNum 4 | lower }}
+{{ $jobuuid := uuidv4 }}
+{{ $nodes := div .Values.workload.gpus 8 | max 1 }}
+{{ $gpusPerNode := min .Values.workload.gpus 8 }}
+{{- $root := . -}}
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "{{ .Release.Name }}"
+  namespace: default
+  labels:
+  {{- if $root.Values.queue }}
+    kueue.x-k8s.io/queue-name: "{{ $root.Values.queue }}"
+  {{- end }}
+spec:
+  {{- if $root.Values.queue }}
+  suspend: true
+  {{- end }}
+  parallelism: {{ $nodes }}
+  completions: {{ $nodes }}
+  backoffLimit: 0
+  completionMode: Indexed
+  ttlSecondsAfterFinished: 43200
+  template:
+    metadata: 
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+      annotations:
+        kubectl.kubernetes.io/default-container: workload
+        {{- if $root.Values.volumes.gcsVolumes }}
+        gke-gcsfuse/volumes: "true"
+        gke-gcsfuse/cpu-limit: "500m"
+        gke-gcsfuse/memory-limit: "1Ti"
+        gke-gcsfuse/ephemeral-storage-limit: "2Ti"
+        {{- end }}
+        {{- if $root.Values.volumes.psVolumes }}
+        gke-parallelstore/volumes: "true"
+        gke-parallelstore/cpu-limit: "0"
+        gke-parallelstore/memory-limit: "0"
+        {{- end }}
+        {{- if and $root.Values.queue $root.Values.tasSettings.topologyRequest }}
+        {{- toYaml .Values.tasSettings.topologyRequest | nindent 8 }}
+        {{- end }}
+        {{- if and $root.Values.queue $root.Values.dwsSettings.maxRunDurationSeconds }}
+        provreq.kueue.x-k8s.io/maxRunDurationSeconds: "{{ $root.Values.dwsSettings.maxRunDurationSeconds }}"
+        {{- end }}
+        {{- if not $root.Values.network.hostNetwork }}
+        devices.gke.io/container.tcpxo-daemon: |+
+          - path: /dev/nvidia0
+          - path: /dev/nvidia1
+          - path: /dev/nvidia2
+          - path: /dev/nvidia3
+          - path: /dev/nvidia4
+          - path: /dev/nvidia5
+          - path: /dev/nvidia6
+          - path: /dev/nvidia7
+          - path: /dev/nvidiactl
+          - path: /dev/nvidia-uvm
+          - path: /dev/dmabuf_import_helper
+        networking.gke.io/default-interface: "eth0"
+        networking.gke.io/interfaces: |
+        {{- if $root.Values.network.subnetworks }}
+          [
+            {{- range $i, $subnetwork := $root.Values.network.subnetworks }}
+            {"interfaceName":"eth{{ $i }}","network":"{{ $subnetwork }}"}{{ eq $i 9 | ternary "" ","}}
+            {{- end }}
+          ]
+        {{- else }}
+          [
+            {"interfaceName":"eth0","network":"default"},
+            {{- range  $i := until 8 }}
+            {"interfaceName":"eth{{ add 1 $i }}","network":"vpc{{ add 1 $i }}"}{{ eq $i 7 | ternary "" ","}}
+            {{- end }}
+          ]
+        {{- end }}
+        {{- end }}
+    spec:
+      {{- if $root.Values.network.hostNetwork }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- end }}
+      subdomain: "{{.Release.Name}}"
+      restartPolicy: Never
+      {{ if $root.Values.targetNodes }}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                {{- range $hostname := $root.Values.targetNodes }}
+                - {{ $hostname }}
+                {{- end }}
+      {{ end }}
+      
+      tolerations:
+      - operator: "Exists"
+        key: nvidia.com/gpu
+      - operator: "Exists"
+        key: cloud.google.com/impending-node-termination
+
+      volumes:
+      - name: libraries
+        hostPath:
+          path: /home/kubernetes/bin/nvidia
+      - name: sys
+        hostPath:
+          path: /sys
+      - name: proc-sys
+        hostPath:
+          path: /proc/sys
+      - name: aperture-devices
+        hostPath:
+          path: /dev/aperture_devices
+      {{- if $root.Values.network.pluginVersion }}
+      - name: nccl-plugin-volume
+        emptyDir: {}
+      {{- end }}
+      - name: workload-configuration
+        configMap:
+          name: "{{.Release.Name}}-config"
+          items:
+          - key: workload-configuration
+            path: {{ $root.Values.workload.configFile | default "workload-configuration" }}
+
+      - name: workload-launcher
+        configMap:
+          name: "{{.Release.Name}}-launcher"
+      
+      - name: shared-memory
+        emptyDir:
+          medium: "Memory"
+          sizeLimit: 250Gi
+
+      {{- range $pvc := $root.Values.volumes.pvcMounts }}
+      - name: "{{ $pvc.claimName }}"
+        persistentVolumeClaim:
+          claimName: "{{ $pvc.claimName }}"
+      {{- end }}
+
+      {{- range $gcs := $root.Values.volumes.gcsMounts }}
+      - name: "{{ $gcs.bucketName }}"
+        csi:
+          driver: gcsfuse.csi.storage.gke.io
+          volumeAttributes:
+            bucketName: "{{ $gcs.bucketName }}"
+            {{- if $gcs.mountOptions }}
+            mountOptions: "{{ $gcs.mountOptions }}"
+            {{- end }}
+      {{- end}}
+
+      {{- if $root.Values.volumes.ssdMountPath }}
+      - name: local-ssd
+        hostPath:
+          path: /mnt/stateful_partition/kube-ephemeral-ssd
+      {{- end }}
+
+      initContainers:
+      {{ if $root.Values.gcsDownload }}
+      - name: training-data-downloader
+        image: gcr.io/google.com/cloudsdktool/google-cloud-cli
+        volumeMounts:
+        - name: local-ssd
+          mountPath: "{{ $root.Values.volumes.ssdMountPath }}"
+
+        {{- range $pvc := $root.Values.volumes.pvcMounts }}
+        - name: "{{ $pvc.name }}"
+          mountPath: "{{ $pvc.mountPath }}"
+        {{- end }}
+
+        {{- range $gcs := $root.Values.volumes.gcsMounts }}
+        - name: "{{ $gcs.bucketName }}"
+          mountPath: "{{ $gcs.mountPath }}"
+        {{- end }}
+
+        env:
+        - name: GCS_DATA_SOURCE
+          value: "{{ $root.Values.gcsDownload.source }}"
+        - name: GCS_DATA_TARGET
+          value: "{{ $root.Values.gcsDownload.target }}"
+        command:
+          - /bin/sh
+          - -c
+          - |
+            echo "Caching training data from $GCS_DATA_SOURCE to $GCS_DATA_TARGET"
+            mkdir -p $GCS_DATA_TARGET
+
+            SECONDS=0
+            gcloud storage rsync \
+              --recursive \
+              $GCS_DATA_SOURCE $GCS_DATA_TARGET
+            duration=$SECONDS
+            echo "Transferred or synchronized $GCS_DATA_SOURCE to $GCS_DATA_TARGET in $duration seconds."
+      {{ end }}
+      {{- if $root.Values.network.pluginVersion }}
+      - name: nccl-plugin-installer
+        image: "{{ $root.Values.network.pluginVersion }}"
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: nccl-plugin-volume
+          mountPath: /usr/local/nccl-plugin
+        env:
+          - name: NCCL_BUILD_TYPE
+            value: "{{ $root.Values.network.ncclBuildType | default 222 }}"
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -ex
+          chmod 755 /scripts/container_entry.sh
+          /scripts/container_entry.sh install --install-nccl --nccl-buildtype=$NCCL_BUILD_TYPE
+          cp -r /var/lib/tcpxo/* /usr/local/nccl-plugin/
+          echo "Installed NCCL plugin to pod-wide, shared NCCL plug-in volume"
+          echo "Contents (mounted at /usr/local/nccl-plugin/lib64):"
+          ls /usr/local/nccl-plugin/lib64 | sed 's/^/  /'
+          echo "Contents (mounted at /usr/local/nccl-plugin/):"
+          ls /usr/local/nccl-plugin/ | sed 's/^/  /'
+      {{- end }}
+      - name: tcpxo-daemon
+        image: "{{ $root.Values.network.daemonVersion }}"
+        imagePullPolicy: Always
+        restartPolicy: Always
+        securityContext:
+        {{- if $root.Values.network.hostNetwork }}
+          privileged: true
+        {{- end }}
+          capabilities:
+            add:
+              - NET_ADMIN
+              - NET_BIND_SERVICE
+        volumeMounts:
+        - name: libraries
+          mountPath: /usr/local/nvidia
+        - name: sys
+          mountPath: /hostsysfs
+        - name: proc-sys
+          mountPath: /hostprocsysfs
+        env:
+        - name: LD_LIBRARY_PATH
+          value: /usr/local/nvidia/lib64
+
+        command:
+        - bash
+        - -c
+        - |
+          cleanup() {
+            echo "Received SIGTERM, exiting RxDM"
+            if [ -n "$child_pid" ]; then
+              echo "Sending SIGTERM to child process"
+              kill -TERM "$child_pid"
+            fi
+            exit 0
+          }
+          trap cleanup SIGTERM
+
+          chmod 755 /fts/entrypoint_rxdm_container.sh
+          /fts/entrypoint_rxdm_container.sh --num_hops=2 --num_nics=8  --uid= --alsologtostderr & child_pid=$!
+
+          wait "$child_pid"
+      containers:
+      {{- if $root.Values.workload.gcsSidecarImage }}
+      - name: gke-gcsfuse-sidecar
+        image: {{ $root.Values.workload.gcsSidecarImage }}
+      - name: gke-gcsfuse-metadata-prefetch
+        image: {{ $root.Values.workload.gcsSidecarImage }}
+      {{- end }}
+      {{- if $root.Values.workload.psSidecarImage }}
+      - name: gke-parallelstore-sidecar
+        image: {{ $root.Values.workload.psSidecarImage }}
+      {{- end }}
+      - name: workload
+        image: "{{ $root.Values.workload.image }}"
+        imagePullPolicy: Always
+        {{- if $root.Values.network.hostNetwork }}
+        securityContext:
+          privileged: true
+        {{- end }}
+        env:
+        - name: JOB_IDENTIFIER
+          value: "{{ .Release.Name }}-{{ $timestamp }}"
+        - name: JOB_TIMESTAMP
+          value: "{{ $timestamp }}"
+        - name: JOB_UUID
+          value: "{{ $jobuuid }}"
+        - name: JOB_ORCHESTRATOR
+          value: "gke"
+        - name: SSD_MOUNT_PATH
+          value: "{{ $root.Values.volumes.ssdMountPath }}"
+
+        # The following settings are specific to the Torch distributed launcher:
+        - name: MASTER_ADDR
+          value: "{{.Release.Name}}-0.{{.Release.Name}}.default.svc.cluster.local"
+        - name: MASTER_PORT
+          value: "6002"
+        - name: WORLD_SIZE
+          value: "{{ $root.Values.workload.gpus }}"
+        - name: NNODES
+          value: "{{ $nodes }}"
+        - name: GPUS_PER_NODE
+          value: "{{ $gpusPerNode }}"
+
+        {{ if $root.Values.network.pluginVersion }}
+        - name: NCCL_PLUGIN_PATH
+          value: /usr/local/nccl-plugin/lib64:/usr/local/nvidia/lib64
+        - name: NCCL_INIT_SCRIPT
+          value: "/usr/local/nccl-plugin/lib64/nccl-env-profile.sh"
+        - name: NCCL_LIB_DIR
+          value: /usr/local/nccl-plugin/lib64
+        {{ else }}
+        - name: NCCL_PLUGIN_PATH
+          value: /usr/local/nvidia/lib64
+        {{ end }}
+        - name: NCCL_FASTRAK_LLCM_DEVICE_DIRECTORY
+          value: "/dev/aperture_devices"
+        
+        {{ if $root.Values.network.ncclSettings }}
+        {{- toYaml .Values.network.ncclSettings | nindent 8 }}
+        {{ end }} 
+
+        {{ if $root.Values.workload.envs }}
+        {{- toYaml .Values.workload.envs | nindent 8 }}
+        {{ end }}
+
+        command:
+        - bash
+        - -c
+        - |
+          echo "Pod on $(hostname --fqdn) is running"
+          echo "Pod is assigned job index of $JOB_COMPLETION_INDEX"
+          echo "Job ID is $JOB_IDENTIFIER"
+
+          if [[ -n "${NCCL_INIT_SCRIPT}" ]]; then
+            echo "Running NCCL init script: ${NCCL_INIT_SCRIPT}"
+            source ${NCCL_INIT_SCRIPT}
+          fi
+
+          echo "Launching workload with the following arguments:"
+          {{- range $root.Values.workload.defaultArguments }}
+          echo "  {{ . }}"
+          {{- end }}
+          {{- range $root.Values.workload.arguments }}
+          echo "  {{ . }}"
+          {{- end }}
+          echo ""
+
+          sleep 10
+
+          bash /workload/launcher/launch-workload.sh \
+          {{- range $root.Values.workload.defaultArguments }}
+          {{ . }} \
+          {{- end }}
+          {{- range $root.Values.workload.arguments }}
+          {{ . }} \
+          {{- end }}
+
+
+        volumeMounts:
+          {{- if $root.Values.network.pluginVersion }}
+          - name: nccl-plugin-volume
+            mountPath: /usr/local/nccl-plugin
+          {{- end }}
+
+          - name: workload-configuration
+            mountPath: {{ $root.Values.workload.configPath | default "/workload/configs" }}
+
+          - name: workload-launcher
+            mountPath: /workload/launcher
+
+          - name: shared-memory
+            mountPath: /dev/shm
+
+          - name: aperture-devices
+            mountPath: /dev/aperture_devices 
+
+          {{- range $pvc := $root.Values.volumes.pvcMounts }}
+          - name: "{{ $pvc.claimName }}"
+            mountPath: "{{ $pvc.mountPath }}"
+          {{- end }}
+
+          {{- range $gcs := $root.Values.volumes.gcsMounts }}
+          - name: "{{ $gcs.bucketName }}"
+            mountPath: "{{ $gcs.mountPath }}"
+          {{- end }}
+
+          {{- if $root.Values.volumes.ssdMountPath }}
+          - name: local-ssd
+            mountPath: "{{ $root.Values.volumes.ssdMountPath }}"
+          {{- end }}
+
+        resources:
+          limits:
+            nvidia.com/gpu: {{ $gpusPerNode }}

@@ -21,8 +21,8 @@ trainer:
   gradient_clip_val: 1.0
   enable_model_summary: false
 exp_manager:
-  exp_dir: 
-  explicit_log_dir: 
+  exp_dir:
+  explicit_log_dir:
   name: megatron_gpt
   create_wandb_logger: false
   create_dllogger_logger: true
@@ -143,14 +143,14 @@ model:
     start_step: 41
     end_step: 43
     ranks:
-    - 0
+      - 0
   optim:
     name: mcore_distributed_optim
     lr: 0.00015
     weight_decay: 0.1
     betas:
-    - 0.9
-    - 0.95
+      - 0.9
+      - 0.95
     sched:
       name: CosineAnnealing
       warmup_steps: 636
@@ -177,9 +177,9 @@ model:
     reset_position_ids: false
     reset_attention_mask: false
     eod_mask_loss: false
-    index_mapping_dir: "/gcs/index_mapping_dir"
+    index_mapping_dir: "/job-logs/index_mapping_dir"
     data_cache_gcs_dir: gs://nemo-megatron-demo/training-data/tokenized/bpe2gpt/wikipedia/
     data_cache_local_dir: /ssd/.cache
     data_prefix:
-    - 1.0
-    - /ssd/.cache/wikipedia-tokenized-for-gpt2
+      - 1.0
+      - /ssd/.cache/wikipedia-tokenized-for-gpt2

@@ -1,4 +1,4 @@
-# Copyright 2024 Google LLC
+# Copyright 2025 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,28 +11,63 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+queue:
 
-targetPlatform: "gke"
+dwsSettings:
+  maxRunDurationSeconds:
+
+tasSettings:
+  topologyRequest:
+    kueue.x-k8s.io/podset-preferred-topology: "kubernetes.io/hostname"
 
 volumes:
+  gcsVolumes: true
+  psVolumes: false
+  gcsMounts:
+    - bucketName:
+      mountPath: "/job-logs"
+    - bucketName: cloud-samples-data
+      mountPath: "/artifacts"
+      mountOptions: "implicit-dirs"
   # The VM host path for SSDs is assumed at /mnt/stateful_partition/kube-ephemeral-ssd
   ssdMountPath: "/ssd"
 
 workload:
-  torchDistributedTarget: "/opt/NeMo/examples/nlp/language_modeling/megatron_gpt_pretraining.py"
-  gpus: 256
+  gpus: 256 # This should be one of: {<= 8,  multiple of 8}
+  defaultArguments[]:
+  arguments[]:
+  configFile: nemo-config.yaml
+  configPath: /workload/configs
+  envs:
+    - name: NEMO_CONFIG_PATH
+      value: "/workload/configs"
+    - name: NEMO_CONFIG_NAME
+      value: "nemo-config.yaml"
+    - name: EXPERIMENT_NAME
+      value: "nemo-experiments"
+    - name: EXPERIMENT_ROOT_DIR
+      value: "/job-logs"
+    - name: NVTE_FWD_LAYERNORM_SM_MARGIN
+      value: "8"
+    - name: NVTE_BWD_LAYERNORM_SM_MARGIN
+      value: "8"
+    - name: GLOO_SOCKET_IFNAME
+      value: "eth0"
+    - name: TOKENIZER_PATH
+      value: "/artifacts/third-party/tokenizers/gpt2"
+    - name: NEMO_LAUNCH_SCRIPT
+      value: "/opt/NeMo/examples/nlp/language_modeling/megatron_gpt_pretraining.py"
 
 network:
-  stack: "tcpxo"
-
+  subnetworks[]:
+  hostNetwork: true
   daemonVersion: "us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/tcpgpudmarxd-dev:v1.0.9"
   pluginVersion: "us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/nccl-plugin-gpudirecttcpx-dev:v1.0.3"
-
+  ncclBuildType: 221
   ncclSettings:
-  - name: NCCL_DEBUG
-    value: "VERSION"
-  - name: NCCL_ALGO
-    value: "Ring,Tree"
-  # The following NCCL settings are recommended for TCPxo only (but tunable):
-  - name: NCCL_MIN_NCHANNELS
-    value: "4"
+    - name: NCCL_DEBUG
+      value: "VERSION"
+    - name: NCCL_ALGO
+      value: "Ring,Tree"
+    - name: NCCL_MIN_NCHANNELS
+      value: "4"
