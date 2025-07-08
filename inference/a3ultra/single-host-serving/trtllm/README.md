@@ -1,140 +1,181 @@
-# Single Node Model Serving with NVIDIA TensorRT-LLM (TRT-LLM) on A3 Ultra GKE Node Pool
+# Single Host Model Serving with NVIDIA TensorRT-LLM (TRT-LLM) on A3 Ultra GKE Node Pool
 
-This document outlines the steps to serve and benchmark various Large Language Models (LLMs) using [NVIDIA TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) on an [A3 Ultra GKE Node pool](https://cloud.google.com/kubernetes-engine).
+This document outlines the steps to serve and benchmark various Large Language Models (LLMs) using the [NVIDIA TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) framework on a single [A3 Ultra GKE Node pool](https://cloud.google.com/kubernetes-engine).
 
-<a name="supported-models"></a>
-
-## Supported Models
-
-This recipe supports the deployment of the following models:
-
-1.  [Llama 3.1 405B](#serving-llama-3.1-405b-model)
-
-The recipe is also compatible with similar sized large [models supported by NVIDIA TensorRT-LLM](https://nvidia.github.io/TensorRT-LLM/reference/support-matrix.html).
+This guide walks you through setting up the necessary cloud infrastructure, configuring your environment, and deploying a high-performance LLM for inference.
 
 <a name="table-of-contents"></a>
-
 ## Table of Contents
 
-1.  [Orchestration and Deployment Tools](#orchestration-and-deployment-tools)
-2.  [Test Environment](#test-environment)
-3.  [Configure Environment](#configure-environment)
-    *   [3.1. Clone the `gpu-recipes` repository](#get-the-gpu-recipes-repository)
-    *   [3.2. Configure Environment Settings](#configure-environment-settings)
-    *   [3.3. Get Cluster Credentials](#get-cluster-credentials)
-    *   [3.4. Get Hugging Face Token](#get-huggingface-token)
-    *   [3.5. Create Hugging Face Kubernetes Secret](#create-hugging-face-kubernetes-secret)
-    *   [3.6. Build and Push TensorRT-LLM Docker Image](#build-and-push-trtllm-docker-image)
-4.  [Run the recipe](#run-the-recipe)
-    *   [4.1. Inference benchmark for Llama 3.1 405B](#benchmarking-llama-3.1-405b-model)
-5.  [Monitoring Deployment](#monitoring-deployment)
-    *   [5.1. View Deployment Logs](#view-deployment-logs)
-    *   [5.2. Verify Deployment Status](#verify-deployment-status)
-6.  [Cleanup](#cleanup)
-
-<a name="orchestration-and-deployment-tools"></a>
-
-## 1. Orchestration and Deployment Tools
-
-[Back to Top](#table-of-contents)
-
-For this recipe, the following setup is used:
-
-*   **Orchestration**: [Google Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine)
-*   **Deployment Configuration and Deployment**: A Helm chart is used to configure and deploy the [Kubernetes Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/). This deployment encapsulates the inference of the target LLM using NVIDIA TensorRT-LLM. The chart generates manifests adhering to best practices for using RDMA Over Ethernet (RoCE) with Google Kubernetes Engine (GKE) on A3 Ultra node pool.
+* [1. Test Environment](#test-environment)
+* [2. High-Level Architecture](#architecture)
+* [3. Environment Setup (One-Time)](#environment-setup)
+  * [3.1. Clone the Repository](#clone-repo)
+  * [3.2. Configure Environment Variables](#configure-vars)
+  * [3.3. Connect to your GKE Cluster](#connect-cluster)
+  * [3.4. Get Hugging Face Token](#get-hf-token)
+  * [3.5. Create Hugging Face Kubernetes Secret](#setup-hf-secret)
+  * [3.6. Build the vLLM Serving Image](#build-image)
+* [4. Run the Recipe](#run-the-recipe)
+  * [4.1. Inference benchmark for Llama 3.1 405B](#serving-llama-3.1-405b)
+* [5. Monitoring and Troubleshooting](#monitoring)
+  * [5.1. Check Deployment Status](#check-status)
+  * [5.2. View Logs](#view-logs)
+* [6. Cleanup](#cleanup)
 
 <a name="test-environment"></a>
-
-## 2. Test environment
+## 1. Test Environment
 
 [Back to Top](#table-of-contents)
+
+The recipe uses the following setup:
+
+* **Orchestration**: [Google Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine)
+* **Deployment Configuration**: A [Helm chart](https://helm.sh/) is used to configure and deploy a [Kubernetes Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/). This deployment encapsulates the inference of the target LLM using the vLLM framework.
 
 This recipe has been optimized for and tested with the following configuration:
 
-- GKE cluster
-    - [A regional standard cluster](https://cloud.google.com/kubernetes-engine/docs/concepts/configuration-overview) version: 1.31.7-gke.1265000 or later.
-    - A GPU node pool with 1 [a3-ultragpu-8g](https://cloud.google.com/compute/docs/gpus#h200-gpus) machine.
-    - [Workload Identity Federation for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity) enabled.
-    - [Cloud Storage FUSE CSI driver for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/cloud-storage-fuse-csi-driver) enabled.
-    - [DCGM metrics](https://cloud.google.com/kubernetes-engine/docs/how-to/dcgm-metrics) enabled.
-    - [Kueue](https://kueue.sigs.k8s.io/docs/reference/kueue.v1beta1/) and [JobSet](https://jobset.sigs.k8s.io/docs/overview/) APIs installed.
-    - Kueue configured to support [Topology Aware Scheduling](https://kueue.sigs.k8s.io/docs/concepts/topology_aware_scheduling/).
-- A regional Google Cloud Storage (GCS) bucket to store logs generated by the recipe runs.
+* **GKE Cluster**:
+    * A [regional standard cluster](https://cloud.google.com/kubernetes-engine/docs/concepts/configuration-overview) version: `1.31.7-gke.1265000` or later.
+    * A GPU node pool with 1 [a3-ultragpu-8g](https://cloud.google.com/compute/docs/gpus#h200-gpus) machine.
+    * [Workload Identity Federation for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity) enabled.
+    * [Cloud Storage FUSE CSI driver for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/cloud-storage-fuse-csi-driver) enabled.
+    * [DCGM metrics](https://cloud.google.com/kubernetes-engine/docs/how-to/dcgm-metrics) enabled.
+    * [Kueue](https://kueue.sigs.k8s.io/docs/reference/kueue.v1beta1/) and [JobSet](https://jobset.sigs.k8s.io/docs/overview/) APIs installed.
+    * Kueue configured to support [Topology Aware Scheduling](https://kueue.sigs.k8s.io/docs/concepts/topology_aware_scheduling/).
+* A regional Google Cloud Storage (GCS) bucket to store logs generated by the recipe runs.
 
-To prepare the required environment, see
-[GKE environment setup guide](../../../../docs/configuring-environment-gke-a3-ultra.md).
+> [!IMPORTANT]
+> To prepare the required environment, see the [GKE environment setup guide](../../../../docs/configuring-environment-gke-a3-ultra.md).
+> Provisioning a new GKE cluster is a long-running operation and can take **20-30 minutes**.
 
-<a name="configure-environment"></a>
-
-## 3. Configure Environment
+<a name="architecture"></a>
+## 2. High-Level Flow
 
 [Back to Top](#table-of-contents)
 
-The following steps configure the environment to run the recipe. These steps are common for serving the [models supported by this recipe](#supported-models).
+Here is a simplified diagram of the flow that we follow in this recipe:
 
-<a name="get-the-gpu-recipes-repository"></a>
+```mermaid
+---
+config:
+  layout: dagre
+---
+flowchart TD
+ subgraph workstation["Client Workstation"]
+    T["Cluster Toolkit"]
+    B("Kubernetes API")
+    A["helm install"]
+    Y["gcloud"]
+  end
+ subgraph imagerepo["Build Image"]
+    H["Artifact Registry"]
+    G["Cloud Build"]
+  end
+ subgraph huggingface["Hugging Face Hub"]
+    I["Model Weights"]
+  end
+ subgraph gke["GKE Cluster (A3 Ultra)"]
+    C["Deployment"]
+    D["Pod"]
+    E["NVIDIA Triton Server container"]
+    F["Service"]
+  end
+ subgraph storage["Cloud Storage"]
+    J["Bucket"]
+  end
 
-### 3.1. Clone the `gpu-recipes` Repository
+    %% Logical/actual flow
+    T -- Create Cluster --> gke
+    A --> B
+    G -- Pushes Image --> H
+    B --> C & F
+    C --> D
+    D --> E
+    F --> C
+    H -- Pulls Image --> E
+    E -- Downloads at runtime --> I
+    E -- Write logs --> J
+    Y -- Run Build --> imagerepo
 
-Clone the `gpu-recipes` repository and set a reference to the recipe folder.
 
-```bash
-git clone https://github.com/ai-hypercomputer/gpu-recipes.git
-cd gpu-recipes
-export REPO_ROOT=`git rev-parse --show-toplevel`
-export RECIPE_ROOT=$REPO_ROOT/inference/a3ultra/single-host-serving/trtllm
+    %% Layout control
+    gke ~~~ imagerepo
 ```
 
-<a name="configure-environment-settings"></a>
+* **helm:** A package manager for Kubernetes to define, install, and upgrade applications. It's used here to configure and deploy the Kubernetes Deployment.
+* **Deployment:** Manages the lifecycle of your model server pod, ensuring it stays running.
+* **Service:** Provides a stable network endpoint (a DNS name and IP address) to access your model server.
+* **Pod:** The smallest deployable unit in Kubernetes. The Triton server container with TensorRT-LLM runs inside this pod on a GPU-enabled node.
+* **Cloud Build:** A service to run build jobs on Google Cloud to build the Triton server container container image.
+* **Artifact Registry:** A single place to manage container images.
+* **Cloud Storage:** A Cloud Storage bucket to store benchmark logs and other artifacts.
 
-### 3.2. Configure environment settings
+<a name="environment-setup"></a>
+## 3. Environment Setup (One-Time)
 
-From your client, complete the following steps:
+[Back to Top](#table-of-contents)
 
-Set the environment variables to match your environment:
+First, you'll configure your local environment. These steps are required once before you can deploy any models.
 
-  ```bash
-  export PROJECT_ID=<PROJECT_ID>
-  export REGION=<REGION>
-  export CLUSTER_REGION=<CLUSTER_REGION>
-  export CLUSTER_NAME=<CLUSTER_NAME>
-  export GCS_BUCKET=<GCS_BUCKET>
-  export ARTIFACT_REGISTRY=<ARTIFACT_REGISTRY>
-  export TRTLLM_IMAGE=trtllm
-  export TRTLLM_VERSION=v0.17.0
-  export TRITON_SERVER_VERSION=25.02-trtllm-python-py3
-  ```
+<a name="clone-repo"></a>
+### 3.1. Clone the Repository
 
-  Replace the following values:
+```bash
+git clone [https://github.com/ai-hypercomputer/gpu-recipes.git](https://github.com/ai-hypercomputer/gpu-recipes.git)
+cd gpu-recipes
+export REPO_ROOT=$(pwd)
+export RECIPE_ROOT=$REPO_ROOT/inference/a3ultra/single-host-serving/vllm
+```
 
-  *   `<PROJECT_ID>`: your Google Cloud project ID.
-  *   `<REGION>`: the region where you want to run Cloud Build (e.g., `us-central1`) job.
-  *   `<CLUSTER_REGION>`: the region where your cluster is located.
-  *   `<CLUSTER_NAME>`: the name of your GKE cluster.
-  *   `<GCS_BUCKET>`: the name of your Cloud Storage bucket. *Do not include the `gs://` prefix*.
-  *   `<ARTIFACT_REGISTRY>`: the full name of your Artifact Registry repository in the format: `LOCATION-docker.pkg.dev/PROJECT_ID/REPOSITORY` (e.g., `us-central1-docker.pkg.dev/my-project/my-repo`).
-  *   `<TRTLLM_VERSION>`: The TensorRT-LLM version tag to be used for the image build  (e.g., `0.19.0`).
-  *   `<TRITON_SERVER_VERSION>`: The NVIDIA Triton inference server version tag to be used as base image to build TensorRT-LLM  (e.g., `25.04-trtllm-python-py3`).
+<a name="configure-vars"></a>
+### 3.2. Configure Environment Variables
 
-Set the default project:
+This is the most critical step. These variables are used in subsequent commands to target the correct resources.
 
-  ```bash
-  gcloud config set project $PROJECT_ID
-  ```
+```bash
+export PROJECT_ID=<PROJECT_ID>
+export REGION=<REGION_for_cloud_build>
+export CLUSTER_REGION=<REGION_of_your_cluster>
+export CLUSTER_NAME=<YOUR_GKE_CLUSTER_NAME>
+export KUEUE_NAME=<YOUR_KUEUE_NAME>
+export ARTIFACT_REGISTRY=<your-artifact-registry-repo-full-path>
+export GCS_BUCKET=<your-gcs-bucket-for-logs>
+export TRTLLM_IMAGE=trtllm
+export TRTLLM_VERSION=v0.17.0
+export TRITON_SERVER_VERSION=25.02-trtllm-python-py3
 
-<a name="get-cluster-credentials"></a>
+# Set the project for gcloud commands
+gcloud config set project $PROJECT_ID
+```
 
-### 3.3. Get Cluster Credentials
+Replace the following values:
 
-From your client, get the credentials for your cluster:
+| Variable              | Description                                                                                             | Example                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `PROJECT_ID` | Your Google Cloud Project ID. | `gcp-project-12345` |
+| `REGION` | The GCP region to run the Cloud Build job. | `us-central1` |
+| `CLUSTER_REGION` | The GCP region where your GKE cluster is located. | `us-central1` |
+| `CLUSTER_NAME` | The name of your GKE cluster. | `a3-ultra-cluster` |
+| `KUEUE_NAME` | The name of the Kueue local queue. The default queue created by the cluster toolkit is `a3-ultra`. Verify the name in your cluster. | `a3-ultra` |
+| `ARTIFACT_REGISTRY` | Full path to your Artifact Registry repository. | `us-central1-docker.pkg.dev/gcp-project-12345/my-repo` |
+| `GCS_BUCKET` | Name of your GCS bucket (do not include `gs://`). | `my-benchmark-logs-bucket` |
+| `TRTLLM_IMAGE` | The name for the Docker image to be built. | `trtllm` |
+| `TRTLLM_VERSION` | The tag/version for the Docker image. | `v0.17.0` |
+| `TRITON_SERVER_VERSION` | The NVIDIA Triton inference server version tag to be used as base image to build TensorRT-LLM. | `25.02-trtllm-python-py3` |
+
+
+<a name="connect-cluster"></a>
+### 3.3. Connect to your GKE Cluster
+
+Fetch credentials for `kubectl` to communicate with your cluster.
 
 ```bash
 gcloud container clusters get-credentials $CLUSTER_NAME --region $CLUSTER_REGION
 ```
 
-<a name="get-huggingface-token"></a>
-
-### 3.4. Get Hugging Face Token
+<a name="get-hf-token"></a>
+### 3.4. Get Hugging Face token
 
 To access models through Hugging Face, you'll need a Hugging Face token.
   1.  Create a [Hugging Face account](https://huggingface.co/) if you don't have one.
@@ -143,69 +184,68 @@ To access models through Hugging Face, you'll need a Hugging Face token.
   4.  Select **New Token**.
   5.  Specify a Name and a Role of at least `Read`.
   6.  Select **Generate a token**.
-  7.  Copy the generated token to your clipboard. You will use this later.
+  7.  Copy the generated token to your clipboard. You'll use this later.
 
-<a name="create-hugging-face-kubernetes-secret"></a>
 
+<a name="setup-hf-secret"></a>
 ### 3.5. Create Hugging Face Kubernetes Secret
 
 Create a Kubernetes Secret with your Hugging Face token to enable the job to download model checkpoints from Hugging Face.
 
 ```bash
-export HF_TOKEN=<YOUR_HUGGINGFACE_TOKEN> # Paste your token here
-```
+# Paste your Hugging Face token here
+export HF_TOKEN=<YOUR_HUGGINGFACE_TOKEN>
 
-```bash
 kubectl create secret generic hf-secret \
 --from-literal=hf_api_token=${HF_TOKEN} \
 --dry-run=client -o yaml | kubectl apply -f -
 ```
 
-<a name="build-and-push-trtllm-docker-image"></a>
+<a name="build-image"></a>
+### 3.6. Build the vLLM Serving Image
 
-### 3.6. Build and Push TensorRT-LLM Docker Image to the Artifact Registry
+This step uses Cloud Build to create a custom Docker image with vLLM and push it to your Artifact Registry repository.
 
-To build the container, complete the following steps from your client:
+> [!NOTE]
+> This build process can take **up to 30 minutes** as it compiles and installs several dependencies.
 
-1.  Navigate to the TensorRT-LLM docker source directory:
-    ```bash
-    cd $REPO_ROOT/src/docker/trtllm
-    ```
+```bash
+cd $REPO_ROOT/src/docker/trtllm
+gcloud builds submit --region=${REGION} \
+    --config cloudbuild.yml \
+    --substitutions _ARTIFACT_REGISTRY=$ARTIFACT_REGISTRY,_TRTLLM_IMAGE=$TRTLLM_IMAGE,_TRTLLM_VERSION=$TRTLLM_VERSION,_TRITON_SERVER_VERSION=$TRITON_SERVER_VERSION \
+    --timeout "2h" \
+    --machine-type=e2-highcpu-32 \
+    --disk-size=1000 \
+    --quiet \
+    --async
+```
 
-2.  Use Cloud Build to build and push the TensorRT-LLM image to the Artifact Registry repository. Ensure `TRTLLM_VERSION` and `TRITON_SERVER_VERSION` are set (see [Configure Environment Settings](#configure-environment-settings)).
+Optionally, you can monitor the build progress by streaming its logs. Replace `<BUILD_ID>` with the ID from the previous command's output.
 
-    Run the following command:
+```bash
+BUILD_ID=<BUILD_ID>
+gcloud builds log $BUILD_ID --stream --region=$REGION
+```
 
-    ```bash
-    gcloud builds submit --region=${REGION} \
-        --config cloudbuild.yml \
-        --substitutions _ARTIFACT_REGISTRY=$ARTIFACT_REGISTRY,_TRTLLM_IMAGE=$TRTLLM_IMAGE,_TRTLLM_VERSION=$TRTLLM_VERSION,_TRITON_SERVER_VERSION=$TRITON_SERVER_VERSION \
-        --timeout "2h" \
-        --machine-type=e2-highcpu-32 \
-        --disk-size=1000 \
-        --quiet \
-        --async
-    ```
+> [!WARNING]
+> You may see `pip's dependency resolver` warnings in the build logs. These are generally safe to ignore as long as the Cloud Build job completes successfully.
 
-    This command outputs the `build ID`.
-
-3.  (Optional) You can monitor the build progress by streaming the logs for the `build ID`. Replace `<BUILD_ID>` with your build ID.
-
-    ```bash
-    BUILD_ID=<BUILD_ID>
-    gcloud builds log $BUILD_ID --stream --region=$REGION
-    ```
+**You have now completed the environment setup!** You are ready to deploy a model.
 
 <a name="run-the-recipe"></a>
-
 ## 4. Run the recipe
 
 [Back to Top](#table-of-contents)
 
-The following sections detail how to run inference benchmark recipes.
+This recipe supports the deployment of the following models:
 
-<a name="benchmarking-llama-3.1-405b-model"></a>
+1.  [Llama 3.1 405B](#serving-llama-3.1-405b)
 
+> [!NOTE]
+> After running the recipe with `helm install`, it can take **up to 30 minutes** for the deployment to become fully available. This is because the GKE node must first pull the Docker image and then download the model weights from Hugging Face.
+
+<a name="serving-llama-3.1-405b"></a>
 ### 4.1. Inference benchmark for Llama 3.1 405B Model
 
 [Back to Top](#table-of-contents)
@@ -221,7 +261,7 @@ The recipe does the following steps to run the benchmarking:
 
 The recipe uses [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/performance/perf-benchmarking.md), a command-line tool from NVIDIA to benchmark the performance of TensorRT-LLM engine. For more information about `trtllm-bench`, see the [TensorRT-LLM documentation](https://github.com/NVIDIA/TensorRT-LLM).
 
-Install the helm chart to prepare and benchmark the model using [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/performance/perf-benchmarking.md) tool:
+1. Install the helm chart to prepare and benchmark the model using [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/performance/perf-benchmarking.md) tool:
 
     ```bash
     cd $RECIPE_ROOT
@@ -237,185 +277,199 @@ Install the helm chart to prepare and benchmark the model using [`trtllm-bench`]
     $REPO_ROOT/src/helm-charts/a3ultra/inference-templates/deployment
     ```
 
-The deployment will be named `$USER-serving-llama-3-1-405b-model` and the service `$USER-serving-llama-3-1-405b-model-svc`.
+  This creates a Helm release and a Deployment named `$USER-serving-llama-3-1-405b-model`, and a Service named `$USER-serving-llama-3-1-405b-model-svc`.
 
-To view the deployment logs and verify the deployment status, navigate to [Monitoring Deployment](#monitoring-deployment).
+2.  **Check the deployment status.**
 
-**NOTE:** This helm chart is configured to run only a single benchmarking experiment for 30k requests for 128 tokens of input/output lengths. To run other experiments, you can add the various combinations provided in the [values.yaml](values.yaml) file.
+    ```bash
+    kubectl get deployment/$USER-serving-llama-3-1-405b-model
+    ```
 
-<a name="monitoring-deployment"></a>
+    Wait until the `READY` column shows `1/1`. See the [Monitoring and Troubleshooting](#monitoring) section to view the deployment logs.
 
-## 5. Monitoring Deployment
+  > [!NOTE]
+  > - This helm chart is configured to run only a single benchmarking experiment for 30k requests for 128 tokens of input/output lengths. To run other experiments, you can add the various combinations provided in the [values.yaml](values.yaml) file.
+  > - This deployment process can take **up to 30 minutes** as it downloads the model weights from Hugging Face and then the server loads the model weights.
+
+
+<a name="monitoring"></a>
+## 5. Monitoring and Troubleshooting
 
 [Back to Top](#table-of-contents)
 
-After the benchmarking job is deployed via Helm as described in the sections [above](#run-the-recipe), use the following steps to monitor the deployment. Replace `<deployment-name>` and `<service-name>` with the appropriate names from the model-specific deployment instructions (e.g., `$USER-serving-llama-3-1-405b-model` and `$USER-serving-llama-3-1-405b-model-svc`).
+After the model is deployed via Helm as described in the sections [above](#run-the-recipe), use the following steps to monitor the deployment and interact with the model. Replace `<deployment-name>` and `<service-name>` with the appropriate names from the model-specific deployment instructions (e.g., `$USER-serving-llama-3-1-405b-model` and `$USER-serving-llama-3-1-405b-model-svc`).
 
-<a name="view-deployment-logs"></a>
 
-### 5.1. View Deployment Logs
+<a name="check-status"></a>
+### 5.1. Check Deployment Status
+
+Check the status of your deployment. Replace the name if you deployed a different model.
 
 ```bash
-kubectl logs -f deployment/<deployment-name>
+# Example for Llama 3.1 405B
+kubectl get deployment/$USER-serving-llama-3-1-405b-model
+```
+
+Wait until the `READY` column shows `1/1`. If it shows `0/1`, the pod is still starting up.
+
+> [!NOTE]
+> In the GKE UI on Cloud Console, you might see a status of "Does not have minimum availability" during startup. This is normal and will resolve once the pod is ready.
+
+<a name="view-logs"></a>
+### 5.2. View Logs
+
+To see the logs from the vLLM server (useful for debugging), use the `-f` flag to follow the log stream:
+
+```bash
+kubectl logs -f deployment/$USER-serving-llama-3-1-405b-model
 ```
 
 You should see logs indicating preparing the model, and then running the throughput benchmark test, similar to this:
 
-  ```bash
-  Running benchmark for meta-llama/Llama-3.1-405B with ISL=128, OSL=128, TP=8
-  [TensorRT-LLM] TensorRT-LLM version: 0.16.0
-  Parse safetensors files: 100%|██████████| 191/191 [00:01<00:00, 152.55it/s]
-  [05/28/2025-22:40:28] [TRT-LLM] [I] Found dataset.
-  [05/28/2025-22:40:29] [TRT-LLM] [I]
-  ===========================================================
-  = DATASET DETAILS
-  ===========================================================
-  Max Input Sequence Length:      128
-  Max Output Sequence Length:     128
-  Max Sequence Length:    256
-  Target (Average) Input Sequence Length: 128
-  Target (Average) Output Sequence Length:        128
-  Number of Sequences:    30000
-  ===========================================================
-
-
-  [05/28/2025-22:40:29] [TRT-LLM] [I] Max batch size and max num tokens are not provided, use tuning heuristics or pre-defined setting from trtllm-bench.
-  [05/28/2025-22:40:29] [TRT-LLM] [I] Estimated total available memory for KV cache: 717.36 GB
-  [05/28/2025-22:40:29] [TRT-LLM] [I] Estimated total KV cache memory: 681.49 GB
-  [05/28/2025-22:40:29] [TRT-LLM] [I] Estimated max number of requests in KV cache memory: 11076.91
-  [05/28/2025-22:40:29] [TRT-LLM] [I] Estimated max batch size (after fine-tune): 4096
-  [05/28/2025-22:40:29] [TRT-LLM] [I] Estimated max num tokens (after fine-tune): 8192
-  [05/28/2025-22:40:29] [TRT-LLM] [I] Set dtype to bfloat16.
-  [05/28/2025-22:40:29] [TRT-LLM] [I] Set multiple_profiles to True.
-  [05/28/2025-22:40:29] [TRT-LLM] [I] Set use_paged_context_fmha to True.
-  [05/28/2025-22:40:29] [TRT-LLM] [I] Set use_fp8_context_fmha to True.
-  [05/28/2025-22:40:29] [TRT-LLM] [I] Specified dtype 'auto'; inferred dtype 'bfloat16'.
-  [05/28/2025-22:40:29] [TRT-LLM] [W] Implicitly setting LLaMAConfig.tie_word_embeddings = False
-  [05/28/2025-22:40:29] [TRT-LLM] [I] Set nccl_plugin to None.
-  [05/28/2025-22:40:29] [TRT-LLM] [I] start MpiSession with 8 workers
-  [01/21/2025-02:18:20] [TRT-LLM] [I]
-  Loading Model: [1/2]    Loading HF model to memory
-  Loading checkpoint shards: 100%|██████████| 191/191 [02:56<00:00,  1.08it/s]
-  Inserted 2649 quantizers
-  current rank: 0, tp rank: 0, pp rank: 0
-  Time: 1663.266s
-  Loading Model: [2/2]    Building TRT-LLM engine
-  Time: 555.845s
-  Loading model done.
-  Total latency: 2219.111s
-
-  [05/28/2025-23:22:44] [TRT-LLM] [I]
-  ===========================================================
-  = ENGINE BUILD INFO
-  ===========================================================
-  Model Name:             meta-llama/Llama-3.1-405B
-  Model Path:             /ssd/meta-llama/Llama-3.1-405B
-  Workspace Directory:    /ssd
-  Engine Directory:       /ssd/meta-llama/Llama-3.1-405B/tp_8_pp_1
-
-  ===========================================================
-  = ENGINE CONFIGURATION DETAILS
-  ===========================================================
-  Max Sequence Length:            256
-  Max Batch Size:                 4096
-  Max Num Tokens:                 8192
-  Quantization:                   FP8
-  KV Cache Dtype:                 FP8
-  ===========================================================
-
-  [05/28/2025-23:22:44] [TRT-LLM] [I]
-
-  ===========================================================
-  ENGINE SAVED: /ssd/meta-llama/Llama-3.1-405B/tp_8_pp_1
-  ===========================================================
-
-  [TensorRT-LLM] TensorRT-LLM version: 0.17.0.post1
-
-  [05/28/2025-23:24:31] [TRT-LLM] [I] Setting up for warmup...
-  [05/28/2025-23:24:31] [TRT-LLM] [I] Running warmup.
-  [05/28/2025-23:24:31] [TRT-LLM] [I] Starting benchmarking async task.
-  [05/28/2025-23:24:31] [TRT-LLM] [I] Starting benchmark...
-  [05/28/2025-23:24:31] [TRT-LLM] [I] Request submission complete. [count=2, time=0.0000s, rate=175330.94 req/s]
-  [05/28/2025-23:24:36] [TRT-LLM] [I] Benchmark complete.
-  [05/28/2025-23:24:36] [TRT-LLM] [I] Stopping LLM backend.
-  [05/28/2025-23:24:36] [TRT-LLM] [I] Cancelling all 0 tasks to complete.
-  [05/28/2025-23:24:36] [TRT-LLM] [I] All tasks cancelled.
-  [05/28/2025-23:24:36] [TRT-LLM] [I] LLM Backend stopped.
-  [05/28/2025-23:24:36] [TRT-LLM] [I] Warmup done.
-  [05/28/2025-23:24:36] [TRT-LLM] [I] Starting benchmarking async task.
-  [05/28/2025-23:24:36] [TRT-LLM] [I] Starting benchmark...
-  [05/28/2025-23:24:36] [TRT-LLM] [I] Request submission complete. [count=30000, time=0.0121s, rate=2484491.39 req/s]
-  [05/28/2025-23:40:58] [TRT-LLM] [I] Benchmark complete.
-  [05/28/2025-23:40:58] [TRT-LLM] [I] Stopping LLM backend.
-  [05/28/2025-23:40:58] [TRT-LLM] [I] Cancelling all 0 tasks to complete.
-  [05/28/2025-23:40:58] [TRT-LLM] [I] All tasks cancelled.
-  [05/28/2025-23:40:58] [TRT-LLM] [I] LLM Backend stopped.
-  [05/28/2025-23:40:59] [TRT-LLM] [I]
-
-  ===========================================================
-  = ENGINE DETAILS
-  ===========================================================
-  Model:                  meta-llama/Llama-3.1-405B
-  Engine Directory:       /ssd/meta-llama/Llama-3.1-405B/tp_8_pp_1
-  TensorRT-LLM Version:   0.17.0.post1
-  Dtype:                  bfloat16
-  KV Cache Dtype:         FP8
-  Quantization:           FP8
-  Max Input Length:       256
-  Max Sequence Length:    256
-
-  ===========================================================
-  = WORLD + RUNTIME INFORMATION
-  ===========================================================
-  TP Size:                8
-  PP Size:                1
-  Max Runtime Batch Size: 4096
-  Max Runtime Tokens:     8192
-  Scheduling Policy:      Guaranteed No Evict
-  KV Memory Percentage:   95.00%
-  Issue Rate (req/sec):   3.1860E+14
-
-  ===========================================================
-  = PERFORMANCE OVERVIEW
-  ===========================================================
-  Number of requests:             30000
-  Average Input Length (tokens):  128.0000
-  Average Output Length (tokens): 128.0000
-  Token Throughput (tokens/sec):  3914.4509
-  Request Throughput (req/sec):   30.5816
-  Total Latency (ms):             980980.5121
-
-  ===========================================================
-
-  [05/28/2025-23:40:59] [TRT-LLM] [I] Thread proxy_dispatch_result_thread stopped.
-  ```
-
-<a name="verify-deployment-status"></a>
-
-### 5.2. Verify Deployment Status
-
 ```bash
-kubectl get deployment/<deployment-name>
+Running benchmark for meta-llama/Llama-3.1-405B with ISL=128, OSL=128, TP=8
+[TensorRT-LLM] TensorRT-LLM version: 0.16.0
+Parse safetensors files: 100%|██████████| 191/191 [00:01<00:00, 152.55it/s]
+[05/28/2025-22:40:28] [TRT-LLM] [I] Found dataset.
+[05/28/2025-22:40:29] [TRT-LLM] [I]
+===========================================================
+= DATASET DETAILS
+===========================================================
+Max Input Sequence Length:      128
+Max Output Sequence Length:     128
+Max Sequence Length:    256
+Target (Average) Input Sequence Length: 128
+Target (Average) Output Sequence Length:        128
+Number of Sequences:    30000
+===========================================================
+
+
+[05/28/2025-22:40:29] [TRT-LLM] [I] Max batch size and max num tokens are not provided, use tuning heuristics or pre-defined setting from trtllm-bench.
+[05/28/2025-22:40:29] [TRT-LLM] [I] Estimated total available memory for KV cache: 717.36 GB
+[05/28/2025-22:40:29] [TRT-LLM] [I] Estimated total KV cache memory: 681.49 GB
+[05/28/2025-22:40:29] [TRT-LLM] [I] Estimated max number of requests in KV cache memory: 11076.91
+[05/28/2025-22:40:29] [TRT-LLM] [I] Estimated max batch size (after fine-tune): 4096
+[05/28/2025-22:40:29] [TRT-LLM] [I] Estimated max num tokens (after fine-tune): 8192
+[05/28/2025-22:40:29] [TRT-LLM] [I] Set dtype to bfloat16.
+[05/28/2025-22:40:29] [TRT-LLM] [I] Set multiple_profiles to True.
+[05/28/2025-22:40:29] [TRT-LLM] [I] Set use_paged_context_fmha to True.
+[05/28/2025-22:40:29] [TRT-LLM] [I] Set use_fp8_context_fmha to True.
+[05/28/2025-22:40:29] [TRT-LLM] [I] Specified dtype 'auto'; inferred dtype 'bfloat16'.
+[05/28/2025-22:40:29] [TRT-LLM] [W] Implicitly setting LLaMAConfig.tie_word_embeddings = False
+[05/28/2025-22:40:29] [TRT-LLM] [I] Set nccl_plugin to None.
+[05/28/2025-22:40:29] [TRT-LLM] [I] start MpiSession with 8 workers
+[01/21/2025-02:18:20] [TRT-LLM] [I]
+Loading Model: [1/2]    Loading HF model to memory
+Loading checkpoint shards: 100%|██████████| 191/191 [02:56<00:00,  1.08it/s]
+Inserted 2649 quantizers
+current rank: 0, tp rank: 0, pp rank: 0
+Time: 1663.266s
+Loading Model: [2/2]    Building TRT-LLM engine
+Time: 555.845s
+Loading model done.
+Total latency: 2219.111s
+
+[05/28/2025-23:22:44] [TRT-LLM] [I]
+===========================================================
+= ENGINE BUILD INFO
+===========================================================
+Model Name:             meta-llama/Llama-3.1-405B
+Model Path:             /ssd/meta-llama/Llama-3.1-405B
+Workspace Directory:    /ssd
+Engine Directory:       /ssd/meta-llama/Llama-3.1-405B/tp_8_pp_1
+
+===========================================================
+= ENGINE CONFIGURATION DETAILS
+===========================================================
+Max Sequence Length:            256
+Max Batch Size:                 4096
+Max Num Tokens:                 8192
+Quantization:                   FP8
+KV Cache Dtype:                 FP8
+===========================================================
+
+[05/28/2025-23:22:44] [TRT-LLM] [I]
+
+===========================================================
+ENGINE SAVED: /ssd/meta-llama/Llama-3.1-405B/tp_8_pp_1
+===========================================================
+
+[TensorRT-LLM] TensorRT-LLM version: 0.17.0.post1
+
+[05/28/2025-23:24:31] [TRT-LLM] [I] Setting up for warmup...
+[05/28/2025-23:24:31] [TRT-LLM] [I] Running warmup.
+[05/28/2025-23:24:31] [TRT-LLM] [I] Starting benchmarking async task.
+[05/28/2025-23:24:31] [TRT-LLM] [I] Starting benchmark...
+[05/28/2025-23:24:31] [TRT-LLM] [I] Request submission complete. [count=2, time=0.0000s, rate=175330.94 req/s]
+[05/28/2025-23:24:36] [TRT-LLM] [I] Benchmark complete.
+[05/28/2025-23:24:36] [TRT-LLM] [I] Stopping LLM backend.
+[05/28/2025-23:24:36] [TRT-LLM] [I] Cancelling all 0 tasks to complete.
+[05/28/2025-23:24:36] [TRT-LLM] [I] All tasks cancelled.
+[05/28/2025-23:24:36] [TRT-LLM] [I] LLM Backend stopped.
+[05/28/2025-23:24:36] [TRT-LLM] [I] Warmup done.
+[05/28/2025-23:24:36] [TRT-LLM] [I] Starting benchmarking async task.
+[05/28/2025-23:24:36] [TRT-LLM] [I] Starting benchmark...
+[05/28/2025-23:24:36] [TRT-LLM] [I] Request submission complete. [count=30000, time=0.0121s, rate=2484491.39 req/s]
+[05/28/2025-23:40:58] [TRT-LLM] [I] Benchmark complete.
+[05/28/2025-23:40:58] [TRT-LLM] [I] Stopping LLM backend.
+[05/28/2025-23:40:58] [TRT-LLM] [I] Cancelling all 0 tasks to complete.
+[05/28/2025-23:40:58] [TRT-LLM] [I] All tasks cancelled.
+[05/28/2025-23:40:58] [TRT-LLM] [I] LLM Backend stopped.
+[05/28/2025-23:40:59] [TRT-LLM] [I]
+
+===========================================================
+= ENGINE DETAILS
+===========================================================
+Model:                  meta-llama/Llama-3.1-405B
+Engine Directory:       /ssd/meta-llama/Llama-3.1-405B/tp_8_pp_1
+TensorRT-LLM Version:   0.17.0.post1
+Dtype:                  bfloat16
+KV Cache Dtype:         FP8
+Quantization:           FP8
+Max Input Length:       256
+Max Sequence Length:    256
+
+===========================================================
+= WORLD + RUNTIME INFORMATION
+===========================================================
+TP Size:                8
+PP Size:                1
+Max Runtime Batch Size: 4096
+Max Runtime Tokens:     8192
+Scheduling Policy:      Guaranteed No Evict
+KV Memory Percentage:   95.00%
+Issue Rate (req/sec):   3.1860E+14
+
+===========================================================
+= PERFORMANCE OVERVIEW
+===========================================================
+Number of requests:             30000
+Average Input Length (tokens):  128.0000
+Average Output Length (tokens): 128.0000
+Token Throughput (tokens/sec):  3914.4509
+Request Throughput (req/sec):   30.5816
+Total Latency (ms):             980980.5121
+
+===========================================================
+
+[05/28/2025-23:40:59] [TRT-LLM] [I] Thread proxy_dispatch_result_thread stopped.
 ```
 
-Check if the deployment `READY` column shows `1/1`.
-
 <a name="cleanup"></a>
-
 ## 6. Cleanup
 
-[Back to Top](#table-of-contents)
+To avoid incurring further charges, clean up the resources you created.
 
-To clean up the resources created by the recipe:
+1.  **Uninstall the Helm Release:**
 
-1. **List deployed models** in the cluster:
+    First, list your releases to get the deployed models:
 
     ```bash
     # list deployed models
-    helm list $USER-serving-
+    helm list --filter $USER-serving-
     ```
 
-2.  **Uninstall the helm charts** for any deployed models:
+    Then, uninstall the desired release:
 
     ```bash
     # uninstall the deployed model

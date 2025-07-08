@@ -45,6 +45,6 @@ RUN echo "Cloning TensorRT-LLM version: ${TRTLLM_VERSION}" && \
     git lfs pull
 
 COPY requirements.txt /workspace/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --require-hashes -r requirements.txt
 
 ENTRYPOINT [ "/bin/bash" ]

@@ -135,7 +135,8 @@ print_configuration() {
 }
 
 download_model() {
-    echo "Downloading model from HuggingFace"
+    echo "Downloading model from HuggingFace... This may take a while when downloading for the first time."
+    echo "NOTE: by default, huggingface-cli response can be verbose."
     huggingface-cli download $model_name --exclude="*original*" --local-dir ${MODEL_DOWNLOAD_DIR} --local-dir-use-symlinks False
 }
 

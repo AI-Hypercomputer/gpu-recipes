@@ -193,11 +193,6 @@ spec:
               if [[ -n "${NCCL_INIT_SCRIPT}" ]]; then
                 echo "Running NCCL init script: ${NCCL_INIT_SCRIPT}"
                 source ${NCCL_INIT_SCRIPT}
-
-                # vLLM/SGLang is using NCCL version 2.26 that is not compatible with the gIB
-                # context: b/413392438#comment6
-                unset NCCL_NET
-                export NCCL_NET_PLUGIN=/usr/local/gib/lib64/libnccl-net_internal.so
                 env | grep NCCL
                 ldconfig
               fi

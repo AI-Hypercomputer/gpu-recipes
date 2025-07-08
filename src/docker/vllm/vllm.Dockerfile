@@ -23,7 +23,7 @@ COPY ray_init.sh /workspace/ray_init.sh
 RUN apt-get update && apt-get install -y --no-install-recommends pciutils
 
 COPY requirements.txt /workspace/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --require-hashes -r requirements.txt
 
 RUN echo "Cloning vLLM version: ${VLLM_VERSION}" && \
     git clone -b ${VLLM_VERSION} https://github.com/vllm-project/vllm.git && \

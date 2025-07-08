@@ -57,7 +57,7 @@ workload:
 
 network:
   subnetworks[]:
-  gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:v1.0.3
+  gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:v1.0.6
   ncclSettings:
     - name: NCCL_DEBUG
       value: "VERSION"

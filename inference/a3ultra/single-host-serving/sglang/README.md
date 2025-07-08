@@ -1,147 +1,181 @@
-# Single Node Model Serving with SGLang on A3 Ultra GKE Node Pool
+# Single Host Model Serving with SGLang on A3 Ultra GKE Node Pool
 
-This document outlines the steps to serve and benchmark various Large Language Models (LLMs) using [SGLang](https://github.com/sgl-project/sglang/tree/main) framework on a single [A3 Ultra GKE Node pool](https://cloud.google.com/kubernetes-engine).
+This document outlines the steps to serve and benchmark various Large Language Models (LLMs) using the [SGLang](https://github.com/sgl-project/sglang/tree/main) framework on a single [A3 Ultra GKE Node pool](https://cloud.google.com/kubernetes-engine).
 
-<a name="supported-models"></a>
-
-## Supported Models
-
-This recipe supports the deployment of the following models:
-
-1.  [DeepSeek R1 671B](#serving-deepseek-r1-671b-model)
-2.  [Llama 4 Maverick & Scout](#serving-llama-4-models)
-
-The recipe is also compatible with similar sized large [models supported by SGLang](https://docs.sglang.ai/supported_models/generative_models.html#supported-models).
+This guide walks you through setting up the necessary cloud infrastructure, configuring your environment, and deploying a high-performance LLM for inference.
 
 <a name="table-of-contents"></a>
-
 ## Table of Contents
 
-1.  [Orchestration and Deployment Tools](#orchestration-and-deployment-tools)
-2.  [Test Environment](#test-environment)
-3.  [Configure Environment](#configure-environment)
-    *   [3.1. Clone the `gpu-recipes` Repository](#get-the-gpu-recipes-repository)
-    *   [3.2. Configure Environment Settings](#configure-environment-settings)
-    *   [3.3. Get Cluster Credentials](#get-cluster-credentials)
-    *   [3.4. Get Hugging Face Token](#get-huggingface-token)
-    *   [3.5. Create Hugging Face Kubernetes Secret](#create-hugging-face-kubernetes-secret)
-    *   [3.6. Build and Push SGLang Docker Image](#build-and-push-sglang-docker-image)
-4.  [Run the recipe](#run-the-recipe)
-    *   [4.1. Serving DeepSeek R1 671B Model](#serving-deepseek-r1-671b-model)
-        *   [4.1.1. Deploy DeepSeek R1 671B](#deploy-deepseek-r1-671b)
-        *   [4.1.2. Interact with DeepSeek R1 671B](#interact-with-deepseek-r1-671b)
-        *   [4.1.3. Benchmark DeepSeek R1 671B](#benchmark-deepseek-r1-671b)
-    *   [4.2. Serving Llama 4 Models](#serving-llama-4-models)
-        *   [4.2.1. Compatible Llama 4 Models](#compatible-llama-4-models)
-        *   [4.2.2. Deploy Llama 4 Models](#deploy-llama-4-models)
-        *   [4.2.3. Interact with Llama 4 Models](#interact-with-llama-4-models)
-        *   [4.2.4. Benchmark Llama 4 Models](#benchmark-llama-4-models)
-5.  [Monitoring Deployment](#monitoring-deployment)
-    *   [5.1. View Deployment Logs](#view-deployment-logs)
-    *   [5.2. Verify Deployment Status](#verify-deployment-status)
-6.  [Cleanup](#cleanup)
-
-<a name="orchestration-and-deployment-tools"></a>
-
-## 1. Orchestration and Deployment Tools
-
-[Back to Top](#table-of-contents)
-
-For this recipe, the following setup is used:
-
-*   **Orchestration**: [Google Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine)
-*   **Deployment Configuration and Deployment**: A Helm chart is used to configure and deploy the [Kubernetes Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/). This deployment encapsulates the inference of the target LLM using SGLang framework. The chart generates manifests adhering to best practices for using RDMA Over Ethernet (RoCE) with Google Kubernetes Engine (GKE) on A3 Ultra node pool.
+* [1. Test Environment](#test-environment)
+* [2. High-Level Architecture](#architecture)
+* [3. Environment Setup (One-Time)](#environment-setup)
+  * [3.1. Clone the Repository](#clone-repo)
+  * [3.2. Configure Environment Variables](#configure-vars)
+  * [3.3. Connect to your GKE Cluster](#connect-cluster)
+  * [3.4. Get Hugging Face Token](#get-hf-token)
+  * [3.5. Create Hugging Face Kubernetes Secret](#setup-hf-secret)
+  * [3.6. Build the SGLang Serving Image](#build-image)
+* [4. Run the Recipe](#run-the-recipe)
+  * [4.1. Serving DeepSeek R1 671B](#serving-deepseek)
+  * [4.2. Serving Llama 4 Models](#serving-llama4)
+* [5. Monitoring and Troubleshooting](#monitoring)
+  * [5.1. Check Deployment Status](#check-status)
+  * [5.2. View Logs](#view-logs)
+  * [5.3. Common Issues](#troubleshooting)
+* [6. Cleanup](#cleanup)
 
 <a name="test-environment"></a>
-
-## 2. Test environment
+## 1. Test Environment
 
 [Back to Top](#table-of-contents)
+
+The recipe uses the following setup:
+
+* **Orchestration**: [Google Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine)
+* **Deployment Configuration**: A [Helm chart](https://helm.sh/) is used to configure and deploy a [Kubernetes Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/). This deployment encapsulates the inference of the target LLM using the SGLang framework.
 
 This recipe has been optimized for and tested with the following configuration:
 
-- GKE cluster
-    - [A regional standard cluster](https://cloud.google.com/kubernetes-engine/docs/concepts/configuration-overview) version: 1.31.7-gke.1265000 or later.
-    - A GPU node pool with 1 [a3-ultragpu-8g](https://cloud.google.com/compute/docs/gpus#h200-gpus) machine.
-    - [Workload Identity Federation for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity) enabled.
-    - [Cloud Storage FUSE CSI driver for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/cloud-storage-fuse-csi-driver) enabled.
-    - [DCGM metrics](https://cloud.google.com/kubernetes-engine/docs/how-to/dcgm-metrics) enabled.
-    - [Kueue](https://kueue.sigs.k8s.io/docs/reference/kueue.v1beta1/) and [JobSet](https://jobset.sigs.k8s.io/docs/overview/) APIs installed.
-    - Kueue configured to support [Topology Aware Scheduling](https://kueue.sigs.k8s.io/docs/concepts/topology_aware_scheduling/).
-- A regional Google Cloud Storage (GCS) bucket to store logs generated by the recipe runs.
+* **GKE Cluster**:
+    * A [regional standard cluster](https://cloud.google.com/kubernetes-engine/docs/concepts/configuration-overview) version: `1.31.7-gke.1265000` or later.
+    * A GPU node pool with 1 [a3-ultragpu-8g](https://cloud.google.com/compute/docs/gpus#h200-gpus) machine.
+    * [Workload Identity Federation for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity) enabled.
+    * [Cloud Storage FUSE CSI driver for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/cloud-storage-fuse-csi-driver) enabled.
+    * [DCGM metrics](https://cloud.google.com/kubernetes-engine/docs/how-to/dcgm-metrics) enabled.
+    * [Kueue](https://kueue.sigs.k8s.io/docs/reference/kueue.v1beta1/) and [JobSet](https://jobset.sigs.k8s.io/docs/overview/) APIs installed.
+    * Kueue configured to support [Topology Aware Scheduling](https://kueue.sigs.k8s.io/docs/concepts/topology_aware_scheduling/).
+* A regional Google Cloud Storage (GCS) bucket to store logs generated by the recipe runs.
 
-To prepare the required environment, see
-[GKE environment setup guide](../../../../docs/configuring-environment-gke-a3-ultra.md).
+> [!IMPORTANT]
+> To prepare the required environment, see the [GKE environment setup guide](../../../../docs/configuring-environment-gke-a3-ultra.md).
+> Provisioning a new GKE cluster is a long-running operation and can take **20-30 minutes**.
 
-<a name="configure-environment"></a>
-
-## 3. Configure Environment
+<a name="architecture"></a>
+## 2. High-Level Flow
 
 [Back to Top](#table-of-contents)
 
-The following steps configure the environment to run the recipe. These steps are common for serving the [models supported by this recipe](#supported-models).
+Here is a simplified diagram of the flow that we follow in this recipe:
 
-<a name="get-the-gpu-recipes-repository"></a>
+```mermaid
+---
+config:
+  layout: dagre
+---
+flowchart TD
+ subgraph workstation["Client Workstation"]
+    T["Cluster Toolkit"]
+    B("Kubernetes API")
+    A["helm install"]
+    Y["gcloud"]
+  end
+ subgraph imagerepo["Build Image"]
+    H["Artifact Registry"]
+    G["Cloud Build"]
+  end
+ subgraph huggingface["Hugging Face Hub"]
+    I["Model Weights"]
+  end
+ subgraph gke["GKE Cluster (A3 Ultra)"]
+    C["Deployment"]
+    D["Pod"]
+    E["SGLang Container"]
+    F["Service"]
+  end
+ subgraph storage["Cloud Storage"]
+    J["Bucket"]
+  end
 
-### 3.1. Clone the `gpu-recipes` Repository
+    %% Logical/actual flow
+    T -- Create Cluster --> gke
+    A --> B
+    G -- Pushes Image --> H
+    B --> C & F
+    C --> D
+    D --> E
+    F --> C
+    H -- Pulls Image --> E
+    E -- Downloads at runtime --> I
+    E -- Write logs --> J
+    Y -- Run Build --> imagerepo
 
-Clone the `gpu-recipes` repository and set a reference to the recipe folder.
+
+    %% Layout control
+    gke ~~~ imagerepo
+```
+
+* **helm:** A package manager for Kubernetes to define, install, and upgrade applications. It's used here to configure and deploy the Kubernetes Deployment.
+* **Deployment:** Manages the lifecycle of your model server pod, ensuring it stays running.
+* **Service:** Provides a stable network endpoint (a DNS name and IP address) to access your model server.
+* **Pod:** The smallest deployable unit in Kubernetes. The SGLang container runs inside this pod on a GPU-enabled node.
+* **Cloud Build:** A service to run build jobs on Google Cloud to build the SGLang container image.
+* **Artifact Registry:** A single place to manage container images.
+* **Cloud Storage:** A Cloud Storage bucket to store benchmark logs and other artifacts.
+
+<a name="environment-setup"></a>
+## 3. Environment Setup (One-Time)
+
+[Back to Top](#table-of-contents)
+
+First, you'll configure your local environment. These steps are required once before you can deploy any models.
+
+<a name="clone-repo"></a>
+### 3.1. Clone the Repository
 
 ```bash
-git clone https://github.com/ai-hypercomputer/gpu-recipes.git
+git clone [https://github.com/ai-hypercomputer/gpu-recipes.git](https://github.com/ai-hypercomputer/gpu-recipes.git)
 cd gpu-recipes
-export REPO_ROOT=`git rev-parse --show-toplevel`
+export REPO_ROOT=$(pwd)
 export RECIPE_ROOT=$REPO_ROOT/inference/a3ultra/single-host-serving/sglang
 ```
 
-<a name="configure-environment-settings"></a>
+<a name="configure-vars"></a>
+### 3.2. Configure Environment Variables
 
-### 3.2. Configure Environment Settings
+This is the most critical step. These variables are used in subsequent commands to target the correct resources.
 
-From your client, complete the following steps:
+```bash
+export PROJECT_ID=<PROJECT_ID>
+export REGION=<REGION_for_cloud_build>
+export CLUSTER_REGION=<REGION_of_your_cluster>
+export CLUSTER_NAME=<YOUR_GKE_CLUSTER_NAME>
+export KUEUE_NAME=<YOUR_KUEUE_NAME>
+export ARTIFACT_REGISTRY=<your-artifact-registry-repo-full-path>
+export GCS_BUCKET=<your-gcs-bucket-for-logs>
+export SGLANG_IMAGE=lmsysorg/sglang
+export SGLANG_VERSION=v0.4.6.post4-cu124
 
-Set the environment variables to match your environment:
+# Set the project for gcloud commands
+gcloud config set project $PROJECT_ID
+```
 
-  ```bash
-  export PROJECT_ID=<PROJECT_ID>
-  export REGION=<REGION>
-  export CLUSTER_REGION=<CLUSTER_REGION>
-  export CLUSTER_NAME=<CLUSTER_NAME>
-  export GCS_BUCKET=<GCS_BUCKET>
-  export ARTIFACT_REGISTRY=<ARTIFACT_REGISTRY>
-  export SGLANG_IMAGE=lmsysorg/sglang
-  export SGLANG_VERSION=v0.4.6.post4-cu124
-  ```
+Replace the following values:
 
-  Replace the following values:
+| Variable              | Description                                                                                             | Example                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `PROJECT_ID` | Your Google Cloud Project ID. | `gcp-project-12345` |
+| `REGION` | The GCP region to run the Cloud Build job. | `us-central1` |
+| `CLUSTER_REGION` | The GCP region where your GKE cluster is located. | `us-central1` |
+| `CLUSTER_NAME` | The name of your GKE cluster. | `a3-ultra-cluster` |
+| `KUEUE_NAME` | The name of the Kueue local queue. The default queue created by the cluster toolkit is `a3-ultra`. Verify the name in your cluster. | `a3-ultra` |
+| `ARTIFACT_REGISTRY` | Full path to your Artifact Registry repository. | `us-central1-docker.pkg.dev/gcp-project-12345/my-repo` |
+| `GCS_BUCKET` | Name of your GCS bucket (do not include `gs://`). | `my-benchmark-logs-bucket` |
+| `SGLANG_IMAGE` | The name for the Docker image to be built. | `lmsysorg/sglang` |
+| `SGLANG_VERSION` | The tag/version for the Docker image. | `v0.4.6.post4-cu124` |
 
-  *   `<PROJECT_ID>`: your Google Cloud project ID.
-  *   `<REGION>`: the region where you want to run Cloud Build (e.g., `us-central1`) job.
-  *   `<CLUSTER_REGION>`: the region where your cluster is located.
-  *   `<CLUSTER_NAME>`: the name of your GKE cluster.
-  *   `<GCS_BUCKET>`: the name of your Cloud Storage bucket. *Don't include the `gs://` prefix*.
-  *   `<ARTIFACT_REGISTRY>`: the full name of your Artifact Registry repository in the format: `LOCATION-docker.pkg.dev/PROJECT_ID/REPOSITORY` (e.g., `us-central1-docker.pkg.dev/my-project/my-repo`).
-  *   `<SGLANG_VERSION>`: The SGLang version tag to be used for the image build  (e.g., `v0.4.6.post4-cu124`).
 
-Set the default project:
+<a name="connect-cluster"></a>
+### 3.3. Connect to your GKE Cluster
 
-  ```bash
-  gcloud config set project $PROJECT_ID
-  ```
-
-<a name="get-cluster-credentials"></a>
-
-### 3.3. Get Cluster Credentials
-
-From your client, get the credentials for your cluster:
+Fetch credentials for `kubectl` to communicate with your cluster.
 
 ```bash
 gcloud container clusters get-credentials $CLUSTER_NAME --region $CLUSTER_REGION
 ```
 
-<a name="get-huggingface-token"></a>
-
-### 3.4. Get Hugging Face Token
+<a name="get-hf-token"></a>
+### 3.4. Get Hugging Face token
 
 To access models through Hugging Face, you'll need a Hugging Face token.
   1.  Create a [Hugging Face account](https://huggingface.co/) if you don't have one.
@@ -152,86 +186,85 @@ To access models through Hugging Face, you'll need a Hugging Face token.
   6.  Select **Generate a token**.
   7.  Copy the generated token to your clipboard. You'll use this later.
 
-<a name="create-hugging-face-kubernetes-secret"></a>
 
+<a name="setup-hf-secret"></a>
 ### 3.5. Create Hugging Face Kubernetes Secret
 
 Create a Kubernetes Secret with your Hugging Face token to enable the job to download model checkpoints from Hugging Face.
 
 ```bash
-export HF_TOKEN=<YOUR_HUGGINGFACE_TOKEN> # Paste your token here
-```
+# Paste your Hugging Face token here
+export HF_TOKEN=<YOUR_HUGGINGFACE_TOKEN>
 
-```bash
 kubectl create secret generic hf-secret \
 --from-literal=hf_api_token=${HF_TOKEN} \
 --dry-run=client -o yaml | kubectl apply -f -
 ```
 
-<a name="build-and-push-sglang-docker-image"></a>
+<a name="build-image"></a>
+### 3.6. Build the SGLang Serving Image
 
-### 3.6. Build and Push SGLang Docker Image to the Artifact Registry
+This step uses Cloud Build to create a custom Docker image with SGLang and push it to your Artifact Registry repository.
 
-To build the container, complete the following steps from your client:
+> [!NOTE]
+> This build process can take **up to 30 minutes** as it compiles and installs several dependencies.
 
-1.  Navigate to the SGLang docker source directory:
-    ```bash
-    cd $REPO_ROOT/src/docker/sglang
-    ```
+```bash
+cd $REPO_ROOT/src/docker/sglang
+gcloud builds submit --region=${REGION} \
+    --config cloudbuild.yml \
+    --substitutions _ARTIFACT_REGISTRY=$ARTIFACT_REGISTRY,_SGLANG_IMAGE=$SGLANG_IMAGE,_SGLANG_VERSION=$SGLANG_VERSION \
+    --timeout "2h" \
+    --machine-type=e2-highcpu-32 \
+    --disk-size=1000 \
+    --quiet \
+    --async
+```
 
-2.  Use Cloud Build to build and push the SGLang image to the Artifact Registry repository. Ensure `SGLANG_VERSION` is set (see [Configure Environment Settings](#configure-environment-settings)).
+Optionally, you can monitor the build progress by streaming its logs. Replace `<BUILD_ID>` with the ID from the previous command's output.
 
-    Run the following command:
+```bash
+BUILD_ID=<BUILD_ID>
+gcloud builds log $BUILD_ID --stream --region=$REGION
+```
 
-    ```bash
-    gcloud builds submit --region=${REGION} \
-        --config cloudbuild.yml \
-        --substitutions _ARTIFACT_REGISTRY=$ARTIFACT_REGISTRY,_SGLANG_IMAGE=$SGLANG_IMAGE,_SGLANG_VERSION=$SGLANG_VERSION \
-        --timeout "2h" \
-        --machine-type=e2-highcpu-32 \
-        --disk-size=1000 \
-        --quiet \
-        --async
-    ```
+> [!WARNING]
+> You may see `pip's dependency resolver` warnings in the build logs. These are generally safe to ignore as long as the Cloud Build job completes successfully.
 
-    This command outputs the `build ID`.
-
-3.  (Optional) You can monitor the build progress by streaming the logs for the `build ID`. Replace `<BUILD_ID>` with your build ID.
-
-    ```bash
-    BUILD_ID=<BUILD_ID>
-    gcloud builds log $BUILD_ID --stream --region=$REGION
-    ```
-
-You are now ready to run the recipe and deploy the model.
+**You have now completed the environment setup!** You are ready to deploy a model.
 
 <a name="run-the-recipe"></a>
-
-## 4. Run the recipe
+## 4. Run the Recipe
 
 [Back to Top](#table-of-contents)
 
-The following sections detail how to deploy and interact with models.
+This recipe supports the deployment of the following models:
 
-<a name="serving-deepseek-r1-671b-model"></a>
+1.  [DeepSeek R1 671B](#serving-deepseek)
+2.  [Llama 4 Maverick & Scout](#serving-llama4)
 
-### 4.1. Serving DeepSeek R1 671B Model
+Now, select a model to deploy. Each section below is self-contained for deploying a specific model.
+
+> [!NOTE]
+> After running the recipe with `helm install`, it can take **up to 30 minutes** for the deployment to become fully available. This is because the GKE node must first pull the Docker image and then download the model weights from Hugging Face.
+
+<a name="serving-deepseek"></a>
+### 4.1. Serving DeepSeek R1 671B
 
 [Back to Top](#table-of-contents)
 
 This recipe serves the [DeepSeek R1 671B model](https://huggingface.co/deepseek-ai/DeepSeek-R1) using SGLang framework on a single A3 Ultra node in native FP8 mode.
 
-Upon launching the SGLang server, the server performs the following steps:
+Upon launching the SGLang server, it performs the following steps:
 
 1.  Downloads the full DeepSeek R1 671B model checkpoints from Hugging Face.
 2.  Loads the model checkpoints and applies SGLang optimizations.
 3.  Server is ready to respond to requests.
 
 <a name="deploy-deepseek-r1-671b"></a>
-
 #### 4.1.1. Deploy DeepSeek R1 671B
 
-1.  Install the helm chart to prepare and serve the model using SGLang framework:
+1.  **Install the helm chart to prepare and serve the model using SGLang framework:**
 
     ```bash
     cd $RECIPE_ROOT
@@ -247,17 +280,25 @@ Upon launching the SGLang server, the server performs the following steps:
     $REPO_ROOT/src/helm-charts/a3ultra/inference-templates/deployment
     ```
 
-    The deployment will be named `$USER-serving-deepseek-r1-model-serving` and the service `$USER-serving-deepseek-r1-model-svc`.
+    This creates a Helm release and a Deployment named `$USER-serving-deepseek-r1-model`, and a Service named `$USER-serving-deepseek-r1-model-svc`.
 
-To view the deployment logs and verify the deployment status, navigate to [Monitoring Deployment](#monitoring-deployment).
+2.  **Check the deployment status.**
+
+    ```bash
+    kubectl get deployment/$USER-serving-deepseek-r1-model
+    ```
+
+    Wait until the `READY` column shows `1/1`. See the [Monitoring and Troubleshooting](#monitoring) section to view the deployment logs.
+
+  > [!NOTE]
+  > This deployment process can vary as it downloads the model weights from Hugging Face and then the server loads the model weights. Estimated time around 30 min.
 
 <a name="interact-with-deepseek-r1-671b"></a>
-
 #### 4.1.2. Interact with DeepSeek R1 671B model
 
-1.  **Make API requests:**
+1.  **Make an API request:**
 
-    You can make an API request to send a chat message to the deployed DeepSeek R1 671B model and receive a JSON response from the model.
+    Send a chat message and receive a JSON response from the model:
 
     ```bash
     kubectl exec -it deployment/$USER-serving-deepseek-r1-model -- \
@@ -282,46 +323,43 @@ To view the deployment logs and verify the deployment status, navigate to [Monit
     ```
     You should receive a JSON response from the model.
 
-2.  **Stream chat responses:**
+2.  **Stream a chat response:**
 
-    To send messages and receive streaming text responses from the deployed DeepSeek R1 671B model:
-
-    Open a new terminal session and establish a port-forwarding connection to the model's service to allow your local machine to communicate with the model server:
+    First, open a new terminal session and forward a local port to the service to allow your local machine to communicate with the model server:
 
     ```bash
     kubectl port-forward svc/$USER-serving-deepseek-r1-model-svc 8000:8000
     ```
 
-    Open a separate, second terminal session. In this new session, run the `stream_chat.sh` utility script:
+    In a separate terminal, run the `stream_chat.sh` utility script:
 
     ```bash
     $RECIPE_ROOT/stream_chat.sh "Which is bigger 9.9 or 9.11 ?"
     ```
 
 <a name="benchmark-deepseek-r1-671b"></a>
-
 #### 4.1.3. Benchmark DeepSeek R1 671B
 
-To run inference benchmarks, run the [benchmarking tool from SGLang](https://docs.sglang.ai/references/benchmark_and_profiling.html) directly within the running deployment:
+1.  Run the [SGLang benchmarking tool](https://docs.sglang.ai/references/benchmark_and_profiling.html) directly inside the running deployment:
 
-```bash
-kubectl exec -it deployment/$USER-serving-deepseek-r1-model -- /bin/sh -c \
-'mkdir -p /gcs/benchmark_logs/sglang && python3 -m sglang.bench_serving \
-  --backend sglang \
-  --dataset-name random \
-  --random-range-ratio 1 \
-  --num-prompt 1100 \
-  --random-input 1000 \
-  --random-output 1000 \
-  --host 0.0.0.0 \
-  --port 8000 \
-  --output-file /gcs/benchmark_logs/sglang/ds_1000_1000_1100_output.jsonl'
-```
+    ```bash
+    kubectl exec -it deployment/$USER-serving-deepseek-r1-model -- /bin/sh -c \
+    'mkdir -p /gcs/benchmark_logs/sglang && python3 -m sglang.bench_serving \
+      --backend sglang \
+      --dataset-name random \
+      --random-range-ratio 1 \
+      --num-prompt 1100 \
+      --random-input 1000 \
+      --random-output 1000 \
+      --host 0.0.0.0 \
+      --port 8000 \
+      --output-file /gcs/benchmark_logs/sglang/ds_1000_1000_1100_output.jsonl'
+    ```
 
-Benchmark results are displayed in the logs.
+    Benchmark results are displayed in the logs.
 
-<a name="serving-llama-4-models"></a>
 
+<a name="serving-llama4"></a>
 ### 4.2. Serving Llama 4 Models
 
 [Back to Top](#table-of-contents)
@@ -329,71 +367,81 @@ Benchmark results are displayed in the logs.
 This recipe serves various Llama 4 models using SGLang framework on a single A3 Ultra node in full precision (BF16).
 
 <a name="compatible-llama-4-models"></a>
-
 #### 4.2.1. Compatible Llama 4 Models
 
 Llama 4 models are offered in various sizes and precision. This recipe is compatible with:
 
-| Model Name                                                                                       | Total Size | Precision | Context Length |
-| :----------------------------------------------------------------------------------------------- | :--------- | :-------- | :------------- |
-| [Llama-4-Scout-17B-16E](https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E)                   | 109B       | BF16      | 3.6M           |
-| [Llama-4-Scout-17B-16E-Instruct](https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct) | 109B       | BF16      | 3.6M           |
-| [Llama-4-Maverick-17B-128E](https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E)           | 400B       | BF16      | 1M             |
-| [Llama-4-Maverick-17B-128E-Instruct](https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct) | 400B       | BF16      | 1M             |
+| Model Name | Total Size | Precision | Context Length |
+| :--- | :--- | :--- | :--- |
+| [Llama-4-Scout-17B-16E](https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E) | 109B | BF16 | 3.6M |
+| [Llama-4-Scout-17B-16E-Instruct](https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct) | 109B | BF16 | 3.6M |
+| [Llama-4-Maverick-17B-128E](https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E) | 400B | BF16 | 1M |
+| [Llama-4-Maverick-17B-128E-Instruct](https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct) | 400B | BF16 | 1M |
 
-***Note:*** Llama 4 models are gated. Ensure you have access on Hugging Face.
+> [!NOTE]
+> Llama 4 models are gated. Ensure you have requested and been granted access on Hugging Face.
 
 <a name="deploy-llama-4-models"></a>
-
 #### 4.2.2. Deploy Llama 4 Models
 
-1.  Install the helm chart to serve the desired Llama 4 model using SGLang framework:
+1.  **Install the helm chart to prepare and serve the model using SGLang framework (choose one):**
 
-    a.  To serve `Llama-4-Scout-17B-16E` or `Llama-4-Scout-17B-16E-Instruct` (3.6M context):
+    - To serve `Llama-4-Scout-17B-16E` or `Llama-4-Scout-17B-16E-Instruct` (3.6M context):
 
-      ```bash
-      cd $RECIPE_ROOT
-      helm install -f values.yaml \
-      --set-file workload_launcher=$REPO_ROOT/src/launchers/sglang-launcher.sh \
-      --set-file serving_config=$REPO_ROOT/src/frameworks/a3ultra/sglang-configs/llama4-scout.yaml \
-      --set queue=${KUEUE_NAME} \
-      --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
-      --set workload.model.name=meta-llama/Llama-4-Scout-17B-16E-Instruct \
-      --set workload.image=${ARTIFACT_REGISTRY}/${SGLANG_IMAGE}:${SGLANG_VERSION} \
-      --set workload.framework=sglang \
-      $USER-serving-llama-4-scout-model \
-      $REPO_ROOT/src/helm-charts/a3ultra/inference-templates/deployment
+        ```bash
+        cd $RECIPE_ROOT
+        helm install -f values.yaml \
+        --set-file workload_launcher=$REPO_ROOT/src/launchers/sglang-launcher.sh \
+        --set-file serving_config=$REPO_ROOT/src/frameworks/a3ultra/sglang-configs/llama4-scout.yaml \
+        --set queue=${KUEUE_NAME} \
+        --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+        --set workload.model.name=meta-llama/Llama-4-Scout-17B-16E-Instruct \
+        --set workload.image=${ARTIFACT_REGISTRY}/${SGLANG_IMAGE}:${SGLANG_VERSION} \
+        --set workload.framework=sglang \
+        $USER-serving-llama-4-scout-model \
+        $REPO_ROOT/src/helm-charts/a3ultra/inference-templates/deployment
+        ```
 
-      ```
+    This creates a Helm release and a Deployment named `$USER-serving-llama-4-scout-model`, and a Service named `$USER-serving-llama-4-scout-model-svc`.
 
-    b.  To serve `Llama-4-Maverick-17B-128E` or `Llama-4-Maverick-17B-128E-Instruct` (1M context):
-      ```bash
-      cd $RECIPE_ROOT
-      helm install -f values.yaml \
-      --set-file workload_launcher=$REPO_ROOT/src/launchers/sglang-launcher.sh \
-      --set-file serving_config=$REPO_ROOT/src/frameworks/a3ultra/sglang-configs/llama4-maverick.yaml \
-      --set queue=${KUEUE_NAME} \
-      --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
-      --set workload.model.name=meta-llama/Llama-4-Maverick-17B-128E-Instruct \
-      --set workload.image=${ARTIFACT_REGISTRY}/${SGLANG_IMAGE}:${SGLANG_VERSION} \
-      --set workload.framework=sglang \
-      $USER-serving-llama-4-maverick-model \
-      $REPO_ROOT/src/helm-charts/a3ultra/inference-templates/deployment
-      ```
+    - To serve `Llama-4-Maverick-17B-128E` or `Llama-4-Maverick-17B-128E-Instruct` (1M context):
 
-    The deployment will be named like `$USER-serving-llama-4-scout-serving` and service as `$USER-serving-llama-4-scout-svc` depending on which model you deployed.
+        ```bash
+        cd $RECIPE_ROOT
+        helm install -f values.yaml \
+        --set-file workload_launcher=$REPO_ROOT/src/launchers/sglang-launcher.sh \
+        --set-file serving_config=$REPO_ROOT/src/frameworks/a3ultra/sglang-configs/llama4-maverick.yaml \
+        --set queue=${KUEUE_NAME} \
+        --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+        --set workload.model.name=meta-llama/Llama-4-Maverick-17B-128E-Instruct \
+        --set workload.image=${ARTIFACT_REGISTRY}/${SGLANG_IMAGE}:${SGLANG_VERSION} \
+        --set workload.framework=sglang \
+        $USER-serving-llama-4-maverick-model \
+        $REPO_ROOT/src/helm-charts/a3ultra/inference-templates/deployment
+        ```
 
-To view the deployment logs and verify the deployment status, navigate to [Monitoring Deployment](#monitoring-deployment).
+    This creates a Helm release and a Deployment named `$USER-serving-llama-4-maverick-model`, and a Service named `$USER-serving-llama-4-maverick-model-svc`.
+
+  > [!NOTE]
+  > This deployment process can vary as it downloads the model weights from Hugging Face and then the server loads the model weights. Estimated time around 30 min.
+
+2.  **Check the status of your deployment.**
+
+    Change deployment name depending on the Llama 4 model variant deployed. For example, for `Llama-4-Scout-17B-16E-Instruct`, run:
+
+    ```bash
+    kubectl get deployment/$USER-serving-llama-4-scout-model
+    ```
+
+    Wait until the `READY` column shows `1/1`. See the [Monitoring and Troubleshooting](#monitoring) section to view the deployment logs.
+
 
 <a name="interact-with-llama-4-models"></a>
-
 #### 4.2.3. Interact with Llama 4 Models
 
-1.  **Make API requests:**
+1.  **Make an API request:**
 
-    You can make an API request to send a chat message to the deployed model and receive a JSON response from the model.
-
-    Here is the example for `Llama-4-Scout-17B-16E-Instruct` (assuming deployed as `$USER-serving-llama-4-scout`):
+    Send a chat message and receive a JSON response from the model. Here's the example for `Llama-4-Scout-17B-16E-Instruct` (assuming deployed as `$USER-serving-llama-4-scout`):
 
     ```bash
     kubectl exec -it deployment/$USER-serving-llama-4-scout-model -- \
@@ -417,19 +465,17 @@ To view the deployment logs and verify the deployment status, navigate to [Monit
     }'
     ```
 
-    To get a response from a different Llama 4 variant deployed, you can change the `"model"` field in the JSON payload.
+    To get response from a different Llama 4 variant deployed, you can change the `"model"` field in the JSON payload.
 
-2.  **Stream chat responses:**
+2.  **Stream a chat response:**
 
-    To send messages and receive streaming text responses from the deployed Llama4 model variant, for example Llama 4 Scout Instruct:
-
-    Open a new terminal session and establish a port-forwarding connection to the model's service to allow your local machine to communicate with the model server:
+    First, open a new terminal session and forward a local port to the service to allow your local machine to communicate with the model server. For example, for `Llama-4-Scout-17B-16E-Instruct`, run:
 
     ```bash
     kubectl port-forward svc/$USER-serving-llama-4-scout-model-svc 8000:8000
     ```
 
-    Open a separate, second terminal session. In this new session, run the `stream_chat.sh` utility script. Provide the model name as the second argument.
+    In a separate terminal, run the `stream_chat.sh` utility script with the model name as the second argument:
 
     ```bash
     $RECIPE_ROOT/stream_chat.sh "what is the meaning of life ?" "meta-llama/Llama-4-Scout-17B-16E-Instruct"
@@ -439,39 +485,54 @@ To view the deployment logs and verify the deployment status, navigate to [Monit
 
 #### 4.2.4. Benchmark Llama 4 Models
 
-To run inference benchmarks, run the [benchmarking tool from SGLang](https://docs.sglang.ai/references/benchmark_and_profiling.html) directly within the running deployment.
-For example, to run benchmarks for the model `Llama-4-Scout-17B-16E-Instruct` with deployment `$USER-serving-llama-4-scout-serving`:
+1.  Run the [SGLang benchmarking tool](https://docs.sglang.ai/references/benchmark_and_profiling.html) directly inside the running deployment. For example, to run benchmarks for the model `Llama-4-Scout-17B-16E-Instruct` with deployment `$USER-serving-llama-4-scout-serving`:
 
-```bash
-kubectl exec -it deployment/$USER-serving-llama-4-scout-model -- /bin/sh -c \
-'mkdir -p /gcs/benchmark_logs/sglang && python3 -m sglang.bench_serving \
-  --backend sglang \
-  --dataset-name random \
-  --random-range-ratio 1 \
-  --num-prompt 1100 \
-  --random-input 1000 \
-  --random-output 1000 \
-  --host 0.0.0.0 \
-  --port 8000 \
-  --output-file /gcs/benchmark_logs/sglang/llama4_1000_1000_1100_output.jsonl'
-```
+    ```bash
+    kubectl exec -it deployment/$USER-serving-llama-4-scout-model -- /bin/sh -c \
+    'mkdir -p /gcs/benchmark_logs/sglang && python3 -m sglang.bench_serving \
+      --backend sglang \
+      --dataset-name random \
+      --random-range-ratio 1 \
+      --num-prompt 1100 \
+      --random-input 1000 \
+      --random-output 1000 \
+      --host 0.0.0.0 \
+      --port 8000 \
+      --output-file /gcs/benchmark_logs/sglang/llama4_1000_1000_1100_output.jsonl'
+    ```
 
-Benchmark results are displayed in the logs.
+    Benchmark results are displayed in the logs.
 
-<a name="monitoring-deployment"></a>
-
-## 5. Monitoring Deployment
+<a name="monitoring"></a>
+## 5. Monitoring and Troubleshooting
 
 [Back to Top](#table-of-contents)
 
-After the model is deployed via Helm as described in the sections [above](#run-the-recipe), use the following steps to monitor the deployment and interact with the model. Replace `<deployment-name>` and `<service-name>` with the appropriate names from the model-specific deployment instructions (e.g., `$USER-serving-deepseek-r1-model-serving` and `$USER-serving-deepseek-r1-model-svc`).
+After the model is deployed via Helm as described in the sections [above](#run-the-recipe), use the following steps to monitor the deployment and interact with the model. Replace `<deployment-name>` and `<service-name>` with the appropriate names from the model-specific deployment instructions (e.g., `$USER-serving-deepseek-r1-model` and `$USER-serving-deepseek-r1-model-svc`).
 
-<a name="view-deployment-logs"></a>
 
-### 5.1. View Deployment Logs
+<a name="check-status"></a>
+### 5.1. Check Deployment Status
+
+Check the status of your deployment. Replace the name if you deployed a different model.
 
 ```bash
-kubectl logs -f deployment/<deployment-name>
+# Example for DeepSeek
+kubectl get deployment/$USER-serving-deepseek-r1-model
+```
+
+Wait until the `READY` column shows `1/1`. If it shows `0/1`, the pod is still starting up.
+
+> [!NOTE]
+> In the GKE UI on Cloud Console, you might see a status of "Does not have minimum availability" during startup. This is normal and will resolve once the pod is ready.
+
+<a name="view-logs"></a>
+### 5.2. View Logs
+
+To see the logs from the SGLang server (useful for debugging), use the `-f` flag to follow the log stream:
+
+```bash
+kubectl logs -f deployment/$USER-serving-deepseek-r1-model
 ```
 
 You should see logs indicating SGLang server downloading/loading the model, and then starting the API server, similar to this:
@@ -489,32 +550,41 @@ You should see logs indicating SGLang server downloading/loading the model, and 
 [2025-01-31 11:43:10] The server is fired up and ready to roll!
 ```
 
-<a name="verify-deployment-status"></a>
+<a name="troubleshooting"></a>
+### 5.3. Common Issues
 
-### 5.2. Verify Deployment Status
+* **Error: `Connection refused` when using `port-forward`**
 
-```bash
-kubectl get deployment/<deployment-name>
-```
+    If you are trying to stream responses using `kubectl port-forward` and get a connection error, check the following:
 
-Check if the deployment `READY` column shows `1/1`.
+    1.  **Is the deployment ready?** Run `kubectl get deployment` and ensure the `READY` column is `1/1`.
+    2.  **Is the port-forward command running?** The command must remain active in its own terminal while you make requests.
+    3.  **Check Pod Logs:** Use `kubectl logs -f ...` to check for any error messages.
+    4.  **Try again:** Sometimes transient network issues can cause this. Stop the `port-forward` command (`Ctrl+C`) and run it again.
+
+* **Error: `denied: requested access to the resource is denied` during Cloud Build**
+
+    This almost always means the `ARTIFACT_REGISTRY` environment variable is incorrect. It **must** be the full path: `<location>-docker.pkg.dev/<project-id>/<repository-name>`.
+
+* **Error: `deployments.apps "..." not found`**
+
+    This indicates a typo in the deployment name. Use `helm list` to see the correct release names or `kubectl get deployments` to see all available deployment names.
 
 <a name="cleanup"></a>
-
 ## 6. Cleanup
 
-[Back to Top](#table-of-contents)
+To avoid incurring further charges, clean up the resources you created.
 
-To clean up the resources created by the recipe:
+1.  **Uninstall the Helm Release:**
 
-1. **List deployed models** in the cluster:
+    First, list your releases to get the deployed models:
 
     ```bash
     # list deployed models
-    helm list $USER-serving-
+    helm list --filter $USER-serving-
     ```
 
-2.  **Uninstall the helm charts** for any deployed models:
+    Then, uninstall the desired release:
 
     ```bash
     # uninstall the deployed model
