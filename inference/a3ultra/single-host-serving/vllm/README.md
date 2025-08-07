@@ -19,6 +19,7 @@ This guide walks you through setting up the necessary cloud infrastructure, conf
 * [4. Run the Recipe](#run-the-recipe)
   * [4.1. Serving DeepSeek R1 671B](#serving-deepseek)
   * [4.2. Serving Llama 4 Models](#serving-llama4)
+  * [4.3. Serving GPT OSS 120B](#serving-gpt-oss)
 * [5. Monitoring and Troubleshooting](#monitoring)
   * [5.1. Check Deployment Status](#check-status)
   * [5.2. View Logs](#view-logs)
@@ -162,7 +163,7 @@ Replace the following values:
 | `ARTIFACT_REGISTRY` | Full path to your Artifact Registry repository. | `us-central1-docker.pkg.dev/gcp-project-12345/my-repo` |
 | `GCS_BUCKET` | Name of your GCS bucket (do not include `gs://`). | `my-benchmark-logs-bucket` |
 | `VLLM_IMAGE` | The name for the Docker image to be built. | `vllm-openai` |
-| `VLLM_VERSION` | The tag/version for the Docker image. | `v0.9.1` |
+| `VLLM_VERSION` | The tag/version for the Docker image. Set to `gptoss` for GPT OSS models | `v0.9.1` |
 
 
 <a name="connect-cluster"></a>
@@ -242,6 +243,7 @@ This recipe supports the deployment of the following models:
 
 1.  [DeepSeek R1 671B](#serving-deepseek)
 2.  [Llama 4 Maverick & Scout](#serving-llama4)
+3.  [GPT OSS 120B](#serving-gpt-oss)
 
 Now, select a model to deploy. Each section below is self-contained for deploying a specific model.
 
@@ -498,6 +500,114 @@ Llama 4 models are offered in various sizes and precision. This recipe is compat
       --port 8000 \
       --backend vllm'
     ```
+
+    Benchmark results are displayed in the logs.
+
+<a name="serving-gpt-oss"></a>
+### 4.3. Serving GPT OSS 120B
+
+[Back to Top](#table-of-contents)
+
+This recipe serves the [GPT OSS 120B model](https://huggingface.co/openai/gpt-oss-120b) using vLLM framework on a single A3 Ultra node in native MXFP4 mode.
+
+Upon launching the vLLM server, it performs the following steps:
+
+1.  Downloads the full GPT OSS 120B model checkpoints from Hugging Face.
+2.  Loads the model checkpoints and applies vLLM optimizations.
+3.  Server is ready to respond to requests.
+
+<a name="deploy-gpt-oss-120b"></a>
+#### 4.3.1. Deploy GPT OSS 120B
+
+1.  **Install the helm chart to prepare and serve the model using vLLM framework:**
+
+    ```bash
+    cd $RECIPE_ROOT
+    /usr/local/bin/helm/helm install -f values.yaml \
+    --set-file workload_launcher=$REPO_ROOT/src/launchers/vllm-launcher.sh \
+    --set-file serving_config=$REPO_ROOT/src/frameworks/a3ultra/vllm-configs/gpt-oss-120b.yaml \
+    --set queue=${KUEUE_NAME} \
+    --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+    --set workload.model.name=openai/gpt-oss-120b \
+    --set workload.image=${ARTIFACT_REGISTRY}/${VLLM_IMAGE}:${VLLM_VERSION} \
+    --set workload.framework=vllm \
+    $USER-serving-gpt-oss \
+    $REPO_ROOT/src/helm-charts/a3ultra/inference-templates/deployment
+    ```
+
+    This creates a Helm release and a Deployment named `$USER-serving-gpt-oss`, and a Service named `$USER-serving-gpt-oss-svc`.
+
+2.  **Check the deployment status.**
+
+    ```bash
+    kubectl get deployment/$USER-serving-gpt-oss
+    ```
+
+    Wait until the `READY` column shows `1/1`. See the [Monitoring and Troubleshooting](#monitoring) section to view the deployment logs.
+
+  > [!NOTE]
+  > This deployment process can take **up to 30 minutes** as it downloads the model weights from Hugging Face and then the server loads the model weights.
+
+<a name="interact-with-gpt-oss-120b"></a>
+#### 4.3.2. Interact with GPT OSS 120B model
+
+1.  **Make an API request:**
+
+    Send a chat message and receive a JSON response from the model:
+
+    ```bash
+    kubectl exec -it deployment/$USER-serving-gpt-oss -- \
+    curl http://localhost:8000/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -d '{
+    "messages":[
+        {
+            "role":"system",
+            "content":"You are a helpful AI assistant"
+        },
+        {
+            "role":"user",
+            "content":"Explain what MXFP4 quantization is."
+        }
+    ],
+    "temperature":0.6,
+    "top_p":0.95,
+    "max_tokens":2048
+    }'
+    ```
+    You should receive a JSON response from the model.
+
+2.  **Stream a chat response:**
+
+    First, open a new terminal session and forward a local port to the service to allow your local machine to communicate with the model server:
+
+    ```bash
+    kubectl port-forward svc/$USER-serving-gpt-oss-svc 8000:8000
+    ```
+
+    In a separate terminal, run the `stream_chat.sh` utility script:
+
+    ```bash
+    $RECIPE_ROOT/stream_chat.sh "Which is bigger 9.9 or 9.11 ?" "openai/gpt-oss-120b"
+    ```
+
+<a name="benchmark-gpt-oss-120b"></a>
+#### 4.3.3. Benchmark GPT OSS 120B
+
+1.  Run the [vLLM benchmarking tool](https://docs.vllm.ai/references/benchmark_and_profiling.html) directly inside the running deployment:
+
+      ```bash
+      kubectl exec -it deployment/$USER-serving-gpt-oss -- /bin/sh -c \
+      'mkdir -p /gcs/benchmark_logs/vllm && python3 /workspace/vllm/benchmarks/benchmark_serving.py \
+        --model openai/gpt-oss-120b \
+        --dataset-name random \
+        --ignore-eos \
+        --num-prompts 1 \
+        --random-input-len 1000 \
+        --random-output-len 1000 \
+        --port 8000 \
+        --backend vllm'
+      ```
 
     Benchmark results are displayed in the logs.
 

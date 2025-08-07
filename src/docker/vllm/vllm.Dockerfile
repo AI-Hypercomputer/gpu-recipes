@@ -26,8 +26,9 @@ COPY requirements.txt /workspace/requirements.txt
 RUN pip install --no-cache-dir --require-hashes -r requirements.txt
 
 RUN echo "Cloning vLLM version: ${VLLM_VERSION}" && \
-    git clone -b ${VLLM_VERSION} https://github.com/vllm-project/vllm.git && \
+    git clone https://github.com/vllm-project/vllm.git && \
     cd vllm && \
+    (git checkout "$VLLM_VERSION" 2>/dev/null || true) && \
     mv vllm vllm_1
 
 ENTRYPOINT [ "/bin/bash" ]
