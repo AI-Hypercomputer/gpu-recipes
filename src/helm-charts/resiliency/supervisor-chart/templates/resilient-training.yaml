@@ -181,8 +181,29 @@ spec:
       - name: host-daemon
         image: {{ $.Values.host_daemon.image }}
         command:
-          - "python3"
-          - {{ $.Values.host_daemon.command }}
+        - bash
+        - "-c"
+        - |
+          CMD="exec python3 {{ $.Values.host_daemon.command }}"
+          CMD="$CMD --workers_per_host="{{ $.Values.workers_per_host }}" \
+          --port="{{ $.Values.host_daemon.port }}" \
+          --project="{{ $.Values.project }}" \
+          {{- range $.Values.watchdogs }}
+          --watchdogs={{ . }} \
+          {{- end }}
+          --watchdog_interval_s="{{ $.Values.watchdog_interval_s }}" \
+          --watchdog_notification_cooldown_s="{{ $.Values.watchdog_notification_cooldown_s }}""
+
+          {{ if $.Values.enable_standalone_mode }}
+          CMD="$CMD --enable_standalone_mode"
+          {{ end }}
+          {{ if $.Values.enable_topology_aware_scheduling }}
+          CMD="$CMD --enable_topology_aware_scheduling"
+          {{ end }}
+
+          eval echo "Launching command: $CMD"
+          eval "$CMD"
+
         imagePullPolicy: Always
         securityContext:
           privileged: true
@@ -234,3 +255,4 @@ data:
   FAULT_INJECTION_PERIOD_S: "{{ .Values.fault_injection_period_s }}"
   GLOG_logtostderr: "{{ .Values.log_to_stderr }}"
   GLOG_v: "{{ .Values.verbosity }}"
+  WORKLOAD_NAMESPACE: "{{ .Values.workload_namespace }}"

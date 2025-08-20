@@ -29,7 +29,6 @@ from nemo.collections import llm
 from nemo.collections.common.tokenizers import SentencePieceTokenizer
 from nemo.collections.llm.gpt.data.mock import MockDataModule
 from nemo.collections.llm.recipes.llama31_405b import model as llama_model
-
 from nemo.lightning.pytorch.callbacks import GarbageCollectionCallback
 from nemo.lightning.pytorch.callbacks.megatron_comm_overlap import MegatronCommOverlapCallback
 from nemo.lightning.pytorch.optim.megatron import MegatronOptimizerModule
@@ -40,8 +39,10 @@ from nvidia_resiliency_ext.ptl_resiliency.fault_tolerance_callback import Simula
 from resiliency.callbacks import model_checkpoint
 from resiliency.callbacks.logging import StepLoggingCallback, TPSLoggingCallback
 from resiliency.connectors import checkpoint_connector
+from resiliency.plugins.combined_functionality import CombinedCheckpointIO
 from resiliency.plugins.min_ckpt_overhead import MinCkptOverheadCheckpointIO
 from resiliency.plugins.persistent_ckpt_proc import PersistentCheckpointProcessIO
+from resiliency.plugins.replication_utils import ReplicatedOptimizerMegatronStrategy
 from resiliency.utils import get_resiliency_logger
 import torch
 
@@ -128,16 +129,30 @@ def get_parser():
       default="test_job",
   )
   parser.add_argument(
-      "--topk-ckpt",
+      "--local-ckpt-interval",
       type=int,
-      default=10,
-      help="Number of top checkpoints to keep.",
+      default=-1,
+      help="Checkpoint saving to local storage interval in steps.",
   )
   parser.add_argument(
-      "--checkpoint-interval",
+      "--persistent-ckpt-interval",
       type=int,
-      default=1000,
-      help="Number of steps to save a checkpoint.",
+      default=-1,
+      help="Checkpoint saving to persistent storage interval in steps.",
+  )
+  parser.add_argument(
+      "--local-ckpt-dir",
+      type=str,
+      help="Local checkpoint dir.",
+      required=False,
+      default=None,
+  )
+  parser.add_argument(
+      "--persistent-ckpt-dir",
+      type=str,
+      help="Checkpoint dir.",
+      required=False,
+      default=None,
   )
   parser.add_argument(
       "--ckpt-threads-per-rank",
@@ -221,21 +236,38 @@ def main():
   assert gbs > 0
 
   mix_model = fdl.build(model_config)
-  strategy = nl.MegatronStrategy(
-      tensor_model_parallel_size=8,
-      pipeline_model_parallel_size=18,
-      pipeline_dtype=torch.bfloat16,
-      virtual_pipeline_model_parallel_size=7,
-      context_parallel_size=1,
-      sequence_parallel=True,
-      gradient_as_bucket_view=True,
-      ckpt_async_save=args.enable_async_ckpt
-      or args.enable_optimized_async_ckpt,
-      ckpt_parallel_load=True,
-      ddp=DistributedDataParallelConfig(),
-  )
+  if args.local_ckpt_dir:
+    # Supports replicated distributed optimizer for local ckpt
+    assert args.num_nodes % 18 == 0
+    strategy = ReplicatedOptimizerMegatronStrategy(
+        tensor_model_parallel_size=8,
+        pipeline_model_parallel_size=18,
+        pipeline_dtype=torch.bfloat16,
+        virtual_pipeline_model_parallel_size=7,
+        context_parallel_size=1,
+        sequence_parallel=True,
+        ckpt_async_save=args.enable_async_ckpt
+        or args.enable_optimized_async_ckpt,
+        ckpt_parallel_load=True,
+        ddp=DistributedDataParallelConfig(
+            num_distributed_optimizer_instances=args.num_nodes // 18
+        ),
+    )
+  else:
+    strategy = nl.MegatronStrategy(
+        tensor_model_parallel_size=8,
+        pipeline_model_parallel_size=18,
+        pipeline_dtype=torch.bfloat16,
+        virtual_pipeline_model_parallel_size=7,
+        context_parallel_size=1,
+        sequence_parallel=True,
+        gradient_as_bucket_view=True,
+        ckpt_async_save=args.enable_async_ckpt
+        or args.enable_optimized_async_ckpt,
+        ckpt_parallel_load=True,
+        ddp=DistributedDataParallelConfig(),
+    )
 
-  ckpt_dir = Path(args.ckpt_dir) / args.job_name / "checkpoint"
   log_dir = Path(args.log_dir) / args.job_name
   tb_dir = Path(log_dir) / "tb"
   callbacks = []
@@ -247,23 +279,69 @@ def main():
           tb_dir=tb_dir,
       )
   )
-  checkpoint_callback = model_checkpoint.ModelCheckpoint(
-      dirpath=ckpt_dir,
-      save_last=False,
-      monitor="step",
-      save_top_k=args.topk_ckpt,
-      mode="max",
-      save_weights_only=False,
-      every_n_train_steps=args.checkpoint_interval,
-      save_on_train_epoch_end=True,
-      save_optim_on_train_end=True,
-      always_save_context=False,
-      filename="{step}",
-      enable_version_counter=False,
-      use_in_cluster_local_ckpts=None,
-      enable_high_scale_ckpt=False,
-  )
-  callbacks.append(checkpoint_callback)
+
+  local_ckpt_dir = None
+  persistent_ckpt_dir = None
+  if args.local_ckpt_dir is not None:
+    local_ckpt_dir = Path(args.local_ckpt_dir) / args.job_name / "checkpoint"
+    callbacks.append(
+        model_checkpoint.ModelCheckpoint(
+            dirpath=local_ckpt_dir,
+            save_last=False,
+            monitor="step",
+            # Disable deleting ckpt from training code,
+            # as it take a long time to delete ckpts and block training progress.
+            # ckpt_cleaner will delete old ckpts.
+            save_top_k=-1,
+            mode="max",
+            save_weights_only=False,
+            every_n_train_steps=args.local_ckpt_interval,
+            save_on_train_epoch_end=True,
+            save_optim_on_train_end=True,
+            always_save_context=False,
+            filename="{step}",
+            enable_version_counter=False,
+            use_in_cluster_local_ckpts=True,
+            is_persistent_storage=False,
+            enable_high_scale_ckpt=False,
+            preprocess_files=False if args.persistent_ckpt_dir else True,
+            priority=0,
+            delete_unfinished_ckpt_on_start=True,
+        )
+    )
+
+  if args.persistent_ckpt_dir is not None:
+    persistent_ckpt_dir = (
+        Path(args.persistent_ckpt_dir) / args.job_name / "checkpoint"
+    )
+    callbacks.append(
+        model_checkpoint.ModelCheckpoint(
+            dirpath=persistent_ckpt_dir,
+            save_last=False,
+            monitor="step",
+            # Disable deleting ckpt from training code,
+            # as it take a long time to delete ckpts and block training progress.
+            save_top_k=-1,
+            mode="max",
+            save_weights_only=False,
+            every_n_train_steps=args.persistent_ckpt_interval,
+            save_on_train_epoch_end=True,
+            save_optim_on_train_end=True,
+            always_save_context=False,
+            filename="{step}",
+            enable_version_counter=False,
+            use_in_cluster_local_ckpts=False,
+            is_persistent_storage=True,
+            enable_high_scale_ckpt=False,
+            preprocess_files=True,
+            priority=1,
+            delete_unfinished_ckpt_on_start=True,
+        )
+    )
+
+  # Need to sort callbacks so that priority is respected
+  callbacks.sort(key=lambda cb: getattr(cb, "priority", 100), reverse=True)
+
   if args.enable_fault_tolerance:
     callbacks.append(get_ft_callback(log_dir, args.sim_fault_desc))
   if args.enable_gc:
@@ -283,20 +361,37 @@ def main():
       parallel_load=True,
   )
   if args.enable_optimized_async_ckpt:
-    checkpoint_io = MinCkptOverheadCheckpointIO(
-        save_ckpt_format="torch_dist",
-        load_directly_on_device=True,
-        async_save=args.enable_async_ckpt or args.enable_optimized_async_ckpt,
-        torch_dist_multiproc=args.ckpt_threads_per_rank,
-        assume_constant_structure=True,
-        parallel_save=True,
-        parallel_save_within_dp=False,
-        parallel_load=True,
-    )
+    if args.local_ckpt_dir is not None:
+      checkpoint_io = CombinedCheckpointIO(
+          save_ckpt_format="torch_dist",
+          load_directly_on_device=True,
+          async_save=args.enable_async_ckpt or args.enable_optimized_async_ckpt,
+          torch_dist_multiproc=args.ckpt_threads_per_rank,
+          assume_constant_structure=True,
+          persistent_parallel_save=True,
+          persistent_parallel_save_within_dp=False,
+          persistent_parallel_load=True,
+          local_parallel_save=False,
+          local_parallel_save_within_dp=False,
+          local_parallel_load=False,
+          use_ckpt_load_replication=True,
+          local_ckpt_dir=args.local_ckpt_dir,
+      )
+    else:
+      checkpoint_io = MinCkptOverheadCheckpointIO(
+          save_ckpt_format="torch_dist",
+          load_directly_on_device=True,
+          async_save=args.enable_async_ckpt or args.enable_optimized_async_ckpt,
+          torch_dist_multiproc=args.ckpt_threads_per_rank,
+          assume_constant_structure=True,
+          parallel_save=True,
+          parallel_save_within_dp=False,
+          parallel_load=True,
+      )
     checkpoint_io = PersistentCheckpointProcessIO(checkpoint_io)
-  else:
-    if args.enable_async_ckpt:
-      checkpoint_io = AsyncFinalizableCheckpointIO(checkpoint_io)
+
+  elif args.enable_async_ckpt:
+    checkpoint_io = AsyncFinalizableCheckpointIO(checkpoint_io)
 
   if args.enable_dist_ckpt:
     plugins.append(checkpoint_io)
@@ -320,7 +415,9 @@ def main():
   )
   trainer._checkpoint_connector = checkpoint_connector.CheckpointConnector(
       trainer=trainer,
-      persistent_ckpt_dir=ckpt_dir,
+      local_ckpt_dir=local_ckpt_dir,
+      persistent_ckpt_dir=persistent_ckpt_dir,
+      use_ckpt_load_replication=True,
   )
   data = MockDataModule(
       seq_length=model_config.config.seq_length,
@@ -354,7 +451,6 @@ def main():
           use_datetime_version=False,
           update_logger_directory=True,
           wandb=None,
-          ckpt=checkpoint_callback,
       ),
       resume=None,
       optim=optim,

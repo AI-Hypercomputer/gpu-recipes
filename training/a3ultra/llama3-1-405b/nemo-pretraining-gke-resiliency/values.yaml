@@ -21,6 +21,8 @@ tasSettings:
   topologyRequest:
     kueue.x-k8s.io/podset-preferred-topology: "kubernetes.io/hostname"
 
+terminationGracePeriodSeconds: 3
+
 volumes:
   gcsVolumes: true
   psVolumes: false
@@ -32,30 +34,34 @@ volumes:
     mountOptions: "implicit-dirs"
   pvcMounts:
   - claimName: "gcs-checkpoints-pvc"
-    mountPath: "/checkpoints"
+    mountPath: "/persistent_checkpoints"
+  ssdMountPath: "/local_checkpoints"
+  sharedMemorySize: 600Gi
 
 workload:
   gpus: 432
-  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250605
+  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-2025-08-07
   gcsSidecarImage: gcr.io/gke-release/gcs-fuse-csi-driver-sidecar-mounter@sha256:698fb0a9fe7c19adff792256a478963d1596faf4f7ceb8d516a5c85787c66606
   max_workload_restarts: 20
+  enable_local_ckpt: true
 
   defaultArguments:
   - "--num-nodes=${NNODES}"
   - "--tokenizer-path=tokenizer.model"
   - "--max-runtime=86400"
   - "--log-dir=${LOG_DIR_PREFIX}"
-  - "--ckpt-dir=${CKPT_DIR_PREFIX}"
+  - "--persistent-ckpt-dir=${PERSISTENT_CKPT_DIR_PREFIX}"
+  - "--persistent-ckpt-interval=25"
   - "--job-name=${JOB_IDENTIFIER}"
   - "--max-steps=500"
-  - "--topk-ckpt=-1"
-  - "--checkpoint-interval=20"
   - "--ckpt-threads-per-rank=1"
   - "--enable-dist-ckpt"
   - "--enable-gc"
   - "--enable-async-ckpt"
   - "--enable-fault-tolerance"
   - "--enable-optimized-async-ckpt"
+  - "--local-ckpt-dir=${LOCAL_CKPT_DIR_PREFIX}"
+  - "--local-ckpt-interval=5"
 
   arguments[]:
 
@@ -68,12 +74,14 @@ workload:
     value: "train.py"
   - name: LOG_DIR_PREFIX
     value: "/job-logs/nemo-experiments"
-  - name: CKPT_DIR_PREFIX
-    value: "/checkpoints/nemo-experiments"
+  - name: LOCAL_CKPT_DIR_PREFIX
+    value: "/local_checkpoints/nemo-experiments"
+  - name: PERSISTENT_CKPT_DIR_PREFIX
+    value: "/persistent_checkpoints"
   - name: FT_PARAM_INITIAL_RANK_HEARTBEAT_TIMEOUT
-    value: "1800"
+    value: "720"
   - name: FT_PARAM_RANK_HEARTBEAT_TIMEOUT
-    value: "1800"
+    value: "720" # 240
   - name: HOST_DAEMON_PORT
     value: "60010"
   - name: MAX_IN_JOB_RESTARTS
@@ -84,6 +92,22 @@ workload:
     value: "8"
   - name: GLOO_SOCKET_IFNAME
     value: "eth0"
+  - name: WORKLOAD_NAMESPACE
+    value: "default"
+  - name: MAX_WORKLOAD_RESTARTS
+    value: "0"
+  - name: ENABLE_WORKLOAD_SCALING
+    value: "true"
+  - name: MAX_NUM_DP_REPLICAS
+    value: "3"
+  - name: MIN_NUM_DP_REPLICAS
+    value: "2"
+  - name: NUM_NODES_PER_DP
+    value: "18"
+  - name: CONTAINER_TERMINATION_THRESHOLD_S
+    value: "60"
+  - name: WORKLOAD_DOWNTIME_THRESHOLD_S
+    value: "180"
 
 network:
   hostNetwork: true

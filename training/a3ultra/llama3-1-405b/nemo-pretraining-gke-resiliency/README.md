@@ -90,8 +90,11 @@ To configure all-or-nothing scheduling execute the following commands:
 
 3.  Check the new configuration
 
-    You can check the new configuration by running: `bash kubectl get configmap
-    kueue-manager-config -n kueue-system -o yaml`
+    You can check the new configuration by running:
+
+    ```bash
+    kubectl get configmap kueue-manager-config -n kueue-system -o yaml
+    ```
 
     In the output, you should see the `waitForPodsReady` section updated in the
     `controller_manager_config.yaml` data field, looking like this:
@@ -200,6 +203,7 @@ If the output isn't empty, the cluster role was successfully created.
 ```
 cd $RECIPE_ROOT
 helm install -f values-supervisor.yaml \
+  --set project=${PROJECT_ID} \
   $USER-supervisor \
   $REPO_ROOT/src/helm-charts/resiliency/supervisor-chart
 ```

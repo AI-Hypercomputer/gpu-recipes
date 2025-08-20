@@ -25,6 +25,10 @@ kind: JobSet
 metadata:
   name: "{{ $jobName }}"
   namespace: default
+  {{- if $root.Values.workload.annotations }}
+  annotations:
+    {{- toYaml $root.Values.workload.annotations | nindent 4 }}
+  {{- end }}
   labels:
   {{- if $root.Values.queue }}
     kueue.x-k8s.io/queue-name: "{{ $root.Values.queue }}"
@@ -91,6 +95,7 @@ spec:
             dnsPolicy: ClusterFirstWithHostNet
             {{- end }}
             restartPolicy: Never
+            terminationGracePeriodSeconds: {{ default 30 $root.Values.terminationGracePeriodSeconds }}
             {{ if $root.Values.targetNodes }}
             affinity:
               nodeAffinity:
@@ -130,7 +135,7 @@ spec:
             - name: shared-memory
               emptyDir:
                 medium: "Memory"
-                sizeLimit: 500Gi
+                sizeLimit: {{ $root.Values.volumes.sharedMemorySize | default "500Gi" }}
 
             {{- range $pvc := $root.Values.volumes.pvcMounts }}
             - name: "{{ $pvc.claimName }}"
@@ -156,6 +161,46 @@ spec:
             {{- end }}
 
             initContainers:
+            {{ if and $root.Values.workload.enable_local_ckpt $root.Values.volumes.ssdMountPath}}
+            - command:
+              - bash
+              - -c
+              - |
+                echo ${LOCAL_CKPT_DIR_PREFIX} && echo ${JOB_IDENTIFIER}
+                echo "Listing files on ${LOCAL_CKPT_DIR_PREFIX}:"
+                ls -la ${LOCAL_CKPT_DIR_PREFIX}
+                echo "Listing files on ${PERSISTENT_CKPT_DIR_PREFIX}:"
+                ls -la ${PERSISTENT_CKPT_DIR_PREFIX}
+                python3 resiliency/benchmark/ckpt_cleaner.py \
+                  "--local-ckpt-dir-prefix=${LOCAL_CKPT_DIR_PREFIX}" \
+                  "--persistent-ckpt-dir-prefix=${PERSISTENT_CKPT_DIR_PREFIX}" \
+                  "--job-identifier=${JOB_IDENTIFIER}" \
+                  --num-checkpoints-to-keep=3 \
+                  --sleep-interval=60
+              env:
+              - name: NODE_RANK
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
+              - name: JOB_IDENTIFIER
+                value: "{{ $jobName }}"
+              {{ if $root.Values.workload.envs }}
+              {{- toYaml .Values.workload.envs | nindent 14 }}
+              {{ end }}
+              image: "{{ $root.Values.workload.image }}"
+              imagePullPolicy: Always
+              name: ckpt-cleaner
+              restartPolicy: Always
+              volumeMounts:
+              {{- if $root.Values.volumes.ssdMountPath }}
+                - name: local-ssd
+                  mountPath: "{{ $root.Values.volumes.ssdMountPath }}"
+              {{- end }}
+              {{- range $pvc := $root.Values.volumes.pvcMounts }}
+                - name: "{{ $pvc.claimName }}"
+                  mountPath: "{{ $pvc.mountPath }}"
+              {{- end }}
+            {{ end }}
             {{ if $root.Values.network.gibVersion }}
             - name: nccl-plugin-installer
               image: {{ $root.Values.network.gibVersion }}
