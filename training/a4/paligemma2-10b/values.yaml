@@ -1,0 +1,63 @@
+# Note: The only choice is 'gke' or custom k8s + debian (else condition)
+targetPlatform: "gke"
+tasSettings:
+  useLegacyTAS: false
+  topologyRequest:
+    kueue.x-k8s.io/podset-preferred-topology: "cloud.google.com/gce-topology-block"
+
+volumes:
+  # The VM host path for SSDs is assumed at /mnt/stateful_partition/kube-ephemeral-ssd
+  ssdMountPath: "/ssd"
+    
+  gcsMounts:
+    - bucketName:
+      mountPath: "/data"
+    - bucketName:
+      mountPath: "/job_logs"
+
+workload:
+  torchDistributedTarget: "/app/paligemma.py"
+  gpus: 16 # This should be one of: {<= 8,  multiple of 8}
+  image: us-docker.pkg.dev/supercomputer-testing/paligemma2/finetune-paligemma2-cuda-12-8:1.0.1
+  hfToken:
+
+  numTrainEpochs: "1"
+  perDeviceTrainBatchSize: "1"
+  maxSteps: "50" # -1 to run through the entire dataset
+  modelId: "google/paligemma2-10b-pt-224"
+  dataloaderNumWorkers: "4"
+  gradientAccumulationSteps: "2"
+  learningRate: "1e-4"
+  optim: "adamw_torch"
+
+  datasetName:
+  dataSource:
+  gcsBucketPath:
+
+  experimentRootDir: "/job_logs"
+  experimentName: "a4_10b"
+
+  # Enable Nsight profiling, Austin profiling triggers, and Python debug version.
+  # Note: This is NOT fully implemented yet
+  profilingMode: true
+  profilingRanks: "all" # one of {"none", "one", "all"}
+
+  # If not 'null', launches a Tensorboard server on first node. By design, the job will then not exit on first node.
+  # This is primarly intended for debugging purposes, when a shared file-system or external Tensorboard is unavailable.  
+  embeddedTensorboardTarget: null
+
+network:
+  stack: "gib" # one of {"tcp", "tcpx", "tcpxo", "gib"}
+
+  pluginVersion: "us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:v1.0.5"
+
+  ncclSettings:
+  # Note: If you need to debug, using NCCL_DEBUG=INFO and NCCL_DEBUG_SUBSYS=INIT,NET are a good idea. You can look up other options.
+  - name: NCCL_DEBUG
+    value: "VERSION"
+  - name: NCCL_ALGO
+    value: "Ring,Tree"
+
+  # The following NCCL settings are recommended for TCPxo only (but tunable):
+  - name: NCCL_MIN_NCHANNELS
+    value: "4"
