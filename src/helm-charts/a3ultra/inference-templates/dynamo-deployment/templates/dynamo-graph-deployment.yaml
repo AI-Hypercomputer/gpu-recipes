@@ -1,0 +1,449 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+{{ $nodes := div .Values.workload.gpus 8 | max 1 }}
+{{ $gpusPerNode := min .Values.workload.gpus 8 }}
+{{ $gpusPerWorker := div .Values.workload.gpus 2 }}
+{{ $root := . }}
+
+apiVersion: nvidia.com/v1alpha1
+kind: DynamoGraphDeployment
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Values.dynamo.namespace }}
+spec:
+  {{- if .Values.workload.framework }}
+  backendFramework: {{ .Values.workload.framework }}
+  {{- end }}
+  services:
+    Frontend:
+      dynamoNamespace: {{ .Release.Name }}
+      componentType: frontend
+      replicas: 1
+      resources:
+        requests:
+          cpu: "5"
+          memory: "10Gi"
+        limits:
+          cpu: "5"
+          memory: "10Gi"
+      extraPodSpec:
+        mainContainer:
+          image: {{ .Values.workload.image }}
+          workingDir: /workspace/components/backends/{{ .Values.workload.framework }}
+          command:
+            - /bin/sh
+            - -c
+          args:
+          - |
+            python3 -m dynamo.frontend --http-port 8000
+{{- if eq .Values.workload.framework "vllm" }}
+    VllmDecodeWorker:
+{{- else if eq .Values.workload.framework "sglang" }}
+    SglangDecodeWorker:
+{{- end }}
+      dynamoNamespace: {{ .Release.Name }}
+      envFromSecret: {{ .Values.secrets.huggingface.secretName }}
+      componentType: worker
+      replicas: {{ .Values.workload.replicas | default 1 }}
+      sharedMemory:
+        size: 80Gi
+      resources:
+        requests:
+          gpu: "{{ $gpusPerWorker }}"
+        limits:
+          gpu: "{{ $gpusPerWorker }}"
+      extraPodMetadata:
+        annotations:
+          networking.gke.io/default-interface: 'eth0'
+          networking.gke.io/interfaces: |
+            {{- if .Values.network.subnetworks }}
+            [
+              {{- range $i, $subnetwork := .Values.network.subnetworks }}
+              {"interfaceName":"eth{{ $i }}","network":"{{ $subnetwork }}"}{{ eq $i 9 | ternary "" ","}}
+              {{- end }}
+            ]
+            {{- else }}
+            [
+              {"interfaceName":"eth0","network":"default"},
+              {"interfaceName":"eth1","network":"gvnic-1"},
+              {{- range $i := until 8 }}
+              {"interfaceName":"eth{{ add 2 $i }}","network":"rdma-{{ $i }}"}{{ eq $i 7 | ternary "" ","}}
+              {{- end }}
+            ]
+            {{- end }}
+      envs:
+        - name: DYN_SYSTEM_ENABLED
+          value: "true"
+        - name: DYN_SYSTEM_USE_ENDPOINT_HEALTH_STATUS
+          value: "[\"generate\"]"
+        - name: DYN_SYSTEM_PORT
+          value: "9090"
+        - name: HF_HOME
+          value: {{ .Values.volumes.ssdMountPath }}
+        - name: MODEL_NAME
+          value: {{ .Values.workload.model.name }}
+        - name: NCCL_PLUGIN_PATH
+          value: /usr/local/gib/lib64
+        - name: LD_LIBRARY_PATH
+          value: /usr/local/gib/lib64:/usr/local/nvidia/lib64
+        - name: NIXL_PLUGIN_DIR
+          value: /opt/dynamo/venv/lib/python3.12/site-packages/.nixl.mesonpy.libs/plugins
+        - name: HF_HUB_ENABLE_HF_TRANSFER
+          value: "1"
+        - name: LAUNCHER_SCRIPT
+          value: /workload/launcher/launch-workload.sh
+        - name: SERVER_ARGS_FILE
+          value: /workload/configs/serving-args.yaml
+        {{- if .Values.network.gibVersion }}
+        - name: NCCL_INIT_SCRIPT
+          value: "/usr/local/gib/scripts/set_nccl_env.sh"
+        {{- end }}
+        {{- if .Values.network.ncclSettings }}
+        {{- toYaml .Values.network.ncclSettings | nindent 8 }}
+        {{- end }}
+        {{- if .Values.workload.envs }}
+        {{- toYaml .Values.workload.envs | nindent 8 }}
+        {{- end }}
+      extraPodSpec:
+        {{- if .Values.network.gibVersion }}
+        initContainers:
+        - name: nccl-plugin-installer
+          image: {{ .Values.network.gibVersion }}
+          imagePullPolicy: Always
+          args:
+          - |
+            set -ex
+            /scripts/container_entry.sh install --install-nccl
+            cp -R /var/lib/gib/lib64/. /target/usr/local/gib/lib64
+            cp -R /var/lib/gib/. /target/usr/local/gib
+          command:
+          - /bin/sh
+          - -c
+          volumeMounts:
+          - mountPath: /target/usr/local/gib
+            name: gib
+        {{- end }}
+        {{- if .Values.nodeSelector }}
+        nodeSelector:
+          {{- toYaml .Values.nodeSelector | nindent 10 }}
+        {{- end }}
+        mainContainer:
+          startupProbe:
+            httpGet:
+              path: /live
+              port: system
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 1800
+          image: {{ .Values.workload.image }}
+          workingDir: /workspace/components/backends/{{ .Values.workload.framework }}
+          command:
+            - /bin/bash
+            - -c
+          args:
+          - |
+            #!/bin/bash
+            pip install hf_transfer
+            
+            # Setup NCCL if needed
+            if [[ -n "${NCCL_INIT_SCRIPT}" ]]; then
+              echo "Running NCCL init script: ${NCCL_INIT_SCRIPT}"
+              source ${NCCL_INIT_SCRIPT}
+              env | grep NCCL
+              ldconfig
+            fi
+            
+            {{- if .Values.workload_launcher }}
+            # Use custom launcher if provided
+            if [ ! -f "$LAUNCHER_SCRIPT" ]; then
+              echo "Error: Launcher script $LAUNCHER_SCRIPT not found!"
+              exit 1
+            fi
+            
+            ARGS=()
+            if [ -f "$SERVER_ARGS_FILE" ]; then
+              echo "Loading server arguments from ConfigMap"
+              while IFS=': ' read -r key value || [ -n "$key" ]; do
+                [[ -z "$key" || "$key" == \#* ]] && continue
+                key=$(echo "$key" | xargs)
+                value=$(echo "$value" | xargs)
+                
+                if [ -n "$key" ]; then
+                  if [[ "$value" == "true" ]]; then
+                    ARGS+=("--$key")
+                  elif [[ "$value" == "false" ]]; then
+                    ARGS+=("--$key" "false")
+                  elif [ -n "$value" ]; then
+                    ARGS+=("--$key" "$value")
+                  else
+                    ARGS+=("--$key")
+                  fi
+                fi
+              done < "$SERVER_ARGS_FILE"
+            fi
+
+            echo "Running: $LAUNCHER_SCRIPT ${ARGS[@]}"
+            exec "$LAUNCHER_SCRIPT" "${ARGS[@]}"
+            {{- else }}
+            # Default Dynamo launch
+            python3 -m dynamo.{{ .Values.workload.framework }} --model {{ .Values.workload.model.name }} 2>&1 | tee /tmp/{{ .Values.workload.framework }}.log
+            {{- end }}
+          volumeMounts:
+            - name: library-dir-host
+              mountPath: /usr/local/nvidia
+            - name: gib
+              mountPath: /usr/local/gib
+            {{- if .Values.workload_launcher }}
+            - name: serving-configuration
+              mountPath: {{ .Values.workload.configPath | default "/workload/configs" }}
+            - name: serving-launcher
+              mountPath: /workload/launcher
+            {{- end }}
+            {{- range $gcs := .Values.volumes.gcsMounts }}
+            - name: "{{ $gcs.bucketName }}"
+              mountPath: "{{ $gcs.mountPath }}"
+            {{- end }}
+            {{- if .Values.volumes.ssdMountPath }}
+            - name: local-ssd
+              mountPath: "{{ .Values.volumes.ssdMountPath }}"
+            {{- end }}
+        volumes:
+          - name: library-dir-host
+            hostPath:
+              path: /home/kubernetes/bin/nvidia
+          - name: gib
+            hostPath:
+              path: /home/kubernetes/bin/gib
+          {{- if .Values.workload_launcher }}
+          - name: serving-configuration
+            configMap:
+              name: "{{ .Release.Name }}-config"
+              items:
+              - key: serving-configuration
+                path: {{ .Values.workload.configFile | default "serving-args.yaml" }}
+          - name: serving-launcher
+            configMap:
+              name: "{{ .Release.Name }}-launcher"
+              defaultMode: 0700
+          {{- end }}
+          {{- range $gcs := $root.Values.volumes.gcsMounts }}
+          - name: "{{ $gcs.bucketName }}"
+            mountPath: "{{ $gcs.mountPath }}"
+          {{- end }}
+          {{- if .Values.volumes.ssdMountPath }}
+          - name: local-ssd
+            hostPath:
+              path: /mnt/stateful_partition/kube-ephemeral-ssd
+          {{- end }}
+{{- if eq .Values.workload.framework "vllm" }}
+    VllmPrefillWorker:
+{{- else if eq .Values.workload.framework "sglang" }}
+    SglangPrefillWorker:
+{{- end }}
+      dynamoNamespace: {{ .Release.Name }}
+      envFromSecret: {{ .Values.secrets.huggingface.secretName }}
+      componentType: worker
+      replicas: {{ .Values.workload.replicas | default 1 }}
+      sharedMemory:
+        size: 80Gi
+      resources:
+        requests:
+          gpu: "{{ $gpusPerWorker }}"
+        limits:
+          gpu: "{{ $gpusPerWorker }}"
+      extraPodMetadata:
+        annotations:
+          networking.gke.io/default-interface: 'eth0'
+          networking.gke.io/interfaces: |
+            {{- if .Values.network.subnetworks }}
+            [
+              {{- range $i, $subnetwork := .Values.network.subnetworks }}
+              {"interfaceName":"eth{{ $i }}","network":"{{ $subnetwork }}"}{{ eq $i 9 | ternary "" ","}}
+              {{- end }}
+            ]
+            {{- else }}
+            [
+              {"interfaceName":"eth0","network":"default"},
+              {"interfaceName":"eth1","network":"gvnic-1"},
+              {{- range $i := until 8 }}
+              {"interfaceName":"eth{{ add 2 $i }}","network":"rdma-{{ $i }}"}{{ eq $i 7 | ternary "" ","}}
+              {{- end }}
+            ]
+            {{- end }}
+      envs:
+        - name: DYN_SYSTEM_ENABLED
+          value: "true"
+        - name: DYN_SYSTEM_USE_ENDPOINT_HEALTH_STATUS
+          value: "[\"generate\"]"
+        - name: DYN_SYSTEM_PORT
+          value: "9090"
+        - name: HF_HOME
+          value: {{ .Values.volumes.ssdMountPath }}
+        - name: MODEL_NAME
+          value: {{ .Values.workload.model.name }}
+        - name: NCCL_PLUGIN_PATH
+          value: /usr/local/gib/lib64
+        - name: LD_LIBRARY_PATH
+          value: /usr/local/gib/lib64:/usr/local/nvidia/lib64
+        - name: NIXL_PLUGIN_DIR
+          value: /opt/dynamo/venv/lib/python3.12/site-packages/.nixl.mesonpy.libs/plugins
+        - name: HF_HUB_ENABLE_HF_TRANSFER
+          value: "1"
+        - name: LAUNCHER_SCRIPT
+          value: /workload/launcher/launch-workload.sh
+        - name: SERVER_ARGS_FILE
+          value: /workload/configs/serving-args.yaml
+        {{- if .Values.network.gibVersion }}
+        - name: NCCL_INIT_SCRIPT
+          value: "/usr/local/gib/scripts/set_nccl_env.sh"
+        {{- end }}
+        {{- if .Values.network.ncclSettings }}
+        {{- toYaml .Values.network.ncclSettings | nindent 8 }}
+        {{- end }}
+        {{- if .Values.workload.envs }}
+        {{- toYaml .Values.workload.envs | nindent 8 }}
+        {{- end }}
+      extraPodSpec:
+        {{- if .Values.network.gibVersion }}
+        initContainers:
+        - name: nccl-plugin-installer
+          image: {{ .Values.network.gibVersion }}
+          imagePullPolicy: Always
+          args:
+          - |
+            set -ex
+            /scripts/container_entry.sh install --install-nccl
+            cp -R /var/lib/gib/lib64/. /target/usr/local/gib/lib64
+            cp -R /var/lib/gib/. /target/usr/local/gib
+          command:
+          - /bin/sh
+          - -c
+          volumeMounts:
+          - mountPath: /target/usr/local/gib
+            name: gib
+        {{- end }}
+        {{- if .Values.nodeSelector }}
+        nodeSelector:
+          {{- toYaml .Values.nodeSelector | nindent 10 }}
+        {{- end }}
+        mainContainer:
+          startupProbe:
+            httpGet:
+              path: /live
+              port: system
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 1800
+          image: {{ .Values.workload.image }}
+          workingDir: /workspace/components/backends/{{ .Values.workload.framework }}
+          command:
+            - /bin/bash
+            - -c
+          args: 
+          - |
+            #!/bin/bash
+            pip install hf_transfer
+
+            
+            # Setup NCCL if needed
+            if [[ -n "${NCCL_INIT_SCRIPT}" ]]; then
+              echo "Running NCCL init script: ${NCCL_INIT_SCRIPT}"
+              source ${NCCL_INIT_SCRIPT}
+              env | grep NCCL
+              ldconfig
+            fi
+            
+            {{- if .Values.workload_launcher }}
+            # Use custom launcher if provided
+            if [ ! -f "$LAUNCHER_SCRIPT" ]; then
+              echo "Error: Launcher script $LAUNCHER_SCRIPT not found!"
+              exit 1
+            fi
+            
+            ARGS=("--is-prefill-worker")
+            if [ -f "$SERVER_ARGS_FILE" ]; then
+              echo "Loading server arguments from ConfigMap"
+              while IFS=': ' read -r key value || [ -n "$key" ]; do
+                [[ -z "$key" || "$key" == \#* ]] && continue
+                key=$(echo "$key" | xargs)
+                value=$(echo "$value" | xargs)
+                
+                if [ -n "$key" ]; then
+                  if [[ "$value" == "true" ]]; then
+                    ARGS+=("--$key")
+                  elif [[ "$value" == "false" ]]; then
+                    ARGS+=("--$key" "false")
+                  elif [ -n "$value" ]; then
+                    ARGS+=("--$key" "$value")
+                  else
+                    ARGS+=("--$key")
+                  fi
+                fi
+              done < "$SERVER_ARGS_FILE"
+            fi
+            
+            echo "Running: $LAUNCHER_SCRIPT ${ARGS[@]}"
+            exec "$LAUNCHER_SCRIPT" "${ARGS[@]}"
+            {{- else }}
+            # Default Dynamo launch with prefill flag
+            python3 -m dynamo.{{ .Values.workload.framework }} --model {{ .Values.workload.model.name }} --is-prefill-worker 2>&1 | tee /tmp/{{ .Values.workload.framework }}.log
+            {{- end }}
+          volumeMounts:
+            - name: library-dir-host
+              mountPath: /usr/local/nvidia
+            - name: gib
+              mountPath: /usr/local/gib
+            {{- if .Values.workload_launcher }}
+            - name: serving-configuration
+              mountPath: {{ .Values.workload.configPath | default "/workload/configs" }}
+            - name: serving-launcher
+              mountPath: /workload/launcher
+            {{- end }}
+            {{- range $gcs := .Values.volumes.gcsMounts }}
+            - name: "{{ $gcs.bucketName }}"
+              mountPath: "{{ $gcs.mountPath }}"
+            {{- end }}
+            {{- if .Values.volumes.ssdMountPath }}
+            - name: local-ssd
+              mountPath: "{{ .Values.volumes.ssdMountPath }}"
+            {{- end }}
+        volumes:
+          - name: library-dir-host
+            hostPath:
+              path: /home/kubernetes/bin/nvidia
+          - name: gib
+            hostPath:
+              path: /home/kubernetes/bin/gib
+          {{- if .Values.workload_launcher }}
+          - name: serving-configuration
+            configMap:
+              name: "{{ .Release.Name }}-config"
+              items:
+              - key: serving-configuration
+                path: {{ .Values.workload.configFile | default "serving-args.yaml" }}
+          - name: serving-launcher
+            configMap:
+              name: "{{ .Release.Name }}-launcher"
+              defaultMode: 0700
+          {{- end }}
+          {{- range $gcs := $root.Values.volumes.gcsMounts }}
+          - name: "{{ $gcs.bucketName }}"
+            mountPath: "{{ $gcs.mountPath }}"
+          {{- end }}
+          {{- if .Values.volumes.ssdMountPath }}
+          - name: local-ssd
+            hostPath:
+              path: /mnt/stateful_partition/kube-ephemeral-ssd
+          {{- end }}
