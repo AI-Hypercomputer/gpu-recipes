@@ -2,7 +2,7 @@
 
 This document outlines the steps to deploy and serve Large Language Models (LLMs) using [NVIDIA Dynamo](https://github.com/ai-dynamo/dynamo) disaggregated inference platform on [A3 Ultra GKE Node pools](https://cloud.google.com/kubernetes-engine).
 
-Dynamo provides a disaggregated architecture that separates prefill and decode operations for optimized inference performance, supporting both single-node (8 GPUs) and multi-node (16 GPUs) configurations.
+Dynamo provides a disaggregated architecture that separates prefill and decode operations for optimized inference performance, supporting both single-node (8 GPUs) and multi-node (16 GPUs) configurations. Dynamo also supports various inference framework backends like [vLLM](https://docs.nvidia.com/dynamo/latest/components/backends/vllm/README.html) and [SGLang](https://docs.nvidia.com/dynamo/latest/components/backends/sglang/README.html). In this recipe, we will focus on serving using the vLLM backend. 
 
 <a name="table-of-contents"></a>
 ## Table of Contents
@@ -17,8 +17,7 @@ Dynamo provides a disaggregated architecture that separates prefill and decode o
 * [3. Deploy with vLLM Backend](#deploy-vllm)
   * [3.1. Single-Node vLLM Deployment (8 GPUs)](#vllm-single-node)
   * [3.2. Multi-Node vLLM Deployment (16 GPUs)](#vllm-multi-node)
-* [4. Deploy with SGLang Backend](#deploy-sglang)
-  * [4.1. Single-Node SGLang Deployment (8 GPUs)](#sglang-single-node)
+* [4. Inference Request](#inference-request)
 * [5. Advanced Configuration](#advanced-config)
   * [5.1. Custom Network Configuration](#custom-networks)
 * [6. Monitoring and Troubleshooting](#monitoring)
@@ -167,7 +166,7 @@ Single-node deployment uses 8 GPUs on one A3 Ultra machine, suitable for smaller
 
 #### Llama 3.3 70B Model
 
-Deploy Qwen 0.6B for quick testing and validation:
+Deploy Llama 3.3 70B Instruct model for testing and validation. 
 
 ```bash
 cd $RECIPE_ROOT
@@ -189,13 +188,13 @@ Multi-node deployment uses 16 GPUs across two A3 Ultra machines, providing incre
 
 #### Llama 3.3 70B Model
 
-Deploy Llama 3.3 70B Instruct across multiple nodes for production workloads:
+Deploy Llama 3.3 70B Instruct across multiple nodes for production workloads. Note the use of `--set-file serving_config` pointing to `llama-3.3-70b-multi-node.yaml` and `--set workload.gpus=16` for a multi node deployment scenario: 
 
 ```bash
 cd $RECIPE_ROOT
 helm install -f values.yaml \
   --set-file workload_launcher=$REPO_ROOT/src/launchers/dynamo-vllm-launcher.sh \
-  --set-file serving_config=$REPO_ROOT/src/frameworks/a3ultra/dynamo-configs/llama-3.3-70b.yaml \
+  --set-file serving_config=$REPO_ROOT/src/frameworks/a3ultra/dynamo-configs/llama-3.3-70b-multi-node.yaml \
   --set workload.framework=vllm \
   --set workload.model.name=meta-llama/Llama-3.3-70B-Instruct \
   --set workload.image=nvcr.io/nvidia/ai-dynamo/vllm-runtime:${RELEASE_VERSION} \
@@ -253,7 +252,7 @@ You should see a server status like this. Wait for it to be in a `healthy` state
 ``` 
 
 
-Then we can send a request with some sample data like this
+Then we can send a request with some sample data like this for a single node scenario:
 
 ```bash
 kubectl exec -it -n ${NAMESPACE} deployment/$USER-dynamo-single-node-serving-frontend  -- \
@@ -271,6 +270,8 @@ curl localhost:8000/v1/chat/completions \
     "max_tokens": 30
   }' | jq
 ```
+
+For a multi node scenrio, replace the deployment name with `$USER-dynamo-multi-node-serving-frontend` to send the requests.
 
 <a name="advanced-config"></a>
 ## 5. Advanced Configuration
@@ -295,9 +296,9 @@ To configure the correct networking annotations for a cluster that uses non-defa
 cd $RECIPE_ROOT
 helm install -f values.yaml \
   --set-file workload_launcher=$REPO_ROOT/src/launchers/dynamo-vllm-launcher.sh \
-  --set-file serving_config=$REPO_ROOT/src/frameworks/a3ultra/dynamo-configs/qwen-0.6b.yaml \
+  --set-file serving_config=$REPO_ROOT/src/frameworks/a3ultra/dynamo-configs/llama-3.3-70b-single-node.yaml \
   --set workload.framework=vllm \
-  --set workload.model.name=Qwen/Qwen3-0.6B \
+  --set workload.model.name=meta-llama/Llama-3.3-70B-Instruct \
   --set workload.image=nvcr.io/nvidia/ai-dynamo/vllm-runtime:${RELEASE_VERSION} \
   --set network.subnetworks[0]=default \
   --set network.subnetworks[1]=gvnic-1 \
