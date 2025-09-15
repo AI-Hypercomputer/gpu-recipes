@@ -68,6 +68,13 @@ else
   echo "  ${config_overrides}"
 fi
 
+if [ -z "${ENABLE_WORKLOAD_SCALING}" ]; then
+  echo "No Workload scaling"
+else
+  echo "Workload Scaling enabled"
+  ENABLE_WORKLOAD_SCALING="--enable-workload-scaling"
+fi
+
 export LD_LIBRARY_PATH="$NCCL_PLUGIN_PATH"
 ldconfig $LD_LIBRARY_PATH
 echo "Added $LD_LIBRARY_PATH to ldconfig:"
@@ -86,6 +93,17 @@ CMD="exec python3 resiliency/launcher.py --use-supervisor \
 --master_addr="${MASTER_ADDR}" \
 --master_port="${MASTER_PORT}" \
 --max-restarts="${MAX_IN_JOB_RESTARTS}" \
+--host-daemon-port="${HOST_DAEMON_PORT}" \
+--max-workload-restarts="${MAX_WORKLOAD_RESTARTS}" \
+${ENABLE_WORKLOAD_SCALING} \
+--num-nodes-per-dp="${NUM_NODES_PER_DP}" \
+--min-num-dp-replicas="${MIN_NUM_DP_REPLICAS}" \
+--max-num-dp-replicas="${MAX_NUM_DP_REPLICAS}" \
+--container-termination-threshold-s="${CONTAINER_TERMINATION_THRESHOLD_S}" \
+--workload-downtime-threshold-s="${WORKLOAD_DOWNTIME_THRESHOLD_S}" \
+--workload-name="${JOBSET_NAME}" \
+--job-name="workload" \
+--container-name="workload" \
 ${NEMO_CONFIG_PATH}/${NEMO_CONFIG_NAME} \
 ${config_overrides}"
 

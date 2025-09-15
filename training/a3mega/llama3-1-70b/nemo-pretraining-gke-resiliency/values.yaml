@@ -36,7 +36,7 @@ volumes:
 
 workload:
   gpus: 128
-  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-A3Mega-20250605
+  image: us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-goodput:nemo24.12.01-2025-08-07
   gcsSidecarImage: gcr.io/gke-release/gcs-fuse-csi-driver-sidecar-mounter@sha256:698fb0a9fe7c19adff792256a478963d1596faf4f7ceb8d516a5c85787c66606
   max_workload_restarts: 20
   defaultArguments:
@@ -75,7 +75,7 @@ workload:
   - name: FT_PARAM_INITIAL_RANK_HEARTBEAT_TIMEOUT
     value: "600"
   - name: FT_PARAM_RANK_HEARTBEAT_TIMEOUT
-    value: "120"
+    value: "600"
   - name: HOST_DAEMON_PORT
     value: "60010"
   - name: MAX_IN_JOB_RESTARTS
@@ -86,6 +86,22 @@ workload:
     value: "8"
   - name: GLOO_SOCKET_IFNAME
     value: "eth0"
+  - name: WORKLOAD_NAMESPACE
+    value: "default"
+  - name: MAX_WORKLOAD_RESTARTS
+    value: "0"
+  - name: ENABLE_WORKLOAD_SCALING
+    value: "true"
+  - name: MAX_NUM_DP_REPLICAS
+    value: "4"
+  - name: MIN_NUM_DP_REPLICAS
+    value: "2"
+  - name: NUM_NODES_PER_DP
+    value: "4"
+  - name: CONTAINER_TERMINATION_THRESHOLD_S
+    value: "60"
+  - name: WORKLOAD_DOWNTIME_THRESHOLD_S
+    value: "180"
 
 network:
   hostNetwork: true

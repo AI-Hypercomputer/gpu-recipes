@@ -191,6 +191,7 @@ If the output isn't empty, the cluster role was successfully created.
 ```
 cd $RECIPE_ROOT
 helm install -f values-supervisor.yaml \
+  --set project=${PROJECT_ID} \
   $USER-supervisor \
   $REPO_ROOT/src/helm-charts/resiliency/supervisor-chart
 ```

@@ -46,12 +46,6 @@ Models             | GPU Machine Type                                           
 **Llama-3.1-405B** | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | NeMo      | Pre-training  | GKE          | [Link](./training/a4/llama3-1-405b/nemo-pretraining-gke/README.md)
 **Mixtral-8-7B**   | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | NeMo      | Pre-training  | GKE          | [Link](./training/a4/mixtral-8x7b/nemo-pretraining-gke/README.md)
 
-### Training benchmarks A4X
-
-Models             | GPU Machine Type                                                                                     | Framework | Workload Type | Orchestrator | Link to the recipe
------------------- | ---------------------------------------------------------------------------------------------------- | --------- | ------------- | ------------ | ------------------
-**Llama-3.1-8B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)      | NeMo   | Pre-training  | GKE          | [Link](./training/a4x/llama3-1-8b/nemo-pretraining-gke/1node/README.md)
-
 ### Inference benchmarks A3 Mega
 
 | Models           | GPU Machine Type | Framework | Workload Type       | Orchestrator | Link to the recipe |
