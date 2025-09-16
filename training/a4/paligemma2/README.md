@@ -39,9 +39,9 @@ This recipe uses the [merve/vqav2-small](https://huggingface.co/datasets/merve/v
 
 This recipe uses the following [Deep Learning Software Layer](https://cloud.google.com/ai-hypercomputer/docs/software-stack#cluster_images) container image:
 
-`us-central1-docker.pkg.dev/deeplearning-images/reproducibility/pytorch-gpu-nemo-nccl:nemo25.02-gib1.0.5-A4`.
+`nvcr.io/nvidia/pytorch:25.01-py3`.
 
-This image is based on NVIDIA NeMo 25.02 and contains the NCCL gIB plugin v1.0.5, bundling all NCCL binaries validated for use with A4 GPUs.
+This image is based on NVIDIA NeMo 25.02 and contains the NCCL gIB plugin v1.1.0, bundling all NCCL binaries validated for use with A4 GPUs.
 
 
 ## Run the recipe
@@ -95,6 +95,7 @@ gcloud container clusters get-credentials $CLUSTER_NAME --region $CLUSTER_REGION
 ```
 
 ### Configure and submit a pretraining job
+_Update `<HF_TOKEN>` (your Hugging Face [token](https://huggingface.co/settings/tokens)) in [launcher.sh](./launcher.sh)._
 
 #### Using 4 nodes (32 GPUs) BF16
 
@@ -106,7 +107,7 @@ helm install $USER-paligemma2 ${RECIPE_ROOT} -f ${RECIPE_ROOT}/values.yaml \
    --set-file workload_launcher=${RECIPE_ROOT}/launcher.sh \
    --set-file workload_config=${RECIPE_ROOT}/main.py \
    --set workload.image=nvcr.io/nvidia/pytorch:25.01-py3 \
-   --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET}$ \
+   --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
    --set volumes.gcsMounts[0].mountPath=/job-logs \
    --set workload.envs[0].value=/job-logs/${user}-paligemma2
 ```
@@ -136,7 +137,7 @@ kubectl get pods | grep JOB_NAME_PREFIX
 ```
 
 Replace the following:
-- JOB_NAME_PREFIX - your job name prefix. For example $USER-mixtral-8x7b-nemo.
+- JOB_NAME_PREFIX - your job name prefix. For example $USER-paligemma2.
 
 To get the logs for one of the pods, run the following command:
 
@@ -161,7 +162,7 @@ To check the status of the job's pods, use the following command:
 kubectl get pods | grep JOB_NAME_PREFIX
 ```
 
-Replace `JOB_NAME_PREFIX` with the prefix of your job name. For example, `$USER-mixtral-8x7b-nemo`. This command will list all pods associated with the specified job, along with their current status.
+Replace `JOB_NAME_PREFIX` with the prefix of your job name. For example, `$USER-paligemma2`. This command will list all pods associated with the specified job, along with their current status.
 
 
 To get the logs from a specific pod, use the following command:
@@ -188,7 +189,7 @@ Replace the following:
 - `PROJECT_ID`: your Google Cloud project ID.
 - `CLUSTER_REGION`: the region where your cluster is located.
 - `CLUSTER_NAME`: the name of your GKE cluster.
-- `JOB_NAME_PREFIX`: the prefix of your job name (e.g., `$USER-mixtral-8x7b-nemo`).
+- `JOB_NAME_PREFIX`: the prefix of your job name (e.g., `$USER-paligemma2`).
 
 This filter will retrieve logs from all containers within pods that match the job with the specified name prefix.
 
@@ -199,6 +200,6 @@ You can delete the job and other resources created by the Helm chart.
 To uninstall Helm, run the following command from your client:
 
 ```bash
-helm uninstall $USER-mixtral-8x7b-nemo
+helm uninstall $USER-paligmma2
 ```
 

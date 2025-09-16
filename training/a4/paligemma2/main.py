@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+
+# Reference: https://huggingface.co/blog/paligemma2.
 """Fine-tunes a PaliGemma model on a given dataset."""
 
 import os
@@ -22,14 +25,10 @@ load_dataset = datasets.load_dataset
 TrainingArguments = transformers.TrainingArguments
 Trainer = transformers.Trainer
 PaliGemmaProcessor = transformers.PaliGemmaProcessor
-PaliGemmaForConditionalGeneration = (
-    transformers.PaliGemmaForConditionalGeneration
-)
+PaliGemmaForConditionalGeneration = transformers.PaliGemmaForConditionalGeneration
 
 num_train_epochs = int(os.getenv("NUM_TRAIN_EPOCHS", "3"))
-per_device_train_batch_size = int(
-    os.getenv("PER_DEVICE_TRAIN_BATCH_SIZE", "96")
-)
+per_device_train_batch_size = int(os.getenv("PER_DEVICE_TRAIN_BATCH_SIZE", "96"))
 gradient_accumulation_steps = int(os.getenv("GRADIENT_ACCUMULATION_STEPS", "4"))
 learning_rate = float(os.getenv("LEARNING_RATE", "2e-5"))
 warmup_steps = int(os.getenv("WARMUP_STEPS", "2"))
@@ -53,20 +52,20 @@ processor = PaliGemmaProcessor.from_pretrained(model_id)
 
 
 def collate_fn(examples):
-  """Collate function for the dataset."""
-  texts = ["<image>answer en " + example["question"] for example in examples]
-  labels = [example["multiple_choice_answer"] for example in examples]
-  images = [example["image"].convert("RGB") for example in examples]
-  tokens = processor(
-      text=texts,
-      images=images,
-      suffix=labels,
-      return_tensors="pt",
-      padding="longest",
-  )
+    """Collate function for the dataset."""
+    texts = ["<image>answer en " + example["question"] for example in examples]
+    labels = [example["multiple_choice_answer"] for example in examples]
+    images = [example["image"].convert("RGB") for example in examples]
+    tokens = processor(
+        text=texts,
+        images=images,
+        suffix=labels,
+        return_tensors="pt",
+        padding="longest",
+    )
 
-  tokens = tokens.to(torch.bfloat16)
-  return tokens
+    tokens = tokens.to(torch.bfloat16)
+    return tokens
 
 
 model = PaliGemmaForConditionalGeneration.from_pretrained(
@@ -101,4 +100,3 @@ trainer = Trainer(
 )
 
 trainer.train()
-
