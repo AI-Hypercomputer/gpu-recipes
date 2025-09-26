@@ -1,0 +1,293 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+image:
+  repository: {{ docker_repository }}
+  tag: {{ docker_tag }}
+  pullPolicy: Always
+
+nameOverride: "kuberay"
+fullnameOverride: ""
+
+common:
+  # containerEnv specifies environment variables for the Ray head and worker containers.
+  # Follows standard K8s container env schema.
+  containerEnv: {{ "{}" }}
+
+configMap:
+  fluentbit:
+    data:
+      fluent-bit.conf: |
+        {{ fluent_bit_conf | indent(8)}}
+
+annotations:
+  kueue.x-k8s.io/podset-preferred-topology: "cloud.google.com/gce-topology-block"
+
+head:
+  # rayVersion determines the autoscaler's image version.
+  # It should match the Ray version in the image of the containers.
+  # rayVersion: 2.9.0
+  # If enableInTreeAutoscaling is true, the autoscaler sidecar will be added to the Ray head pod.
+  # Ray autoscaler integration is supported only for Ray versions >= 1.11.0
+  # Ray autoscaler integration is Beta with KubeRay >= 0.3.0 and Ray >= 2.0.0.
+  enableInTreeAutoscaling: false
+  # autoscalerOptions is an OPTIONAL field specifying configuration overrides for the Ray autoscaler.
+  # The example configuration shown below represents the DEFAULT values.
+  autoscalerOptions:
+    upscalingMode: Default
+    # idleTimeoutSeconds is the number of seconds to wait before scaling down a worker pod which is not using Ray resources.
+    idleTimeoutSeconds: 60
+  # Note: From KubeRay v0.6.0, users need to create the ServiceAccount by themselves if they specify the `serviceAccountName`
+  # in the headGroupSpec. See https://github.com/ray-project/kuberay/pull/1128 for more details.
+  serviceAccountName: ""
+  rayStartParams:
+    dashboard-host: '0.0.0.0'
+    # node-manager-port: 4202
+    # object-manager-port: 4203
+    # runtime-env-agent-port: 4204
+    # dashboard-agent-grpc-port: 4205
+    # dashboard-agent-listen-port: 4206
+    # metrics-export-port: 4207
+  # containerEnv specifies environment variables for the Ray container,
+  # Follows standard K8s container env schema.
+  containerEnv:
+  - name: RAY_GROUP
+    value: "head"
+  #   value: "1"
+    # - name: "RAY_ENABLE_RECORD_ACTOR_TASK_LOGGING"
+    #   value: "1"
+    # - name: "RAY_DEDUP_LOGS"
+    #   value: "0"
+  envFrom: []
+    # - secretRef:
+    #     name: my-env-secret
+  # ports optionally allows specifying ports for the Ray container.
+  # ports: []
+  # resource requests and limits for the Ray head container.
+  # Modify as needed for your application.
+  # Note that the resources in this example are much too small for production;
+  # we don't recommend allocating less than 8G memory for a Ray pod in production.
+  # Ray pods should be sized to take up entire K8s nodes when possible.
+  # Always set CPU and memory limits for Ray pods.
+  # It is usually best to set requests equal to limits.
+  # See https://docs.ray.io/en/latest/cluster/kubernetes/user-guides/config.html#resources
+  # for further guidance.
+  resources:
+    limits:
+      cpu: "2"
+      # To avoid out-of-memory issues, never allocate less than 2G memory for the Ray head.
+      memory: "12G"
+    requests:
+      cpu: "2"
+      memory: "12G"
+  # Ray container security context.
+  # Optional: The following volumes/volumeMounts configurations are optional but recommended because
+  # Ray writes logs to /tmp/ray/session_latests/logs instead of stdout/stderr.
+  volumes:
+    - name: log-volume
+      emptyDir: {{ "{}" }}
+    - name: fluentbit-config-volume
+      configMap:
+        name: {{ cluster_name }}-fluentbit-config
+  volumeMounts:
+    - mountPath: /tmp/ray
+      name: log-volume
+  # sidecarContainers specifies additional containers to attach to the Ray pod.
+  # Follows standard K8s container spec.
+  sidecarContainers:
+    - name: fluent-bit
+      image: fluent/fluent-bit:latest
+      env:
+      - name: RAY_GROUP
+        value: "head"
+      volumeMounts:
+        - name: fluentbit-config-volume
+          mountPath: /fluent-bit/etc/
+        - mountPath: /tmp/ray
+          name: log-volume
+  # See docs/guidance/pod-command.md for more details about how to specify
+  # container command for head Pod.
+  command:
+    - "apt-get install -y sudo"
+  args: []
+  # Optional, for the user to provide any additional fields to the service.
+  # See https://pkg.go.dev/k8s.io/Kubernetes/pkg/api/v1#Service
+  headService: {{ "{}" }}
+    # metadata:
+    #   annotations:
+    #     prometheus.io/scrape: "true"
+
+
+worker:
+  # If you want to disable the default workergroup
+  # uncomment the line below
+  disabled: true
+
+# The map's key is used as the groupName.
+# For example, key:small-group in the map below
+# will be used as the groupName
+additionalWorkerGroups:
+{% for idx in range(num_worker_groups) %}
+    worker-grp-{{ loop.index0 }}:
+      disabled: false
+      replicas: {{ worker_group_size }}
+      minReplicas: {{ worker_group_size }}
+      maxReplicas: {{ worker_group_size }}
+      labels: {{ "{}" }}
+      serviceAccountName: ""
+      rayStartParams:
+        resources: '"{{ "{" }}\"$RAY_GROUP\": {{ cpus_per_node }}{{ "}" }}"'
+      # containerEnv specifies environment variables for the Ray container,
+      # Follows standard K8s container env schema.
+      containerEnv:
+        - name: RAY_GROUP
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['ray.io/group']
+        - name: "RAY_worker_register_timeout_seconds"
+          value: "120"
+        - name: "RAY_ENABLE_RECORD_ACTOR_TASK_LOGGING"
+          value: "1"
+        - name: "RAY_DEDUP_LOGS"
+          value: "0"
+      envFrom: []
+          # - secretRef:
+          #     name: my-env-secret
+      # ports optionally allows specifying ports for the Ray container.
+      # ports: [12355]
+      # resource requests and limits for the Ray head container.
+      # Modify as needed for your application.
+      # Note that the resources in this example are much too small for production;
+      # we don't recommend allocating less than 8G memory for a Ray pod in production.
+      # Ray pods should be sized to take up entire K8s nodes when possible.
+      # Always set CPU and memory limits for Ray pods.
+      # It is usually best to set requests equal to limits.
+      # See https://docs.ray.io/en/latest/cluster/kubernetes/user-guides/config.html#resources
+      # for further guidance.
+      resources:
+        limits:
+          cpu: {{ cpus_per_node }}
+      annotations: {{ "{}" }}
+      nodeSelector: {{ "{}" }}
+      tolerations:
+
+        - operator: "Exists"
+          key: cloud.google.com/impending-node-termination
+      affinity: {{ "{}" }}
+      # Ray container security context.
+      securityContext:
+        privileged: true
+      # Optional: The following volumes/volumeMounts configurations are optional but recommended because
+      # Ray writes logs to /tmp/ray/session_latests/logs instead of stdout/stderr.
+      volumes:
+        - name: log-volume
+          emptyDir: {{ "{}" }}
+        - name: shared-memory
+          emptyDir:
+            medium: "Memory"
+            sizeLimit: 250Gi
+        - name: ray-tmp
+          emptyDir:
+            medium: "Memory"
+        - name: fluentbit-config-volume
+          configMap:
+            name: {{ cluster_name }}-fluentbit-config
+        # - name: nvidia-install-dir-host
+        #   hostPath:
+        #     path: /home/kubernetes/bin/nvidia
+        # - name: tcpx-nccl-plugin-volume
+        #   emptyDir: {{ "{}" }}
+        # - name: tcpxo-nccl-plugin-volume
+        #   emptyDir: {{ "{}" }}
+        # - name: fastrak-nccl-plugin-volume
+        #   emptyDir: {{ "{}" }}
+        # - name: dmabuf
+        #   hostPath:
+        #     path: /dev/dmabuf_import_helper
+        #     type: CharDevice
+        # - name: tcpx-socket
+        #   emptyDir:
+        #     medium: "Memory"
+      volumeMounts:
+        - mountPath: /tmp/ray
+          name: log-volume
+        - name: shared-memory
+          mountPath: /dev/shm
+        # - name: nvidia-install-dir-host
+        #   mountPath: /usr/local/nvidia
+        # - name: tcpx-nccl-plugin-volume
+        #   mountPath: /var/lib/tcpx
+        # - name: tcpxo-nccl-plugin-volume
+        #   mountPath: /var/lib/tcpxo
+        # - name: fastrak-nccl-plugin-volume
+        #   mountPath: /var/lib/fastrak
+        # - name: dmabuf
+        #   mountPath: /dev/dmabuf_import_helper
+      command:
+        # - "ldconfig /usr/local/nvidia/lib64/ &&"
+        # - "ldconfig -p | grep libcuda | sed 's/^/  /' &&"
+        # - "export LD_LIBRARY_PATH=\"/var/lib/tcpxo/lib64:$LD_LIBRARY_PATH\" && "
+        - "apt-get install -y sudo"
+      # initContainers:
+      #   - name: nccl-plugin-installer
+      #     imagePullPolicy: Always
+      #     image: {{ nccl_plugin_image }}
+      #     volumeMounts:
+      #     # Some of these may be unused based on NCCL plugin version
+      #     - name: tcpx-nccl-plugin-volume
+      #       mountPath: /var/lib/tcpx
+      #     - name: tcpxo-nccl-plugin-volume
+      #       mountPath: /var/lib/tcpxo
+      #     - name: fastrak-nccl-plugin-volume
+      #       mountPath: /var/lib/fastrak
+      #     args: ['install', '--install-nccl']
+      # # sidecarContainers specifies additional containers to attach to the Ray pod.
+      # # Follows standard K8s container spec.
+      sidecarContainers:
+        - name: fluent-bit
+          env:
+            - name: RAY_GROUP
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['ray.io/group']
+          image: fluent/fluent-bit:latest
+          volumeMounts:
+            - name: fluentbit-config-volume
+              mountPath: /fluent-bit/etc/
+            - mountPath: /tmp/ray
+              name: log-volume
+      #   - name: "rxdm-sidecar"
+      #     image: {{ rxdm_image }}
+      #     imagePullPolicy: Always
+      #     #restartPolicy: OnFailure
+      #     securityContext:
+      #       privileged: true
+      #     volumeMounts:
+      #     - name: tcpx-socket
+      #       mountPath: /run/tcpx
+      #     - name: dmabuf
+      #       mountPath: /dev/dmabuf_import_helper
+      #     - name: nvidia-install-dir-host
+      #       mountPath: "/usr/local/nvidia"
+      #     env:
+      #     - name: LD_LIBRARY_PATH
+      #       value: /usr/local/nvidia/lib64
+      #     args: {{ rxdm_args }}
+
+{% endfor %}
+
+# Configuration for Head's Kubernetes Service
+service:
+  # This is optional, and the default is ClusterIP.
+  type: ClusterIP
