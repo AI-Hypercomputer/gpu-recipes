@@ -120,7 +120,7 @@ The Ray cluster may take a while to start. To check the status, run this command
 kubectl get pods | grep ray-cluster
 ```
 
-Once everything is correctly set up, you should see '2/2 Running' for all the pods (head and workers), like this example:
+If everything is set up correctly, you should see '2/2 Running' for all the pods (head and workers), like this example:
 
 ```
 ray-cluster-kuberay-head-l7bw6                          2/2     Running     0          106s
@@ -129,7 +129,7 @@ ray-cluster-kuberay-worker-grp-0-worker-xwpln           2/2     Running     0   
 ```
 #### Launch a single node qwen 2.5 1.5b GRPO workload 
 
-Once your Ray cluster is completely up and running, you can start submitting your jobs.
+Once the Ray cluster is completely up and running, you can start submitting your jobs.
 Check out the submit_qwen2.5-1.5b.sh script for example commands, fill in your actual HF and WandB keys
 
 ```
