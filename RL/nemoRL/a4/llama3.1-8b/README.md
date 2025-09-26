@@ -34,7 +34,7 @@ To prepare the required environment, see
 
 ## Training dataset
 
-This recipe uses nvidia/OpenMathInstruct2Dataset dataset
+This recipe uses nvidia/OpenMathInstruct2Dataset https://huggingface.co/datasets/nvidia/OpenMathInstruct-2 dataset
 
 ## Docker container image
 
