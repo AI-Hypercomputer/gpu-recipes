@@ -1,4 +1,4 @@
-"""Nemo2 pretraining recipe for Llama 3.1 8B model."""
+"""Nemo2 pretraining recipe for Llama 3.1 70B model."""
 
 from nemo.collections import llm
 from nemo.collections.llm.recipes import llama31_70b
@@ -17,7 +17,7 @@ def recipe(
     profile_end_step: int = 0,
     profile_ranks: str = "0",
 ) -> run.Partial:
-  """Returns a Nemo2 training recipe for Llama 3.1 8B model.
+  """Returns a Nemo2 training recipe for Llama 3.1 70B model.
 
   Args:
       profile_enabled: Whether to enable Nsys profiling.
@@ -102,7 +102,7 @@ def recipe(
   pretrain.trainer.callbacks.append(
       run.Config(
           FLOPsMeasurementCallback,
-          model_name="llama31-8b",
+          model_name="llama31-70b",
           model_config=pretrain.model.config,
           data_config=pretrain.data,
       )
