@@ -70,7 +70,7 @@ head:
       emptyDir: {}
     - name: fluentbit-config-volume
       configMap:
-        name: "my-ray-cluster-kuberay-fluentbit-config"
+        name: "ray-cluster-kuberay-fluentbit-config"
   sidecarContainers:
     - name: fluent-bit
       image: fluent/fluent-bit:latest
@@ -153,7 +153,7 @@ additionalWorkerGroups:
           medium: "Memory"
       - name: fluentbit-config-volume
         configMap:
-          name: "my-ray-cluster-kuberay-fluentbit-config"
+          name: "ray-cluster-kuberay-fluentbit-config"
       - name: nvidia-install-dir-host
         hostPath:
           path: /home/kubernetes/bin/nvidia
