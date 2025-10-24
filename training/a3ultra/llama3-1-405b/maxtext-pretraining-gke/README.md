@@ -1,4 +1,4 @@
-# Pretrain Llama-3.1-405B workloads on A3 Ultra GKE Node pools using MaxText (TEST DAVID)
+# Pretrain Llama-3.1-405B workloads on A3 Ultra GKE Node pools using MaxText
 
 This recipe outlines the steps for running a Llama-3.1-405B pretraining workload on
 [A3 Ultra GKE Node pools](https://cloud.google.com/kubernetes-engine) by using the
