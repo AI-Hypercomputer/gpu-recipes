@@ -1,0 +1,46 @@
+dwsSettings:
+  maxRunDurationSeconds: null
+network:
+  gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:v1.1.0
+  hostNetwork: true
+  ncclSettings:
+  - name: NCCL_DEBUG
+    value: WARN
+  subnetworks[]: null
+queue: null
+tasSettings:
+  topologyRequest:
+    kueue.x-k8s.io/podset-preferred-topology: kubernetes.io/hostname
+volumes:
+  gcsMounts:
+  - bucketName: tess-benchmark-outputs
+    mountPath: /job-logs
+  gcsVolumes: true
+  psVolumes: false
+  pvcMounts:
+  - claimName: "gcs-data-pvc"
+    mountPath: "/data"
+  - claimName: "gcs-checkpoints-pvc"
+    mountPath: "/checkpoints"
+
+workload:
+  arguments[]: null
+  configFile: llama3-1-70b.py
+  configPath: /workload/configs/
+  defaultArguments[]: null
+  experimentName: "nemo-experiments-storage"
+  envs:
+  - name: GLOO_SOCKET_IFNAME
+    value: eth0
+  gcsSidecarImage: gcr.io/gcs-tess/ashmeen/gcs-fuse-csi-driver-sidecar-mounter:v3.2.0_test
+  gpus: 128 # default value
+  step_count: 100 # default value
+  image: nvcr.io/nvidia/nemo:25.07
+  enable_dataloading: false
+  enable_ckpt_write: false
+  enable_ckpt_load: false
+  ckpt_write_interval: 25
+  restore_path:
+  token_path: /data/llama/llama_tokenizer.model
+  dataset_path: /data/data
+workload_launcher: launcher.sh
