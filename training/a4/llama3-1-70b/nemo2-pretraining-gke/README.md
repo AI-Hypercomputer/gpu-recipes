@@ -60,7 +60,7 @@ From your client workstation, complete the following steps:
 Set the environment variables to match your environment:
 
  ```bash
- export PROJECT_ID=gcs-tess
+ export PROJECT_ID=<PROJECT_ID>
  export CLUSTER_REGION=<CLUSTER_REGION>
  export CLUSTER_NAME=<CLUSTER_NAME>
  export GCS_BUCKET_LOGS=<GCS_BUCKET_LOGS>
