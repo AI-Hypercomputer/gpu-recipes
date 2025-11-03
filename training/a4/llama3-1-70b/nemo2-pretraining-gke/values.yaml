@@ -41,6 +41,6 @@ workload:
   enable_ckpt_load: false
   ckpt_write_interval: 25
   restore_path:
-  token_path: /data/llama/llama_tokenizer.model
-  dataset_path: /data/data
+  token_path:
+  dataset_path:
 workload_launcher: launcher.sh
