@@ -152,12 +152,11 @@ your client:
     cd $RECIPE_ROOT
     export WORKLOAD_NAME=a4-llama3-1-70b-gpus128
     helm install $WORKLOAD_NAME . -f values.yaml \
-    --set-file workload_launcher=launcher.sh \
-    --set-file workload_config=llama3-1-70b.py \
+    --set workload_launcher=launcher.sh \
+    --set workload_config=llama3-1-70b.py \
     --set workload.image=nvcr.io/nvidia/nemo:25.07 \
-    --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
-    --set volumes.gcsMounts[0].mountPath=/job-logs \
-    --set workload.envs[0].value=/job-logs/$WORKLOAD_NAME
+    --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET_LOGS} \
+    --set volumes.gcsMounts[0].mountPath=/job-logs
     ```
 
 **Examples**
@@ -169,12 +168,12 @@ your client:
     cd $RECIPE_ROOT
     export WORKLOAD_NAME=a4-llama3-1-70b-gpus128
     helm install $WORKLOAD_NAME . -f values.yaml \
-    --set-file workload_launcher=launcher.sh \
-    --set-file workload_config=llama3-1-70b.py \
+    --set workload_launcher=launcher.sh \
+    --set workload_config=llama3-1-70b.py \
     --set workload.image=nvcr.io/nvidia/nemo:25.07 \
-    --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+    --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET_LOGS} \
     --set volumes.gcsMounts[0].mountPath=/job-logs \
-    --set workload.step_count=100
+     --set workload.step_count=100
     ```
 -   To enable dataloading, checkpoint restore and checkpoint write at every 25 steps, run the following command from
     your client:
@@ -183,15 +182,15 @@ your client:
     cd $RECIPE_ROOT
     export WORKLOAD_NAME=a4-llama3-1-70b-gpus128
     helm install $WORKLOAD_NAME . -f values.yaml \
-    --set-file workload_launcher=launcher.sh \
-    --set-file workload_config=llama3-1-70b.py \
+    --set workload_launcher=launcher.sh \
+    --set workload_config=llama3-1-70b.py \
     --set workload.image=nvcr.io/nvidia/nemo:25.07 \
-    --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+    --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET_LOGS} \
     --set volumes.gcsMounts[0].mountPath=/job-logs \
     --set workload.enable_dataloading=$ENABLE_DATALOADING \
     --set workload.enable_ckpt_write=$ENABLE_CHECKPOINT_WRITE \
     --set workload.enable_ckpt_load=$ENABLE_CHECKPOINT_LOAD \
-    --set workload.ckpt_write_interval=$CKPT_WRITE_INTERVAL \
+    --set workload.ckpt_write_interval=$CHECKPOINT_WRITE_INTERVAL \
     --set workload.token_path=$TOKEN_PATH \
     --set workload.dataset_path=$DATASET_PATH \
     --set workload.restore_path=$RESTORE_PATH 

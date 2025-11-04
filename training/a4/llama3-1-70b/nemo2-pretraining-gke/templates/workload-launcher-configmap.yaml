@@ -20,7 +20,7 @@ metadata:
 data:
   launch-workload.sh: |-
 {{- if .Values.workload_launcher }}
-{{ .Values.workload_launcher | nindent 4 }}
+{{ .Files.Get .Values.workload_launcher | nindent 4 }}
 {{- else }}
     #!/bin/bash
     echo "No workload launcher specified"

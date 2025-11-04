@@ -13,7 +13,7 @@ tasSettings:
     kueue.x-k8s.io/podset-preferred-topology: kubernetes.io/hostname
 volumes:
   gcsMounts:
-  - bucketName: tess-benchmark-outputs
+  - bucketName:
     mountPath: /job-logs
   gcsVolumes: true
   psVolumes: false
