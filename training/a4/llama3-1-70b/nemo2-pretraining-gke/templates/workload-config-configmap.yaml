@@ -20,7 +20,7 @@ metadata:
 data:
   workload-configuration: |-
 {{- if .Values.workload.configFile }}
-{{ .Files.Get .Values.workload.configFile | nindent 4 }}
+{{ .Values.workload.configFile | nindent 4 }}
 {{- else }}
 {{ "config: null" | nindent 4 }}
 {{- end }}
