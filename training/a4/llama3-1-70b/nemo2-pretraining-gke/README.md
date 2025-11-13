@@ -144,7 +144,7 @@ $REPO_ROOT/src/helm-charts/storage/gcs-fuse
 
 ### Configure and submit a pretraining job
 
-#### Using 16 node (64 gpus) fp8 precision
+#### Using 16 node (64 gpus) bf16-mixed precision
 To execute the job with the default settings, run the following command from
 your client:
 
