@@ -1,8 +1,8 @@
 <!-- mdformat global-off -->
-# Pretrain llama3-1-70b-gpus128 workloads on a4 GKE Node pools with Nvidia NeMo Framework  using Google Cloud Storage for training data and checkpoints
+# Pretrain llama3-1-70b-gpus128 workloads on A4 GKE Node pools with Nvidia NeMo Framework  using Google Cloud Storage for training data and checkpoints
 
 This recipe outlines the steps for running a llama3-1-70b-gpus128 pretraining
-workload on [a4 GKE Node pools](https://cloud.google.com/kubernetes-engine) by using the
+workload on [A4 GKE Node pools](https://cloud.google.com/kubernetes-engine) by using the
 [NVIDIA NeMo framework](https://github.com/NVIDIA/nemo).
 
 ## Orchestration and deployment tools
