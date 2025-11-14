@@ -52,7 +52,7 @@ nvidia-smi
 ### 1. Install Docker
 
 Before you can serve the model, you need to have Docker installed on your VM. You can follow the official documentation to install Docker on Ubuntu:
-[Install Docker Engine on Ubuntu](httpss://docs.docker.com/engine/install/ubuntu/)
+[Install Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
 
 After installing Docker, make sure the Docker daemon is running.
 
