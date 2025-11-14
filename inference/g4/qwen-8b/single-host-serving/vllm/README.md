@@ -1,4 +1,4 @@
-# vLLM serving on a GCP VM with G4 GPUs
+# Single host inference benchmark of Qwen3-8B with vLLM on G4
 
 This recipe shows how to serve and benchmark Qwen3-8B model using [vLLM](https://github.com/vllm-project/vllm) on a single GCP VM with G4 GPUs. vLLM is a high-throughput and memory-efficient inference and serving engine for LLMs. For more information on G4 machine types, see the [GCP documentation](https://cloud.google.com/compute/docs/accelerator-optimized-machines#g4-machine-types).
 
@@ -52,7 +52,7 @@ nvidia-smi
 ### 1. Install Docker
 
 Before you can serve the model, you need to have Docker installed on your VM. You can follow the official documentation to install Docker on Ubuntu:
-[Install Docker Engine on Ubuntu](httpss://docs.docker.com/engine/install/ubuntu/#install-using-the-repository)
+[Install Docker Engine on Ubuntu](httpss://docs.docker.com/engine/install/ubuntu/)
 
 After installing Docker, make sure the Docker daemon is running.
 
@@ -94,7 +94,7 @@ Here's a breakdown of the arguments:
 -   `--kv-cache-dtype fp8`: Sets the data type for the key-value cache to FP8 to save GPU memory.
 -   `--gpu-memory-utilization 0.95`: The fraction of GPU memory to be used by vLLM.
 
-For more information on the available engine arguments, you can refer to the [official vLLM documentation](https://docs.vllm.ai/en/latest/configuration/engine_args/).
+For more information on the available engine arguments, you can refer to the [official vLLM documentation](https://docs.vllm.ai/en/latest/configuration/engine_args/), which includes different parallelism strategies that can be used with multi GPU setup.
 
 After running the command, the model will be served. To run the benchmark, you will need to either run the server in the background by appending `&` to the command, or open a new terminal to run the benchmark command.
 
