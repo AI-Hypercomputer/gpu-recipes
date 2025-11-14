@@ -103,13 +103,13 @@ The Pile dataset in the NVIDIA NeMo *mmap* format is staged in the public GCS bu
 1. Create a folder for the dataset
 
 ```
-gcloud storage folders create gs://${GCS_BUCKET_DATA}/pile
+gcloud storage folders create gs://${GCS_BUCKET_DATA}/data
 ```
 
 2. Upload the dataset
 
 ```
-gcloud storage cp gs://cloud-samples-data/third-party/pile/*.* gs://${GCS_BUCKET_DATA}/
+gcloud storage cp gs://cloud-samples-data/third-party/pile/*.* gs://${GCS_BUCKET_DATA}/data
 ```
 
 ### Get the recipe
@@ -120,8 +120,7 @@ Clone the `gpu-recipes` repository and set a reference to the recipe folder.
 git clone https://github.com/ai-hypercomputer/gpu-recipes.git
 cd gpu-recipes
 export REPO_ROOT=`git rev-parse --show-toplevel`
-export RECIPE_ROOT=$REPO_ROOT/training/a4/llama3-1-70b/nemo-pretraining-gke/
-16node-bf16-seq8192-gbs512-gcs
+export RECIPE_ROOT=$REPO_ROOT/training/a4/llama3-1-70b/nemo-pretraining-gke/16node-bf16-seq8192-gbs512-gcs
 cd $RECIPE_ROOT
 ```
 
