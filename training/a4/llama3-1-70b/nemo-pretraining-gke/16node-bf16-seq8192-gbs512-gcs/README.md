@@ -1,5 +1,5 @@
 <!-- mdformat global-off -->
-# Pretrain llama3-1-70b-gpus128 workloads on A4 GKE Node pools with Nvidia NeMo Framework  using Google Cloud Storage for training data and checkpoints
+# Pretrain llama3-1-70b-gpus128 workloads on A4 GKE Node pools with Nvidia NeMo Framework using Google Cloud Storage for training data and checkpoints
 
 This recipe outlines the steps for running a llama3-1-70b-gpus128 pretraining
 workload on [A4 GKE Node pools](https://cloud.google.com/kubernetes-engine) by using the
@@ -19,7 +19,7 @@ For this recipe, the following setup is used:
 
 This recipe has been optimized for and tested with the following configuration:
 
-- A  standard GKE cluster:
+- A standard GKE cluster:
   - GKE version: 1.33.5-gke.1162000 or later
   - A GPU node pool with 16 [a4-highgpu-8g](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-machine-type) machines
   - Workload Identity Federation for GKE enabled
@@ -83,13 +83,13 @@ Replace the following values:
   - `<GCS_BUCKET_LOGS>`: the name of a Cloud Storage bucket for logs. Do not include the `gs://` prefix
   - `<GCS_BUCKET_DATA>`: the name of a Cloud Storage bucket for training data. Do not include the `gs://` prefix
   - `<GCS_BUCKET_CHECKPOINTS>`: the name of a Cloud Storage bucket for checkpoints. Do not include the `gs://` prefix
-  * `<ENABLE_DATALOADING>`: The recipe has an option to use real dataset for dataloading.
-*   `<ENABLE_CHECKPOINT_WRITE>`: To enable checkpoint write.
-*   `<CHECKPOINT_WRITE_INTERVAL>`: Step interval at which checkpoint will be written.
-*   `<ENABLE_CHECKPOINT_LOAD>`: To enable checkpoint restore.
-*   `<RESTORE_PATH>`: Path to a specific checkpoint to restore from. The mount point of checkpoint_bucket is `/checkpoints` and hence the path should start with `/checkpoints`. 
-*   `<TOKEN_PATH>`: tokenizer model file of sentencepiece.
-*   `<DATASET_PATH>`: Path in dataset_bucket for dataloading. The path should contain only the dataloading objects. The mount point of dataset_bucket is `/data` and hence the path should start with `/data`. 
+  - `<ENABLE_DATALOADING>`: The recipe has an option to use real dataset for dataloading.
+  - `<ENABLE_CHECKPOINT_WRITE>`: To enable checkpoint write.
+  - `<CHECKPOINT_WRITE_INTERVAL>`: Step interval at which checkpoint will be written.
+  - `<ENABLE_CHECKPOINT_LOAD>`: To enable checkpoint restore.
+  - `<RESTORE_PATH>`: Path to a specific checkpoint to restore from. The mount point of checkpoint_bucket is `/checkpoints` and hence the path should start with `/checkpoints`. 
+  - `<TOKEN_PATH>`: tokenizer model file of sentencepiece.
+  - `<DATASET_PATH>`: Path in dataset_bucket for dataloading. The path should contain only the dataloading objects. The mount point of dataset_bucket is `/data` and hence the path should start with `/data`. 
 
 Set the default project:
 
@@ -175,8 +175,7 @@ your client:
     --set volumes.gcsMounts[0].mountPath=/job-logs \
     --set workload.step_count=100
     ```
--   To enable dataloading, checkpoint restore and checkpoint write at every 25 steps, run the following command from
-    your client:
+-   To enable dataloading, checkpoint restore and checkpoint write at every 25 steps, run the following command from your client:
 
     ```bash
     cd $RECIPE_ROOT
@@ -223,7 +222,7 @@ For example: `a4-llama3-1-70b-gpus128-workload-0-0-s9zrv`.
 ### Analyze results
 
 When completed, the job creates several artifacts, including logs and traces, and places them
-in the  Google Cloud Storage logs bucket as follows:
+in the Google Cloud Storage logs bucket as follows:
 
 ```
 gs://${GCS_BUCKET_LOGS}/nemo-experiments-storage/<JOB_ID>
@@ -248,7 +247,7 @@ gs://${GCS_BUCKET_LOGS}/nemo-experiments-storage/<JOB_ID>
    and includes loss, step_time, and other key metrics for each training step
 
 
-The NeMo log files include information about checkpoint operations on each rank. 
+The NeMo log files include information about checkpoint operations on each rank. Users can find checkpoint read and write informatiom in `nemo_log_globalrank-[RANK]_localrank-[LOCAL].txt` files.
 
 ### Uninstall the Helm release
 
