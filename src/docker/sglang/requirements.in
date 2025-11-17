@@ -1,2 +1,2 @@
 hf_transfer==0.1.9
-huggingface_hub[hf_xet]==0.31.4
+huggingface_hub[hf_xet]>=0.34.0,<1.0
