@@ -173,7 +173,7 @@ your client:
     --set workload.image=nvcr.io/nvidia/nemo:25.07 \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET_LOGS} \
     --set volumes.gcsMounts[0].mountPath=/job-logs \
-     --set workload.step_count=100
+    --set workload.step_count=100
     ```
 -   To enable dataloading, checkpoint restore and checkpoint write at every 25 steps, run the following command from
     your client:
@@ -247,23 +247,8 @@ gs://${GCS_BUCKET_LOGS}/nemo-experiments-storage/<JOB_ID>
    DLLogger is configured to store logs on the rank 0 node. The log is in JSON format
    and includes loss, step_time, and other key metrics for each training step
 
-The `<JOB_ID>` has the following format:
-- `$USER--llama31-70b-gcs-[YYYY]-[MM]-[DD]-[hh]-[mm]-[ss]`, where the suffix of the ID is a day and time when the job was started.
 
-
-The NeMo log files include information about checkpoint operations on each rank. You can use the [checkpointing_metrics](../../../../src/utils/checkpointint_metrics) utility to calculate statistics for checkpoint write times.
-
-To calculate statistics:
-
-
-1. Set a path to the NeMo logs.
-
-```
-export JOB_ID=<JOB_ID>
-export GCS_LOGS_PATH="gs://${GCS_BUCKET_LOGS}/nemo-experiments-storage/${JOB_ID}"
-```
-
-Replace `<JOB_ID>` with the ID of your job.
+The NeMo log files include information about checkpoint operations on each rank. 
 
 ### Uninstall the Helm release
 
@@ -271,7 +256,7 @@ You can delete the job and other resources created by the Helm chart. To
 uninstall Helm, run the following command from your client:
 
 ```bash
-helm uninstall a4-llama3-1-70b-gpus128
+helm uninstall $WORKLOAD_NAME
 ```
 
 ### Uninstall PVCs and PVs
