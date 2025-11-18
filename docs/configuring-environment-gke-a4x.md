@@ -38,7 +38,7 @@ The environment comprises of the following components:
   private container registry for storing and managing Docker images used in the deployment.
 - A [Google Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine/docs/concepts/kubernetes-engine-overview)
   cluster configured as follows:
-    - [A GKE regional standard cluster](https://cloud.google.com/kubernetes-engine/docs/concepts/configuration-overview) version: v1.32.4-gke.1236000 or later.
+    - [A GKE regional standard cluster](https://cloud.google.com/kubernetes-engine/docs/concepts/configuration-overview) version: `1.33.4-gke.1036000` or later.
     - A GPU node pool with the user specified number of [a4x-highgpu-4g](https://cloud.google.com/compute/docs/gpus) provisioned using the DENSE deployment type.
     - [Workload Identity Federation for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity) enabled.
     - [Cloud Storage FUSE CSI driver for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/cloud-storage-fuse-csi-driver) enabled.
