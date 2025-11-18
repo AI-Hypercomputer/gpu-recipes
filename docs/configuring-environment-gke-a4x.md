@@ -253,11 +253,19 @@ After the cluster toolkit blueprint has completed verify key configurations.
     ```
     You should see the output similar to the following:
     ```
+<<<<<<< HEAD
     NAME                                                  STATUS   ROLES    AGE     VERSION                                                                                    
 gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-0phl   Ready    <none>   11d     v1.32.9-gke.1130000                                                                        
 gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-12dg   Ready    <none>   11d     v1.32.9-gke.1130000                                                                        
 gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-4ncf   Ready    <none>   11d     v1.32.9-gke.1130000                                                                        
 gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-6t1h   Ready    <none>   11d     v1.32.9-gke.1130000
+=======
+    NAME                                              STATUS   ROLES    AGE    VERSION
+    gke-glacier-peak-a4x-highgpu-4g-a-76a6f770-0phl   Ready    <none>   1d     v1.32.9-gke.1130000                                                                        
+    gke-glacier-peak-a4x-highgpu-4g-a-76a6f770-12dg   Ready    <none>   1d     v1.32.9-gke.1130000                                                                        
+   gke-glacier-peak-a4x-highgpu-4g-a-76a6f770-4ncf   Ready    <none>   1d     v1.32.9-gke.1130000                                                                        
+   gke-glacier-peak-a4x-highgpu-4g-a-76a6f770-6t1h   Ready    <none>   1d     v1.32.9-gke.1130000
+>>>>>>> 1b3d10a (Remove accidental file add)
     ...
     ```
 
