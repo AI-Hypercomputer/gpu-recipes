@@ -209,6 +209,9 @@ The recipe does the following steps to run the benchmarking:
 
 The recipe uses [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/performance/perf-benchmarking.md), a command-line tool from NVIDIA to benchmark the performance of TensorRT-LLM engine. For more information about `trtllm-bench`, see the [TensorRT-LLM documentation](https://github.com/NVIDIA/TensorRT-LLM).
 
+> [!NOTE]
+> The config file directly exposes the settings within TensorRT-LLM's llm_args.py class, which are passed to `trtllm-bench` or `trtllm-serve`, you can modify these as needed in [`src/frameworks/a4x/trtllm-configs/deepseek-r1-nvfp4.yaml`](../../../../src/frameworks/a4x/trtllm-configs/deepseek-r1-nvfp4.yaml)
+
 1. Install the helm chart to prepare and benchmark the model using [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/performance/perf-benchmarking.md) tool:
 
     ```bash
@@ -217,7 +220,7 @@ The recipe uses [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/mai
     --set-file workload_launcher=$REPO_ROOT/src/launchers/trtllm-launcher.sh \
     --set-file serving_config=$REPO_ROOT/src/frameworks/a4x/trtllm-configs/deepseek-r1-nvfp4.yaml \
     --set queue=${KUEUE_NAME} \
-    --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+    --set "volumes.gcsMounts[0].bucketName=${GCS_BUCKET}" \
     --set workload.model.name=nvidia/DeepSeek-R1-NVFP4-v2 \
     --set workload.image=nvcr.io/nvidia/tensorrt-llm/release:${TRTLLM_VERSION} \
     --set workload.framework=trtllm \
@@ -236,7 +239,7 @@ The recipe uses [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/mai
     Wait until the `READY` column shows `1/1`. See the [Monitoring and Troubleshooting](#monitoring) section to view the deployment logs.
 
   > [!NOTE]
-  > - This helm chart is configured to run only a single benchmarking experiment for 1k requests for 1024 tokens of input/output lengths. To run other experiments, you can add the various combinations provided in the [values.yaml](values.yaml) file.
+  > - This helm chart is configured to run only a single benchmarking experiment for 1k requests for 128 tokens of input/output lengths. To run other experiments, you can add the various combinations provided in the [values.yaml](values.yaml) file.
   > - This deployment process can take **up to 30 minutes** as it downloads the model weights from Hugging Face and then the server loads the model weights.
 
 
@@ -275,36 +278,36 @@ kubectl logs -f deployment/$USER-serving-deepseek-r1-model
 You should see logs indicating preparing the model, and then running the throughput benchmark test, similar to this:
 
 ```bash
-Running benchmark for nvidia/DeepSeek-R1-NVFP4-v2 with ISL=128, OSL=128, TP=4
+Running benchmark for nvidia/DeepSeek-R1-NVFP4-v2 with ISL=128, OSL=128, TP=4, EP=4, PP=1
 
 ===========================================================
 = PYTORCH BACKEND
 ===========================================================
-Model:                  nvidia/DeepSeek-R1-NVFP4-v2
-Model Path:             None
-TensorRT LLM Version:   1.2.0rc2
-Dtype:                  bfloat16
-KV Cache Dtype:         FP8
-Quantization:           NVFP4
+Model:			nvidia/DeepSeek-R1-NVFP4-v2
+Model Path:		/ssd/nvidia/DeepSeek-R1-NVFP4-v2
+TensorRT LLM Version:	1.2
+Dtype:			bfloat16
+KV Cache Dtype:		FP8
+Quantization:		NVFP4
 
 ===========================================================
 = REQUEST DETAILS 
 ===========================================================
 Number of requests:             1000
-Number of concurrent requests:  890
-Average Input Length (tokens):  1024.0000
-Average Output Length (tokens): 1024.0000
+Number of concurrent requests:  985.9849
+Average Input Length (tokens):  128.0000
+Average Output Length (tokens): 128.0000
 ===========================================================
 = WORLD + RUNTIME INFORMATION 
 ===========================================================
 TP Size:                4
 PP Size:                1
 EP Size:                4
-Max Runtime Batch Size: 320
-Max Runtime Tokens:     4096
+Max Runtime Batch Size: 2304
+Max Runtime Tokens:     4608
 Scheduling Policy:      GUARANTEED_NO_EVICT
-KV Memory Percentage:   90.00%
-Issue Rate (req/sec):   1.7750E+17
+KV Memory Percentage:   85.00%
+Issue Rate (req/sec):   8.3913E+13
 
 ===========================================================
 = PERFORMANCE OVERVIEW 
@@ -330,20 +333,20 @@ Per GPU Output Throughput (tps/gpu):              X.XX
 ===========================================================
 = DATASET DETAILS
 ===========================================================
-Dataset Path:         deepseek_r1_fp4_isl1024_osl1024_1000.json
+Dataset Path:         /ssd/token-norm-dist_DeepSeek-R1-NVFP4-v2_128_128_tp4.json
 Number of Sequences:  1000
 
 -- Percentiles statistics ---------------------------------
 
         Input              Output           Seq. Length
 -----------------------------------------------------------
-MIN:  1024.0000          1024.0000          2048.0000
-MAX:  1024.0000          1024.0000          2048.0000
-AVG:  1024.0000          1024.0000          2048.0000
-P50:  1024.0000          1024.0000          2048.0000
-P90:  1024.0000          1024.0000          2048.0000
-P95:  1024.0000          1024.0000          2048.0000
-P99:  1024.0000          1024.0000          2048.0000
+MIN:   128.0000           128.0000           256.0000
+MAX:   128.0000           128.0000           256.0000
+AVG:   128.0000           128.0000           256.0000
+P50:   128.0000           128.0000           256.0000
+P90:   128.0000           128.0000           256.0000
+P95:   128.0000           128.0000           256.0000
+P99:   128.0000           128.0000           256.0000
 ===========================================================
 ```
 

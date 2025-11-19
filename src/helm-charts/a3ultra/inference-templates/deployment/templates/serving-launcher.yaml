@@ -182,6 +182,9 @@ spec:
               value: "{{ $root.Values.workload.model.name }}"
             - name: MODEL_DOWNLOAD_DIR
               value: "/ssd/{{ $root.Values.workload.model.name }}"
+            # A3-Ultra recipe is based on the TensorRT image, which puts tensorrt_llm in a different path than default
+            - name: TRTLLM_DIR
+              value: "/workspace/tensorrtllm_backend/tensorrt_llm"
             {{- if $root.Values.workload.envs }}
             {{- toYaml .Values.workload.envs | nindent 12 }}
             {{- end }}

@@ -2,3 +2,34 @@ tp_size: 4
 ep_size: 4
 pp_size: 1
 backend: pytorch
+kv_cache_free_gpu_mem_fraction: 0.85
+llm_api_args:
+  cuda_graph_config:
+    batch_sizes:
+    - 1
+    - 2
+    - 4
+    - 8
+    - 16
+    - 20
+    - 24
+    - 32
+    - 64
+    - 96
+    - 128
+    - 160
+    - 192
+    - 256
+    - 320
+    - 384
+    - 512
+    enable_padding: true
+  enable_attention_dp: true
+  enable_chunked_prefill: true
+  kv_cache_config:
+    dtype: auto
+    enable_block_reuse: false
+    free_gpu_memory_fraction: 0.85
+  moe_config:
+    backend: CUTLASS
+  print_iter_log: true
