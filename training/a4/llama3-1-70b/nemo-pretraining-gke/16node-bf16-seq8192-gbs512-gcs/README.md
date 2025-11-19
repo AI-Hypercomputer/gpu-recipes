@@ -247,7 +247,7 @@ gs://${GCS_BUCKET_LOGS}/nemo-experiments-storage/<JOB_ID>
    and includes loss, step_time, and other key metrics for each training step
 
 
-The NeMo log files include information about checkpoint operations on each rank. Users can find checkpoint read and write informatiom in `nemo_log_globalrank-[RANK]_localrank-[LOCAL].txt` files.
+The NeMo log files include information about checkpoint operations on each rank. Users can find checkpoint read and write information in `nemo_log_globalrank-0_localrank-0.txt` files.
 
 ### Uninstall the Helm release
 
