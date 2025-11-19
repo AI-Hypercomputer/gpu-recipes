@@ -117,6 +117,9 @@ parse_serving_config() {
 
     tp_size=${SERVING_CONFIG_DICT["tp_size"]:=8}
     pp_size=${SERVING_CONFIG_DICT["pp_size"]:=1}
+    ep_size=${SERVING_CONFIG_DICT["ep_size"]:=1}
+    backend=${SERVING_CONFIG_DICT["backend"]:="tensorrt"}
+    kv_cache_free_gpu_mem_fraction=${SERVING_CONFIG_DICT["kv_cache_free_gpu_mem_fraction"]:=0.95}
 }
 
 print_configuration() {
@@ -131,6 +134,9 @@ print_configuration() {
     echo "number of requests:      $num_requests"
     echo "tensor parallel size:    $tp_size"
     echo "pipeline parallel size:  $pp_size"
+    echo "expert parallel size:    $ep_size"
+    echo "backend:                 $backend"
+    echo "kv_cache_free_gpu_mem_fraction: $kv_cache_free_gpu_mem_fraction"
     echo "--------------------------------"
 }
 
@@ -148,14 +154,22 @@ run_benchmark() {
     local num_requests=$4
     local tp_size=$5
     local pp_size=$6
+    local ep_size=$7
+    local backend=$8
+    local kv_cache_free_gpu_mem_fraction=$9
 
-    echo "Running benchmark for $model_name with ISL=$isl, OSL=$osl, TP=$tp_size, PP=$pp_size"
+    echo "Running benchmark for $model_name with ISL=$isl, OSL=$osl, TP=$tp_size, PP=$pp_size, EP=$ep_size, backend=$7"
 
     dataset_file="/ssd/token-norm-dist_${model_name##*/}_${isl}_${osl}_tp${tp_size}.json"
     output_file="/ssd/output_${model_name##*/}_isl${isl}_osl${osl}_tp${tp_size}.txt"
+    extra_args_file="/tmp/extra_llm_api_args.yaml"
+    extra_args=""
+    if [ -f "$extra_args_file" ]; then
+        extra_args="--extra_llm_api_options $extra_args_file"
+    fi
 
     echo "Preparing dataset"
-    python3 /workspace/tensorrtllm_backend/tensorrt_llm/benchmarks/cpp/prepare_dataset.py \
+    python3 $TRTLLM_DIR/benchmarks/cpp/prepare_dataset.py \
         --tokenizer=$model_name \
         --stdout token-norm-dist \
         --num-requests=$num_requests \
@@ -164,25 +178,39 @@ run_benchmark() {
         --input-stdev=0 \
         --output-stdev=0 >$dataset_file
 
-    echo "Building engine"
-    trtllm-bench \
-        --model $model_name \
-        --model_path /ssd/${model_name} \
-        --workspace /ssd build \
-        --tp_size $tp_size \
-        --quantization FP8 \
-        --dataset $dataset_file
-
-    engine_dir="/ssd/${model_name}/tp_${tp_size}_pp_${pp_size}"
-
-    # Save throughput output to a file
-    echo "Running throughput benchmark"
-    trtllm-bench \
+    if [[ $backend == "pytorch" ]]; then
+        echo "Running throughput benchmark"
+        trtllm-bench \
         --model $model_name \
         --model_path /ssd/${model_name} throughput \
         --dataset $dataset_file \
-        --engine_dir $engine_dir \
-        --kv_cache_free_gpu_mem_fraction 0.95 >$output_file
+        --tp $tp_size \
+        --pp $pp_size \
+        --ep $ep_size \
+        --backend "pytorch" \
+        --kv_cache_free_gpu_mem_fraction $kv_cache_free_gpu_mem_fraction $extra_args >$output_file
+    else
+        echo "Building engine"
+        trtllm-bench \
+            --model $model_name \
+            --model_path /ssd/${model_name} \
+            --workspace /ssd build \
+            --tp_size $tp_size \
+            --pp_size $pp_size \
+            --quantization FP8 \
+            --dataset $dataset_file
+
+        engine_dir="/ssd/${model_name}/tp_${tp_size}_pp_${pp_size}"
+
+        # Save throughput output to a file
+        echo "Running throughput benchmark"
+        trtllm-bench \
+            --model $model_name \
+            --model_path /ssd/${model_name} throughput \
+            --dataset $dataset_file \
+            --engine_dir $engine_dir \
+            --kv_cache_free_gpu_mem_fraction $kv_cache_free_gpu_mem_fraction $extra_args >$output_file
+    fi
 
     cat $output_file
     gsutil cp $output_file /gcs/benchmark_logs/trtllm/
@@ -205,7 +233,7 @@ main() {
     # run benchmark
     mkdir -p /gcs/benchmark_logs/trtllm
     echo "Running benchmarks"
-    run_benchmark "$model_name" $isl $osl $num_requests $tp_size $pp_size
+    run_benchmark "$model_name" $isl $osl $num_requests $tp_size $pp_size $ep_size $backend $kv_cache_free_gpu_mem_fraction
 }
 
 # Set environment variables

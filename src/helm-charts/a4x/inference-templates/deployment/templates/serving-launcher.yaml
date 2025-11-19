@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-{{ $nodes := div .Values.workload.gpus 8 | max 1 }}
-{{ $gpusPerNode := min .Values.workload.gpus 8 }}
+{{ $nodes := div .Values.workload.gpus 4 | max 1 }}
+{{ $gpusPerNode := min .Values.workload.gpus 4 }}
 
 {{ $root := . }}
 
@@ -49,22 +49,22 @@ spec:
         {{- end }}
         {{- if not $root.Values.network.hostNetwork }}
         networking.gke.io/default-interface: "eth0"
-        networking.gke.io/interfaces: |
-        {{- if $root.Values.network.subnetworks }}
-          [
-            {{- range $i, $subnetwork := $root.Values.network.subnetworks }}
-            {"interfaceName":"eth{{ $i }}","network":"{{ $subnetwork }}"}{{ eq $i 9 | ternary "" ","}}
-            {{- end }}
-          ]
-        {{- else }}
-          [
-            {"interfaceName":"eth0","network":"default"},
-            {"interfaceName":"eth1","network":"gvnic-1"},
-            {{- range  $i := until 8 }}
-            {"interfaceName":"eth{{ add 2 $i }}","network":"rdma-{{ $i }}"}{{ eq $i 7 | ternary "" ","}}
-            {{- end }}
-          ]
-        {{- end }}
+        # networking.gke.io/interfaces: |
+        # {{- if $root.Values.network.subnetworks }}
+        #   [
+        #     {{- range $i, $subnetwork := $root.Values.network.subnetworks }}
+        #     {"interfaceName":"eth{{ $i }}","network":"{{ $subnetwork }}"}{{ eq $i 5 | ternary "" ","}}
+        #     {{- end }}
+        #   ]
+        # {{- else }}
+        #   [
+        #     {"interfaceName":"eth0","network":"default"},
+        #     {"interfaceName":"eth1","network":"gvnic-1"},
+        #     {{- range  $i := until 4 }}
+        #     {"interfaceName":"eth{{ add 2 $i }}","network":"rdma-{{ $i }}"}{{ eq $i 3 | ternary "" ","}}
+        #     {{- end }}
+        #   ]
+        # {{- end }}
         {{- end }}
     spec:
       {{- if $root.Values.network.hostNetwork }}
@@ -91,6 +91,10 @@ spec:
         key: nvidia.com/gpu
       - operator: "Exists"
         key: cloud.google.com/impending-node-termination
+      - key: "kubernetes.io/arch"
+        operator: "Equal"
+        value: "arm64"
+        effect: "NoSchedule"
       volumes:
         {{- if $root.Values.network.gibVersion }}
         - name: gib
@@ -182,9 +186,8 @@ spec:
               value: "{{ $root.Values.workload.model.name }}"
             - name: MODEL_DOWNLOAD_DIR
               value: "/ssd/{{ $root.Values.workload.model.name }}"
-            # A3-Ultra recipe is based on the TensorRT image, which puts tensorrt_llm in a different path than default
             - name: TRTLLM_DIR
-              value: "/workspace/tensorrtllm_backend/tensorrt_llm"
+              value: "/app/tensorrt_llm"
             {{- if $root.Values.workload.envs }}
             {{- toYaml .Values.workload.envs | nindent 12 }}
             {{- end }}
@@ -194,44 +197,53 @@ spec:
           args:
             - |
               #!/bin/bash
-
-              if [[ -n "${NCCL_INIT_SCRIPT}" ]]; then
-                echo "Running NCCL init script: ${NCCL_INIT_SCRIPT}"
-                source ${NCCL_INIT_SCRIPT}
-                env | grep NCCL
-                ldconfig
-              fi
-
+              pip install pyyaml hf_transfer
               if [ ! -f "$LAUNCHER_SCRIPT" ]; then
                 echo "Error: Launcher script $LAUNCHER_SCRIPT not found!"
                 exit 1
               fi
 
               ARGS=()
+              EXTRA_ARGS_FILE="/tmp/extra_llm_api_args.yaml"
 
-              if [ -f "$SERVER_ARGS_FILE" ]; then
-                echo "Loading server arguments from ConfigMap"
-                while IFS=': ' read -r key value || [ -n "$key" ]; do
-                  [[ -z "$key" || "$key" == \#* ]] && continue
-                  key=$(echo "$key" | xargs)
-                  value=$(echo "$value" | xargs)
+              # Use Python to parse the main config file, extract llm_api_args,
+              # and generate the command-line arguments.
+              python -c "
+              import yaml
+              import sys
 
-                  if [ -n "$key" ]; then
-                    # Handle boolean values
-                    if [[ "$value" == "true" ]]; then
-                      # For true values, just add the flag without a value
-                      ARGS+=("--$key")
-                    elif [[ "$value" == "false" ]]; then
-                      ARGS+=("--$key" "false")
-                    elif [ -n "$value" ]; then
-                      # For non-boolean values, add both the flag and its value
-                      ARGS+=("--$key" "$value")
-                    else
-                      ARGS+=("--$key")
-                    fi
-                  fi
-                done < "$SERVER_ARGS_FILE"
-              fi
+              args = []
+              llm_api_args = {}
+              config_file = sys.argv[1]
+              extra_args_file = sys.argv[2]
+
+              try:
+                with open(config_file, 'r') as f:
+                  config = yaml.safe_load(f)
+
+                if 'llm_api_args' in config:
+                  llm_api_args = config.pop('llm_api_args')
+                  with open(extra_args_file, 'w') as f:
+                    yaml.dump(llm_api_args, f)
+
+                for key, value in config.items():
+                  if value is True:
+                    args.append(f'--{key}')
+                  elif value is not False:
+                    args.append(f'--{key}')
+                    args.append(str(value))
+
+                # Print the arguments for the shell script to capture
+                print(' '.join(args))
+
+              except Exception as e:
+                print(f'Error parsing config file: {e}', file=sys.stderr)
+                sys.exit(1)
+              " "$SERVER_ARGS_FILE" "$EXTRA_ARGS_FILE" > /tmp/launcher_args.txt
+
+              # Read the generated arguments into the ARGS array
+              mapfile -t ARGS < <(tr ' ' '\n' < /tmp/launcher_args.txt)
+              rm /tmp/launcher_args.txt
 
               {{ if eq $root.Values.workload.framework "trtllm" }}
               {{- range $root.Values.workload.benchmarks.experiments }}
