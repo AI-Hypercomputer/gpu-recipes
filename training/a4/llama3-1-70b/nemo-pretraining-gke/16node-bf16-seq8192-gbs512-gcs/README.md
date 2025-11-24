@@ -28,17 +28,17 @@ This recipe has been optimized for and tested with the following configuration:
   - Kueue and JobSet APIs installed
   - Kueue configured to support Topology Aware Scheduling
 - A regional Google Cloud Storage (GCS) bucket to store logs.
-- A regional Google Cloud Storage (GCS) bucket with [hierarchical](https://cloud.google.com/storage/docs/hns-overview)) namespace to store the Pile dataset
-- A regional Google Cloud Storage (GCS) bucket with [hierarchical](https://cloud.google.com/storage/docs/hns-overview)) namespace to store checkpoints
+- A regional Google Cloud Storage (GCS) bucket with [hierarchical](https://cloud.google.com/storage/docs/hns-overview) namespace to store the Pile dataset
+- A regional Google Cloud Storage (GCS) bucket with [hierarchical](https://cloud.google.com/storage/docs/hns-overview) namespace to store checkpoints
 - A client workstation with the following pre-installed:
    - Google Cloud SDK
    - Helm
    - kubectl
 
-*Important: All GCS buckets must be in the same region as the GKE cluster*.
-
 To prepare the required environment, see
 [GKE environment setup guide](../../../../docs/configuring-environment-gke-a4.md).
+
+**Important:** All GCS buckets must be in the same region as the GKE cluster.
 
 ## Training dataset
 
@@ -83,10 +83,10 @@ Replace the following values:
   - `<GCS_BUCKET_LOGS>`: the name of a Cloud Storage bucket for logs. Do not include the `gs://` prefix
   - `<GCS_BUCKET_DATA>`: the name of a Cloud Storage bucket for training data. Do not include the `gs://` prefix
   - `<GCS_BUCKET_CHECKPOINTS>`: the name of a Cloud Storage bucket for checkpoints. Do not include the `gs://` prefix
-  - `<ENABLE_DATALOADING>`: The recipe has an option to use real dataset for dataloading.
-  - `<ENABLE_CHECKPOINT_WRITE>`: To enable checkpoint write.
+  - `<ENABLE_DATALOADING>`: The recipe has an option to use real dataset for dataloading. Default is false.
+  - `<ENABLE_CHECKPOINT_WRITE>`: To enable checkpoint write. Default is false.
   - `<CHECKPOINT_WRITE_INTERVAL>`: Step interval at which checkpoint will be written.
-  - `<ENABLE_CHECKPOINT_LOAD>`: To enable checkpoint restore.
+  - `<ENABLE_CHECKPOINT_LOAD>`: To enable checkpoint restore. Default is false.
   - `<RESTORE_PATH>`: Path to a specific checkpoint to restore from. The mount point of checkpoint_bucket is `/checkpoints` and hence the path should start with `/checkpoints`. 
   - `<TOKEN_PATH>`: tokenizer model file of sentencepiece.
   - `<DATASET_PATH>`: Path in dataset_bucket for dataloading. The path should contain only the dataloading objects. The mount point of dataset_bucket is `/data` and hence the path should start with `/data`. 
@@ -260,7 +260,7 @@ helm uninstall $WORKLOAD_NAME
 
 ### Uninstall PVCs and PVs
 
-To uninstall Persistent Volume and Persistent Volume Claim resources for Parallelstore execute the following command:
+To uninstall Persistent Volume and Persistent Volume Claim resources for GCSFuse execute the following command:
 
 ```
 helm uninstall $USER-gcs-pv-pvc

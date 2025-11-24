@@ -32,7 +32,7 @@ workload:
   envs:
   - name: GLOO_SOCKET_IFNAME
     value: eth0
-  gcsSidecarImage: gcr.io/gcs-tess/ashmeen/gcs-fuse-csi-driver-sidecar-mounter:v3.2.0_test
+  gcsSidecarImage: gcr.io/gke-release/gcs-fuse-csi-driver-sidecar-mounter:v1.17.7-gke.4
   gpus: 128 # default value
   step_count: 100 # default value
   image: nvcr.io/nvidia/nemo:25.07
