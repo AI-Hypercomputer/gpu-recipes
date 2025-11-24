@@ -32,6 +32,7 @@ workload:
   envs:
   - name: GLOO_SOCKET_IFNAME
     value: eth0
+  # The recipe is designed and tested for gcsfuse v3.2.0 and later versions.
   gcsSidecarImage: gcr.io/gke-release/gcs-fuse-csi-driver-sidecar-mounter:v1.17.7-gke.4
   gpus: 128 # default value
   step_count: 100 # default value

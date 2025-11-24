@@ -49,7 +49,7 @@ The recipe uses the [Pile dataset](https://pile.eleuther.ai/) converted to NeMo 
 This recipe uses the following docker images:
 
 - `nvcr.io/nvidia/nemo:25.07`
-- `us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib-arm64:v1.0.6`
+- `us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:v1.1.0`
 
 ## Run the recipe
 
@@ -83,12 +83,12 @@ Replace the following values:
   - `<GCS_BUCKET_LOGS>`: the name of a Cloud Storage bucket for logs. Do not include the `gs://` prefix
   - `<GCS_BUCKET_DATA>`: the name of a Cloud Storage bucket for training data. Do not include the `gs://` prefix
   - `<GCS_BUCKET_CHECKPOINTS>`: the name of a Cloud Storage bucket for checkpoints. Do not include the `gs://` prefix
-  - `<ENABLE_DATALOADING>`: The recipe has an option to use real dataset for dataloading. Default is false.
+  - `<ENABLE_DATALOADING>`: The recipe has an option to use a real dataset for dataloading. Default is false.
   - `<ENABLE_CHECKPOINT_WRITE>`: To enable checkpoint write. Default is false.
-  - `<CHECKPOINT_WRITE_INTERVAL>`: Step interval at which checkpoint will be written.
+  - `<CHECKPOINT_WRITE_INTERVAL>`: Step interval at which checkpoints will be written.
   - `<ENABLE_CHECKPOINT_LOAD>`: To enable checkpoint restore. Default is false.
   - `<RESTORE_PATH>`: Path to a specific checkpoint to restore from. The mount point of checkpoint_bucket is `/checkpoints` and hence the path should start with `/checkpoints`. 
-  - `<TOKEN_PATH>`: tokenizer model file of sentencepiece.
+  - `<TOKEN_PATH>`: SentencePiece tokenizer model file.
   - `<DATASET_PATH>`: Path in dataset_bucket for dataloading. The path should contain only the dataloading objects. The mount point of dataset_bucket is `/data` and hence the path should start with `/data`. 
 
 Set the default project:
@@ -144,7 +144,7 @@ $REPO_ROOT/src/helm-charts/storage/gcs-fuse
 
 ### Configure and submit a pretraining job
 
-#### Using 16 node (64 gpus) bf16-mixed precision
+#### Using 16 node (128 gpus) bf16-mixed precision
 To execute the job with the default settings, run the following command from
 your client:
 
