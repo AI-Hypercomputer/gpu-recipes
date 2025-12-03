@@ -13,6 +13,7 @@
 # limitations under the License.
 
 {{- range $gcs := .Values.gcsVolumes }}
+{{- if $gcs.bucketName }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -27,4 +28,5 @@ spec:
   storageClassName: gcs-fuse-storage
   volumeName: {{ $gcs.name }}-pv
 ---
+{{- end }}
 {{- end }}

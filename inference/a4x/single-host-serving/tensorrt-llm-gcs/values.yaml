@@ -1,0 +1,78 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+queue:
+
+dwsSettings:
+  maxRunDurationSeconds:
+
+volumes:
+  gcsVolumes: true
+  ssdMountPath: "/ssd"
+  gcsMounts:
+    - bucketName:
+      mountPath: "/gcs-logs"
+  pvcMounts:
+    - claimName: "gcs-serving-model-pvc"
+      mountPath: "/serving-model"
+
+service:
+  type: ClusterIP
+  ports:
+    http: 8000
+
+workload:
+  model:
+    name:
+  gpus: 4
+  image:
+  framework: trtllm
+  configFile: serving-args.yaml
+  configPath: /workload/configs
+  envs:
+    - name: LAUNCHER_SCRIPT
+      value: "/workload/launcher/launch-workload.sh"
+    - name: SERVER_ARGS_FILE
+      value: "/workload/configs/serving-args.yaml"
+  benchmarks:
+    experiments:
+      - isl: 128
+        osl: 128
+        num_requests: 1000
+
+network:
+  gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib-arm64:v1.0.7
+  ncclSettings:
+    - name: NCCL_DEBUG
+      value: "VERSION"
+
+targetNodes:
+- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-0phl
+- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-12dg
+- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-4ncf
+- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-6t1h
+- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-7knw
+- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-8z5k
+- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-jt1t
+- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-km6k
+- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-lr4w
+- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-lzj8
+- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-nghr
+- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-q1rz
+- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-rvlb
+- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-sjcg
+- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-v549
+- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-vd4h
+- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-x1qx
+- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-z47k

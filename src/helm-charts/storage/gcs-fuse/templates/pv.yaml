@@ -13,6 +13,7 @@
 # limitations under the License.
 
 {{- range $gcs := .Values.gcsVolumes }}
+{{- if $gcs.bucketName }}
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -45,24 +46,43 @@ spec:
       gcsfuseMetadataPrefetchOnMount: "true"
 {{- else if eq $gcs.type "checkpoints" }}
   mountOptions:
-    - implicit-dirs  
-    - metadata-cache:negative-ttl-secs:0 
-    - metadata-cache:ttl-secs:-1 
+    - implicit-dirs
+    - metadata-cache:negative-ttl-secs:0
+    - metadata-cache:ttl-secs:-1
     - metadata-cache:stat-cache-max-size-mb:-1
     - metadata-cache:type-cache-max-size-mb:-1
     - write:enable-streaming-writes:true
     # This workaround is for gcsfuse v3.5.0 and below versions.
     # Earlier GCSFuse versions do not recognize a4-highgpu-8g as a high-performance machine.
-    # Setting machine-type to a3-highgpu-8g increases the global-max-block, which is 
+    # Setting machine-type to a3-highgpu-8g increases the global-max-block, which is
     # crucial for streaming writes. Without a higher global-max-block, streaming writes
     # would fall back to staged writes, resulting in slower write performance.
     # For gcsfuse v3.5.0 and later, `machine-type:a3-highgpu-8g` can be commented out.
     - machine-type:a3-highgpu-8g
-    - file-cache:max-size-mb:-1 
-    - file-cache:cache-file-for-range-read:true 
-    - file-cache:enable-parallel-downloads:true 
+    - file-cache:max-size-mb:-1
+    - file-cache:cache-file-for-range-read:true
+    - file-cache:enable-parallel-downloads:true
   {{- if $gcs.dirPath }}
-  - only-dir:{{ $gcs.dirPath }}
+    - only-dir:{{ $gcs.dirPath }}
+  {{- end }}
+  csi:
+    driver: gcsfuse.csi.storage.gke.io
+    volumeHandle: {{ $gcs.bucketName }}
+    volumeAttributes:
+      skipCSIBucketAccessCheck: "true"
+      gcsfuseMetadataPrefetchOnMount: "true"
+{{- else if eq $gcs.type "serving-model" }}
+  mountOptions:
+    - implicit-dirs
+    - metadata-cache:negative-ttl-secs:0
+    - metadata-cache:ttl-secs:-1
+    - metadata-cache:stat-cache-max-size-mb:-1
+    - metadata-cache:type-cache-max-size-mb:-1
+    - read_ahead_kb=1024
+    - file-cache:max-size-mb:0
+    - file-cache:enable-parallel-downloads:false
+  {{- if $gcs.dirPath }}
+    - only-dir:{{ $gcs.dirPath }}
   {{- end }}
   csi:
     driver: gcsfuse.csi.storage.gke.io
@@ -72,4 +92,5 @@ spec:
       gcsfuseMetadataPrefetchOnMount: "true"
 {{- end }}
 ---
+{{- end }}
 {{- end }}
