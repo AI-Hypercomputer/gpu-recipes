@@ -1,14 +1,13 @@
-# Single Host Model Serving with NVIDIA TensorRT-LLM (TRT-LLM) on A4x GKE Node Pool using Google Cloud Storage
+# Single Host Model Serving with NVIDIA TensorRT-LLM (TRT-LLM) and Google Cloud Storage on A4x GKE Node Pool
 
-This document outlines the steps to serve and benchmark various Large Language Models (LLMs) using the [NVIDIA TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) framework on a single [A4x GKE Node pool](https://cloud.google.com/kubernetes-engine)
-and using Google Cloud Storage to hold the model folder.
+This document outlines the steps to serve and benchmark various Large Language Models (LLMs) using the [NVIDIA TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) framework on a single [A4x GKE Node pool](https://cloud.google.com/kubernetes-engine), with model stored in Google Cloud Storage.
 
 This guide walks you through setting up the necessary cloud infrastructure, configuring your environment, and deploying a high-performance LLM for inference.
 
 <a name="table-of-contents"></a>
 ## Table of Contents
 
-- [Single Host Model Serving with NVIDIA TensorRT-LLM (TRT-LLM) on A4x GKE Node Pool using Google Cloud Storage](#single-host-model-serving-with-nvidia-tensorrt-llm-trt-llm-on-a4x-gke-node-pool-using-google-cloud-storage)
+- [Single Host Model Serving with NVIDIA TensorRT-LLM (TRT-LLM) and Google Cloud Storage on A4x GKE Node Pool](#single-host-model-serving-with-nvidia-tensorrt-llm-trt-llm-and-google-cloud-storage-on-a4x-gke-node-pool)
   - [Table of Contents](#table-of-contents)
   - [1. Test Environment](#1-test-environment)
   - [2. High-Level Flow](#2-high-level-flow)
@@ -16,7 +15,7 @@ This guide walks you through setting up the necessary cloud infrastructure, conf
     - [3.1. Clone the Repository](#31-clone-the-repository)
     - [3.2. Configure Environment Variables](#32-configure-environment-variables)
     - [3.3. Connect to your GKE Cluster](#33-connect-to-your-gke-cluster)
-    - [3.4 Upload the model checkpoints](#34-upload-the-model-checkpoints)
+    - [3.4 Upload the Model Checkpoints](#34-upload-the-model-checkpoints)
     - [3.5 Create Persistent Volumes and Persistent Volume Claims](#35-create-persistent-volumes-and-persistent-volume-claims)
     - [3.6 Grant Storage Permission to Kubernetes Service Account](#36-grant-storage-permission-to-kubernetes-service-account)
   - [4. Run the recipe](#4-run-the-recipe)
@@ -34,8 +33,7 @@ This guide walks you through setting up the necessary cloud infrastructure, conf
 The recipe uses the following setup:
 
 * **Orchestration**: [Google Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine)
-* **Deployment Configuration**: A [Helm chart](https://helm.sh/) is used to configure and deploy a [Kubernetes Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/). This deployment encapsulates the inference of the target LLM using the TensorRT-LLM framework.
-  Another Helm chart is used to create persistent volume and persistent volume claim for model folder in GCS.
+* **Deployment Configuration**: A [Helm chart](https://helm.sh/) is used to configure and deploy a [Kubernetes Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/). This deployment encapsulates the inference of the target LLM using the TensorRT-LLM framework.  A separate Helm chart creates the necessary Persistent Volume (PV) and Persistent Volume Claim (PVC), facilitating access to the model stored in Google Cloud Storage (GCS).
 
 This recipe has been optimized for and tested with the following configuration:
 
@@ -128,22 +126,13 @@ export RECIPE_ROOT=$REPO_ROOT/inference/a4x/single-host-serving/tensorrt-llm-gcs
 This is the most critical step. These variables are used in subsequent commands to target the correct resources.
 
 ```bash
-export PROJECT_ID=<PROJECT_ID>
-export CLUSTER_REGION=<CLUSTER_REGION>
-export CLUSTER_NAME=<CLUSTER_NAME>
-export KUEUE_NAME=<KUEUE_NAME>
-export GCS_BUCKET_LOGS=<GCS_BUCKET_LOGS>
-export GCS_BUCKET_SERVING_MODEL=<GCS_BUCKET_SERVING_MODEL>
+export PROJECT_ID=<YOUR_PROJECT_ID>
+export CLUSTER_REGION=<YOUR_CLUSTER_REGION>
+export CLUSTER_NAME=<YOUR_CLUSTER_NAME>
+export KUEUE_NAME=<YOUR_KUEUE_NAME>
+export GCS_BUCKET_LOGS=<YOUR_GCS_BUCKET_LOGS>
+export GCS_BUCKET_SERVING_MODEL=<YOUR_GCS_BUCKET_SERVING_MODEL>
 export GCS_FOLDER_SERVING_MODEL=<YOUR_GCS_FOLDER_SERVING_MODEL>
-export TRTLLM_VERSION=1.2.0rc2
-
-export PROJECT_ID=supercomputer-testing
-export CLUSTER_REGION=us-west8
-export CLUSTER_NAME=imo-glacier-peak
-export KUEUE_NAME=a4x
-export GCS_BUCKET_LOGS=tess-benchmark-outputs
-export GCS_BUCKET_SERVING_MODEL=serving-model-us-west8
-export GCS_FOLDER_SERVING_MODEL=cp-hf
 export TRTLLM_VERSION=1.2.0rc2
 
 # Set the project for gcloud commands
@@ -160,7 +149,7 @@ Replace the following values:
 | `KUEUE_NAME` | The name of the Kueue local queue. The default queue created by the cluster toolkit is `a4x`. Verify the name in your cluster. | `a4x` |
 | `GCS_BUCKET_LOGS` | Name of your GCS logs bucket (do not include `gs://`). | `my-benchmark-logs-bucket` |
 | `GCS_BUCKET_SERVING_MODEL` | Name of your GCS model bucket (do not include `gs://`). | `my-benchmark-model-bucket` |
-| `GCS_FOLDER_SERVING_MODEL` | Name of your GCS model folder (do not include `gs://{your-model-bucket}`). | `my-benchmark-model-bucket` |
+| `GCS_FOLDER_SERVING_MODEL` | Name of your GCS model folder (do not include `gs://{your-model-bucket}/`). | `my-benchmark-model-folder` |
 | `TRTLLM_VERSION` | The tag/version for the Docker image. Other verions can be found at https://catalog.ngc.nvidia.com/orgs/nvidia/teams/tensorrt-llm/containers/release | `1.2.0rc2` |
 
 
@@ -173,16 +162,24 @@ Fetch credentials for `kubectl` to communicate with your cluster.
 gcloud container clusters get-credentials $CLUSTER_NAME --region $CLUSTER_REGION
 ```
 
-
 <a name="download-model-checkpoints"></a>
-### 3.4 Upload the model checkpoints
+### 3.4 Upload the Model Checkpoints
+
 In this recipe, we are using [DeepSeek-R1 671B model](https://huggingface.co/deepseek-ai/DeepSeek-R1) on HuggingFace.
-To download the model:
-- [mount the bucket](https://docs.cloud.google.com/storage/docs/cloud-storage-fuse/mount-bucket)
+To download the model, please follow the steps below:
+1. [mount the bucket](https://docs.cloud.google.com/storage/docs/cloud-storage-fuse/mount-bucket)
 to your local system.
-- Access into the mount path, create a folder to hold model.
-- [Download](https://huggingface.co/docs/hub/en/models-downloading)
-the model through `hf command`
+2. Access into the mount point, create the model folder.
+
+Under the mount point:
+
+```bash
+3. [Download](https://huggingface.co/docs/hub/en/models-downloading)
+the model using `hf command`:
+
+```bash
+hf download deepseek-ai/DeepSeek-R1
+```
 
 <a name="create-pv-pvc"></a>
 ### 3.5 Create Persistent Volumes and Persistent Volume Claims
@@ -195,7 +192,7 @@ Claims (PVC). You must generate PVs and PVCs for serving bucket using the
 The chart configures the FUSE driver settings following the best practices
 for optimizing access to buckets for training data and checkpoints.
 
-```
+```bash
 helm install -f $REPO_ROOT/src/helm-charts/storage/gcs-fuse/values.yaml \
 --set gcsVolumes[2].bucketName=${GCS_BUCKET_SERVING_MODEL} \
 --set gcsVolumes[2].dirPath=${GCS_FOLDER_SERVING_MODEL} \
@@ -207,11 +204,11 @@ $REPO_ROOT/src/helm-charts/storage/gcs-fuse
 ### 3.6 Grant Storage Permission to Kubernetes Service Account
 
 For a cluster with
-[Workload Identity Federation](https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity)
-, you can grant `roles/storage.objectAdmin` access to Kubernetes service
-account following
-[instruction](https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity#kubernetes-resources-iam-policies).
-
+[Workload Identity Federation](https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity) enabled
+, please following
+[instructions](https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity#kubernetes-resources-iam-policies)
+to grant `roles/storage.objectAdmin` access to Kubernetes service
+account.
 
 <a name="run-the-recipe"></a>
 ## 4. Run the recipe
@@ -230,7 +227,7 @@ This recipe supports the deployment of the following models:
 
 [Back to Top](#table-of-contents)
 
-The recipe runs inference throughput benchmark for [DeepSeek-R1 671B NVFP4 model](https://huggingface.co/nvidia/DeepSeek-R1-NVFP4-v2) which is Nvidia's pre-quantized FP4 checkpoint of the original [DeepSeek-R1 671B model](https://huggingface.co/deepseek-ai/DeepSeek-R1).
+The recipe runs inference throughputs benchmark for [DeepSeek-R1 671B NVFP4 model](https://huggingface.co/nvidia/DeepSeek-R1-NVFP4-v2) which is Nvidia's pre-quantized FP4 checkpoint of the original [DeepSeek-R1 671B model](https://huggingface.co/deepseek-ai/DeepSeek-R1).
 
 The recipe uses [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/performance/perf-benchmarking.md), a command-line tool from NVIDIA to benchmark the performance of TensorRT-LLM engine. For more information about `trtllm-bench`, see the [TensorRT-LLM documentation](https://github.com/NVIDIA/TensorRT-LLM).
 
@@ -240,16 +237,15 @@ The recipe uses [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/mai
 1. Install the helm chart to prepare and benchmark the model using [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/performance/perf-benchmarking.md) tool:
 
     ```bash
-    --set queue=${KUEUE_NAME} \
-
     cd $RECIPE_ROOT
     helm install -f values.yaml \
     --set-file workload_launcher=$REPO_ROOT/src/launchers/trtllm-launcher-gcs.sh \
     --set-file serving_config=$REPO_ROOT/src/frameworks/a4x/trtllm-configs/deepseek-r1-nvfp4.yaml \
+    --set queue=${KUEUE_NAME} \
     --set "volumes.gcsMounts[0].bucketName=${GCS_BUCKET_LOGS}" \
     --set workload.model.name=nvidia/DeepSeek-R1-NVFP4-v2 \
     --set workload.image=nvcr.io/nvidia/tensorrt-llm/release:${TRTLLM_VERSION} \
-    $USER-serving-deepseek-r1-model-39 \
+    $USER-serving-deepseek-r1-model \
     $REPO_ROOT/src/helm-charts/a4x/inference-templates-gcs/deployment
     ```
 
