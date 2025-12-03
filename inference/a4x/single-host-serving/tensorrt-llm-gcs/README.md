@@ -1,4 +1,4 @@
-# Single Host Model Serving with NVIDIA TensorRT-LLM (TRT-LLM) and Google Cloud Storage on A4x GKE Node Pool
+# Single Host Model Serving with NVIDIA TensorRT-LLM (TRT-LLM) and Google Cloud Storage on A4X GKE Node Pool
 
 This document outlines the steps to serve and benchmark various Large Language Models (LLMs) using the [NVIDIA TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) framework on a single [A4x GKE Node pool](https://cloud.google.com/kubernetes-engine), with model stored in Google Cloud Storage.
 
@@ -7,7 +7,7 @@ This guide walks you through setting up the necessary cloud infrastructure, conf
 <a name="table-of-contents"></a>
 ## Table of Contents
 
-- [Single Host Model Serving with NVIDIA TensorRT-LLM (TRT-LLM) and Google Cloud Storage on A4x GKE Node Pool](#single-host-model-serving-with-nvidia-tensorrt-llm-trt-llm-and-google-cloud-storage-on-a4x-gke-node-pool)
+- [Single Host Model Serving with NVIDIA TensorRT-LLM (TRT-LLM) and Google Cloud Storage on A4X GKE Node Pool](#single-host-model-serving-with-nvidia-tensorrt-llm-trt-llm-and-google-cloud-storage-on-a4x-gke-node-pool)
   - [Table of Contents](#table-of-contents)
   - [1. Test Environment](#1-test-environment)
   - [2. High-Level Flow](#2-high-level-flow)
@@ -33,7 +33,8 @@ This guide walks you through setting up the necessary cloud infrastructure, conf
 The recipe uses the following setup:
 
 * **Orchestration**: [Google Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine)
-* **Deployment Configuration**: A [Helm chart](https://helm.sh/) is used to configure and deploy a [Kubernetes Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/). This deployment encapsulates the inference of the target LLM using the TensorRT-LLM framework.  A separate Helm chart creates the necessary Persistent Volume (PV) and Persistent Volume Claim (PVC), facilitating access to the model stored in Google Cloud Storage (GCS).
+* **Deployment Configuration**: A [Helm chart](https://helm.sh/) is used to configure and deploy a [Kubernetes Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/). This deployment encapsulates the inference of the target LLM using the TensorRT-LLM framework.  A separate Helm chart creates the necessary Persistent Volume (PV) and Persistent Volume Claim (PVC), facilitating access to the model stored in
+  [Google Cloud Storage (GCS)](https://cloud.google.com/storage?hl=en).
 
 This recipe has been optimized for and tested with the following configuration:
 
@@ -89,7 +90,7 @@ flowchart TD
     C --> D
     D --> E
     F --> C
-    H -- Downloads at runtime --> E
+    H -- Load at runtime --> E
     E -- Write logs --> J
 
 
@@ -149,7 +150,7 @@ Replace the following values:
 | `KUEUE_NAME` | The name of the Kueue local queue. The default queue created by the cluster toolkit is `a4x`. Verify the name in your cluster. | `a4x` |
 | `GCS_BUCKET_LOGS` | Name of your GCS logs bucket (do not include `gs://`). | `my-benchmark-logs-bucket` |
 | `GCS_BUCKET_SERVING_MODEL` | Name of your GCS model bucket (do not include `gs://`). | `my-benchmark-model-bucket` |
-| `GCS_FOLDER_SERVING_MODEL` | Name of your GCS model folder (do not include `gs://{your-model-bucket}/`). | `my-benchmark-model-folder` |
+| `GCS_FOLDER_SERVING_MODEL` | Name of your GCS model folder (do not include `gs://{your-benchmark-model-bucket}/`). | `my-benchmark-model-folder` |
 | `TRTLLM_VERSION` | The tag/version for the Docker image. Other verions can be found at https://catalog.ngc.nvidia.com/orgs/nvidia/teams/tensorrt-llm/containers/release | `1.2.0rc2` |
 
 
@@ -165,32 +166,29 @@ gcloud container clusters get-credentials $CLUSTER_NAME --region $CLUSTER_REGION
 <a name="download-model-checkpoints"></a>
 ### 3.4 Upload the Model Checkpoints
 
-In this recipe, we are using [DeepSeek-R1 671B model](https://huggingface.co/deepseek-ai/DeepSeek-R1) on HuggingFace.
-To download the model, please follow the steps below:
-1. [mount the bucket](https://docs.cloud.google.com/storage/docs/cloud-storage-fuse/mount-bucket)
+To download the model from HuggingFace, please follow the steps below:
+
+1.  [Mount the bucket](https://docs.cloud.google.com/storage/docs/cloud-storage-fuse/mount-bucket)
 to your local system.
-2. Access into the mount point, create the model folder.
+1.  Access into the mount point and create the model folder.
+2.  Under the mount point,
+    [download](https://huggingface.co/docs/hub/en/models-downloading) the model
+    using the `hf` command:
 
-Under the mount point:
-
-```bash
-3. [Download](https://huggingface.co/docs/hub/en/models-downloading)
-the model using `hf command`:
-
-```bash
-hf download deepseek-ai/DeepSeek-R1
-```
+    ```bash
+    hf download {MODEL_NAME}
+    ```
 
 <a name="create-pv-pvc"></a>
 ### 3.5 Create Persistent Volumes and Persistent Volume Claims
 
-The inference deployment accesses GCS buckets for model through
+The inference deployment accesses GCS buckets for serving model through
 [the Cloud Storage FUSE CSI driver](https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/cloud-storage-fuse-csi-driver)
 configured using Kubernetes Persistent Volumes (PV) and Persistent Volume
-Claims (PVC). You must generate PVs and PVCs for serving bucket using the
+Claims (PVC). You must generate PVs and PVCs for serving modelbucket using the
 [gcs-fuse helper Helm chart](../../../../src/helm-charts/storage/gcs-fuse).
 The chart configures the FUSE driver settings following the best practices
-for optimizing access to buckets for training data and checkpoints.
+for optimizing access to buckets for serving model.
 
 ```bash
 helm install -f $REPO_ROOT/src/helm-charts/storage/gcs-fuse/values.yaml \
@@ -249,7 +247,7 @@ The recipe uses [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/mai
     $REPO_ROOT/src/helm-charts/a4x/inference-templates-gcs/deployment
     ```
 
-  This creates a Helm release and a Deployment named `$USER-serving-deepseek-r1-model`, and a Service named `$USER-serving-deepseek-r1-model-svc`.
+    This creates a Helm release and a Deployment named `$USER-serving-deepseek-r1-model`, and a Service named `$USER-serving-deepseek-r1-model-svc`.
 
 2.  **Check the deployment status.**
 
@@ -372,6 +370,8 @@ P99:   128.0000           128.0000           256.0000
 
 <a name="cleanup"></a>
 ## 6. Cleanup
+
+[Back to Top](#table-of-contents)
 
 To avoid incurring further charges, clean up the resources you created.
 
