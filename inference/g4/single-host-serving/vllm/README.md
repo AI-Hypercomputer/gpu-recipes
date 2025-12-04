@@ -77,16 +77,14 @@ sudo docker run \
     --env "HUGGING_FACE_HUB_TOKEN=$HF_TOKEN" \
     -p 8000:8000 \
     --ipc=host \
-    --entrypoint python3 \
     vllm/vllm-openai:latest \
-    -m vllm.entrypoints.openai.api_server \
     --model Qwen/Qwen3-32B-FP8 \
     --kv-cache-dtype fp8 \
     --max-num-batched-tokens 4096 \
     --max-num-seqs 256 \
     --max-model-len 8192 \ 
     --gpu-memory-utilization 0.95 \
-    --tensor-parallel-size 1 \ 
+    --tensor-parallel-size 8 \ 
 ```
 For the 32B model on a G4 (1-chip) instance, we recommend --max-num-batched-tokens 4096 --max-num-seqs 256 --max-model-len 8192.
 
