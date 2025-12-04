@@ -123,6 +123,7 @@ we will use the official vllm/vllm-openai:latest Docker image to run the server.
 
 ```bash
 sudo docker run \
+    --runtime nvidia \
     --gpus all \
     -v ~/.cache/huggingface:/root/.cache/huggingface \
     --env "HUGGING_FACE_HUB_TOKEN=$HF_TOKEN" \
