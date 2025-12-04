@@ -93,7 +93,7 @@ NVIDIA provides a pre-quantized version of DeepSeek-R1 on Hugging Face.
 # Inside the container
 
 # Download the pre-quantized model from Hugging Face
-apt-get update && apt-get install -y hugginface-cli
+apt-get update && apt-get install -y huggingface-cli
 
 huggingface-cli download nvidia/DeepSeek-R1-0528-NVFP4-v2 --local-dir /scratch/models/DeepSeek-R1-0528-NVFP4-v2
 ```
