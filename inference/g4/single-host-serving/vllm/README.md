@@ -98,7 +98,7 @@ Here's a breakdown of the arguments:
 -   `vllm/vllm-openai:latest`: This is the name of the official vLLM docker image.
 -   `--model Qwen/Qwen3-32B-FP8`: The model to be served from Hugging Face.
 -   `--kv-cache-dtype fp8`: Sets the data type for the key-value cache to FP8 to save GPU memory.
--   `--max-num-batched-tokens 4096`: The maximum number of tokens (mostly Input tokens from new requests + 1 token per active generating request) that can be processed in a single batch iteration.
+-   `--max-num-batched-tokens 4096`: Maximum number of tokens to be processed in a single iteration.
 -   `--max-num-seqs 256`: This sets the maximum number of concurrent requests (sequences) the VLLM scheduler keeps actively running in the GPU's KV cache. 
 -   `--max-model-len 2300`: This limits the total sequence length to 2300 tokens. This is sufficient to cover our target workload (Input 2048 + Output 128) while leaving a small buffer for prompt variations.
 -   `--gpu-memory-utilization 0.95`: The fraction of GPU memory to be used by vLLM.
