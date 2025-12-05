@@ -57,22 +57,3 @@ network:
     - name: NCCL_DEBUG
       value: "VERSION"
 
-targetNodes:
-- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-0phl
-- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-12dg
-- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-4ncf
-- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-6t1h
-- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-7knw
-- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-8z5k
-- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-jt1t
-- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-km6k
-- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-lr4w
-- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-lzj8
-- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-nghr
-- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-q1rz
-- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-rvlb
-- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-sjcg
-- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-v549
-- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-vd4h
-- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-x1qx
-- gke-imo-glacier-peak-a4x-highgpu-4g-a-76a6f770-z47k
