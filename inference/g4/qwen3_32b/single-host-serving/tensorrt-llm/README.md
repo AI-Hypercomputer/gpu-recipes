@@ -91,7 +91,7 @@ Now you are inside the container.
 # Inside the container
 
 # Download the base model from Hugging Face
-apt-get update && apt-get install -y hugginface-cli
+apt-get update && apt-get install -y huggingface-cli
 
 huggingface-cli download Qwen/Qwen2-32B-Instruct --local-dir /scratch/models/Qwen3-32B
 
