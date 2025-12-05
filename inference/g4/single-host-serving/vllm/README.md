@@ -86,7 +86,7 @@ sudo docker run \
     --gpu-memory-utilization 0.95 \
     --tensor-parallel-size 1 \ 
 ```
-For the 32B model on a G4 (1chip) instance, we recommend --max-num-batched-tokens 4096 --max-num-seqs 256 --max-model-len 2300.
+For the 32B model on a G4 (1 chip) instance, we recommend --max-num-batched-tokens 4096, --max-num-seqs 256, and --max-model-len 2300 for a 2048/128 workload.
 
 Here's a breakdown of the arguments:
 -   `--runtime nvidia --gpus all`: This makes the NVIDIA GPUs available inside the container.
@@ -97,9 +97,9 @@ Here's a breakdown of the arguments:
 -   `vllm/vllm-openai:latest`: This is the name of the official vLLM docker image.
 -   `--model Qwen/Qwen3-32B-FP8`: The model to be served from Hugging Face.
 -   `--kv-cache-dtype fp8`: Sets the data type for the key-value cache to FP8 to save GPU memory.
--   `--max-num-batched-tokens 4096`: This sets the maximum total tokens (Input + Output) the GPU processes in one go. It limits the GPU's immediate computational load.
+-   `--max-num-batched-tokens 4096`: The maximum number of tokens (mostly Input tokens from new requests + 1 token per active generating request) that can be processed in a single batch iteration.
 -   `--max-num-seqs 256`: This sets the maximum number of concurrent requests (sequences) the VLLM scheduler keeps actively running in the GPU's KV cache. 
--   `--max-model-len 2300`: This defines the maximum total context size (Input tokens + Output tokens + 100) allowed for any single request. It sets the model's context window limit.
+-   `--max-model-len 2300`: This defines the maximum total context size (Input tokens + Output tokens + 100) allowed for any single request.
 -   `--gpu-memory-utilization 0.95`: The fraction of GPU memory to be used by vLLM.
 -   `--tensor-parallel-size 1`: It specifies the number of gpu's to use.
 
