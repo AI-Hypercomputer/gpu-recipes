@@ -7,21 +7,23 @@ This guide walks you through setting up the necessary cloud infrastructure, conf
 <a name="table-of-contents"></a>
 ## Table of Contents
 
-* [1. Test Environment](#test-environment)
-* [2. High-Level Architecture](#architecture)
-* [3. Environment Setup (One-Time)](#environment-setup)
-  * [3.1. Clone the Repository](#clone-repo)
-  * [3.2. Configure Environment Variables](#configure-vars)
-  * [3.3. Connect to your GKE Cluster](#connect-cluster)
-  * [3.4 Upload the model checkpoints](#upload-the-model-checkpoints)
-  * [3.5 Create Persistent Volumes and Persistent Volume Claims](#create-persistent-volumes-and-persistent-volume-claims)
-  * [3.6 Grant Storage Permissions to Kubernetes Service Account](#grant-storage-permission-to-kubernetes-service-account)
-* [4. Run the Recipe](#run-the-recipe)
-  * [4.1. Inference benchmark for DeepSeek-R1 671B](#serving-deepseek-r1-671b)
-* [5. Monitoring and Troubleshooting](#monitoring)
-  * [5.1. Check Deployment Status](#check-status)
-  * [5.2. View Logs](#view-logs)
-* [6. Cleanup](#cleanup)
+- [Single Host Model Serving with NVIDIA TensorRT-LLM (TRT-LLM) and Google Cloud Storage on A4X GKE Node Pool](#single-host-model-serving-with-nvidia-tensorrt-llm-trt-llm-and-google-cloud-storage-on-a4x-gke-node-pool)
+  - [Table of Contents](#table-of-contents)
+  - [1. Test Environment](#1-test-environment)
+  - [2. High-Level Flow](#2-high-level-flow)
+  - [3. Environment Setup (One-Time)](#3-environment-setup-one-time)
+    - [3.1. Clone the Repository](#31-clone-the-repository)
+    - [3.2. Configure Environment Variables](#32-configure-environment-variables)
+    - [3.3. Connect to your GKE Cluster](#33-connect-to-your-gke-cluster)
+    - [3.4 Upload the Model Checkpoints](#34-upload-the-model-checkpoints)
+    - [3.5 Create Persistent Volumes and Persistent Volume Claims](#35-create-persistent-volumes-and-persistent-volume-claims)
+    - [3.6 Grant Storage Permission to Kubernetes Service Account](#36-grant-storage-permission-to-kubernetes-service-account)
+  - [4. Run the recipe](#4-run-the-recipe)
+    - [4.1. Inference benchmark for DeepSeek-R1 671B Model](#41-inference-benchmark-for-deepseek-r1-671b-model)
+  - [5. Monitoring and Troubleshooting](#5-monitoring-and-troubleshooting)
+    - [5.1. Check Deployment Status](#51-check-deployment-status)
+    - [5.2. View Logs](#52-view-logs)
+  - [6. Cleanup](#6-cleanup)
 
 <a name="test-environment"></a>
 ## 1. Test Environment
