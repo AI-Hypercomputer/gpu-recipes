@@ -31,7 +31,7 @@ def recipe(
   # Start from the Nemo standard recipe.
   pretrain = llama31_70b.pretrain_recipe(performance_mode=True)
 
-  num_nodes = 64
+  num_nodes = 32
   num_gpus_per_node = 4
   mbs = 1
   gbs = 2048
