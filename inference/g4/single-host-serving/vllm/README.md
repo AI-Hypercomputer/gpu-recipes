@@ -1,6 +1,6 @@
-# Single host inference benchmark of Qwen3-8B with vLLM on G4
+# Single host inference benchmark of Qwen3-32B-FP8 with vLLM on G4
 
-This recipe shows how to serve and benchmark Qwen3-8B model using [vLLM](https://github.com/vllm-project/vllm) on a single GCP VM with G4 GPUs. vLLM is a high-throughput and memory-efficient inference and serving engine for LLMs. For more information on G4 machine types, see the [GCP documentation](https://cloud.google.com/compute/docs/accelerator-optimized-machines#g4-machine-types).
+This recipe shows how to serve and benchmark Qwen3-32B-FP8 model using [vLLM](https://github.com/vllm-project/vllm) on a single GCP VM with G4 GPUs. vLLM is a high-throughput and memory-efficient inference and serving engine for LLMs. For more information on G4 machine types, see the [GCP documentation](https://cloud.google.com/compute/docs/accelerator-optimized-machines#g4-machine-types).
 
 ## Before you begin
 
@@ -47,7 +47,7 @@ gcloud compute ssh ${VM_NAME?} --project=${PROJECT_ID?} --zone=${ZONE?}
 nvidia-smi
 ```
 
-## Serve a model
+## Install Dependencies
 
 ### 1. Install Docker
 
@@ -63,9 +63,9 @@ To enable Docker containers to access the GPU, you need to install the NVIDIA Co
 You can follow the official NVIDIA documentation to install the container toolkit:
 [NVIDIA Container Toolkit Install Guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
 
-### 3. Install vLLM
+##  Serve a Model
 
-We will use the official vLLM docker image. This image comes with vLLM and all its dependencies pre-installed.
+### 1. Serving on Single-Chip (1 GPU):
 
 To run the vLLM server, you can use the following command:
 
@@ -78,10 +78,16 @@ sudo docker run \
     -p 8000:8000 \
     --ipc=host \
     vllm/vllm-openai:latest \
-    --model nvidia/Qwen3-8B-FP4 \
+    --model Qwen/Qwen3-32B-FP8 \
     --kv-cache-dtype fp8 \
-    --gpu-memory-utilization 0.95
+    --max-num-batched-tokens 4096 \
+    --max-num-seqs 256 \
+    --max-model-len 2300 \ 
+    --gpu-memory-utilization 0.95 \
+    --tensor-parallel-size 1  
 ```
+
+For the 32B model on a G4 (1 chip) instance, we recommend `--max-num-batched-tokens 4096`, `--max-num-seqs 256`, and `--max-model-len 2300` for a `2048/128` workload.
 
 Here's a breakdown of the arguments:
 -   `--runtime nvidia --gpus all`: This makes the NVIDIA GPUs available inside the container.
@@ -90,15 +96,50 @@ Here's a breakdown of the arguments:
 -   `-p 8000:8000`: This maps port 8000 on the host to port 8000 in the container.
 -   `--ipc=host`: This allows the container to share the host's IPC namespace, which can improve performance.
 -   `vllm/vllm-openai:latest`: This is the name of the official vLLM docker image.
--   `--model nvidia/Qwen3-8B-FP4`: The model to be served from Hugging Face.
+-   `--model Qwen/Qwen3-32B-FP8`: The model to be served from Hugging Face.
 -   `--kv-cache-dtype fp8`: Sets the data type for the key-value cache to FP8 to save GPU memory.
+-   `--max-num-batched-tokens 4096`: Maximum number of tokens to be processed in a single iteration.
+-   `--max-num-seqs 256`: This sets the maximum number of concurrent requests (sequences) the VLLM scheduler keeps actively running in the GPU's KV cache. 
+-   `--max-model-len 2300`: This limits the total sequence length to 2300 tokens. This is sufficient to cover our target workload (Input 2048 + Output 128) while leaving a small buffer for prompt variations.
 -   `--gpu-memory-utilization 0.95`: The fraction of GPU memory to be used by vLLM.
+-   `--tensor-parallel-size 1`: It specifies the number of gpu's to use.
+
+### 2. Serving on Multi-Chip (8 GPU): 
+
+G4 instances enhance multi-GPU workload performance by using direct GPU [peer-to-peer](https://cloud.google.com/blog/products/compute/g4-vms-p2p-fabric-boosts-multi-gpu-workloads/) communication. This capability allows GPUs that attach to the same G4 instance to exchange data directly over the PCIe bus, bypassing the need to transfer data through the CPU's main memory.
+
+
+```
+To configure NCCL, before you run your workloads, set the NCCL_P2P_LEVEL on your G4 instance by:
+export NCCL_P2P_LEVEL=SYS
+```
+
+we will use the official vllm/vllm-openai:latest Docker image to run the server. 
+
+```bash
+sudo docker run \
+    --runtime nvidia \
+    --gpus all \
+    -v ~/.cache/huggingface:/root/.cache/huggingface \
+    --env "HUGGING_FACE_HUB_TOKEN=$HF_TOKEN" \
+    -p 8000:8000 \
+    --ipc=host \
+    vllm/vllm-openai:latest \
+    --model Qwen/Qwen3-32B-FP8 \
+    --kv-cache-dtype fp8 \
+    --gpu-memory-utilization 0.95 \
+    --tensor-parallel-size 8 
+```
+
+Here's a breakdown of the arguments:
+-   `gpus all`: Exposes all 8 available GPUs to the Docker container.
+-   `tensor-parallel-size 8`: This is the crucial setting, enabling Tensor Parallelism to split the 32B model weights and operations across all 8 GPUs.
 
 For more information on the available engine arguments, you can refer to the [official vLLM documentation](https://docs.vllm.ai/en/latest/configuration/engine_args/), which includes different parallelism strategies that can be used with multi GPU setup.
 
 After running the command, the model will be served. To run the benchmark, you will need to either run the server in the background by appending `&` to the command, or open a new terminal to run the benchmark command.
 
-## Run Benchmarks for Qwen3-8B-FP4
+## Run Benchmarks for Qwen3-32B-FP8
 
 ### 1. Server Output
 
@@ -122,23 +163,22 @@ sudo docker run \
     --network="host" \
     --entrypoint vllm \
     vllm/vllm-openai:latest bench serve \
-    --model nvidia/Qwen3-8B-FP4 \
+    --model Qwen/Qwen3-32B-FP8 \
     --dataset-name random \
-    --random-input-len 128 \
-    --random-output-len 2048 \
+    --random-input-len 2048 \
+    --random-output-len 128 \
     --request-rate inf \
-    --num-prompts 100 \
+    --num-prompts 1000 \
     --ignore-eos
 ```
-
 Here's a breakdown of the arguments:
-- `--model nvidia/Qwen3-8B-FP4`: The model to benchmark.
+- `--model Qwen/Qwen3-32B-FP8`: The model to benchmark.
 - `--dataset-name random`: The dataset to use for the benchmark. `random` will generate random prompts.
-- `--random-input-len 128`: The length of the random input prompts.
-- `--random-output-len 2048`: The length of the generated output.
+- `--random-input-len 2048`: The length of the random input prompts.
+- `--random-output-len 128`: The length of the generated output.
 - `--request-rate inf`: The number of requests per second to send. `inf` sends requests as fast as possible.
-- `--num-prompts 100`: The total number of prompts to send.
-- `--ignore-eos`: A flag to ignore the end-of-sentence token and generate a fixed number of tokens.
+- `--num-prompts 1000`: The total number of prompts to send.
+- `--ignore-eos`: A flag to ignore the end-of-sequence token and generate a fixed number of tokens.
 
 ### 3. Example output
 
