@@ -90,7 +90,7 @@ For the 32B model on a G4 (1chip) instance, we recommend --max-num-batched-token
 
 Here's a breakdown of the arguments:
 -   `--runtime nvidia --gpus all`: This makes the NVIDIA GPUs available inside the container.
--   `-v ~/.cache/huggingface:/root/.cache/huggingface`: This mounts the Hugging Face cache directory from the host to the container. This is useful for cachingdownloaded models.
+-   `-v ~/.cache/huggingface:/root/.cache/huggingface`: This mounts the Hugging Face cache directory from the host to the container. This is useful for caching downloaded models.
 -   `--env "HUGGING_FACE_HUB_TOKEN=$HF_TOKEN"`: This sets the Hugging Face Hub token as an environment variable in the container. This is required for downloading models that require authentication.
 -   `-p 8000:8000`: This maps port 8000 on the host to port 8000 in the container.
 -   `--ipc=host`: This allows the container to share the host's IPC namespace, which can improve performance.
