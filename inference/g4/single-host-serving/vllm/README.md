@@ -84,7 +84,7 @@ sudo docker run \
     --max-num-seqs 256 \
     --max-model-len 2300 \ 
     --gpu-memory-utilization 0.95 \
-    --tensor-parallel-size 1 \ 
+    --tensor-parallel-size 1  
 ```
 
 For the 32B model on a G4 (1 chip) instance, we recommend "--max-num-batched-tokens 4096", "--max-num-seqs 256", and "--max-model-len 2300" for a 2048/128 workload.
@@ -128,7 +128,7 @@ sudo docker run \
     --model Qwen/Qwen3-32B-FP8 \
     --kv-cache-dtype fp8 \
     --gpu-memory-utilization 0.95 \
-    --tensor-parallel-size 8 \
+    --tensor-parallel-size 8 
 ```
 
 Here's a breakdown of the arguments:
