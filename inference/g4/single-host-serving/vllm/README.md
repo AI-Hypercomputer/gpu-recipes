@@ -99,7 +99,7 @@ Here's a breakdown of the arguments:
 -   `--kv-cache-dtype fp8`: Sets the data type for the key-value cache to FP8 to save GPU memory.
 -   `--max-num-batched-tokens 4096`: This sets the maximum total tokens (Input + Output) the GPU processes in one go. It limits the GPU's immediate computational load.
 -   `--max-num-seqs 256`: This sets the maximum number of concurrent requests (sequences) the VLLM scheduler keeps actively running in the GPU's KV cache. 
--   `--max-model-len 2300`: This defines the maximum total context size (Input tokens + output tokens) allowed for any single request. It sets the model's context window limit.
+-   `--max-model-len 2300`: This defines the maximum total context size (Input tokens + output tokens + 100) allowed for any single request. It sets the model's context window limit.
 -   `--gpu-memory-utilization 0.95`: The fraction of GPU memory to be used by vLLM.
 -   `--tensor-parallel-size 1`: It specifies the number of gpu's to use.
 
