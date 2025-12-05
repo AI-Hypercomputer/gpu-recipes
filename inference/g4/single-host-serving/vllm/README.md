@@ -65,7 +65,7 @@ You can follow the official NVIDIA documentation to install the container toolki
 
 ##  Serve a Model
 
-### 1. Serving on Single-Chip (1GPU):
+### 1. Serving on Single-Chip (1 GPU):
 
 To run the vLLM server, you can use the following command:
 
@@ -84,7 +84,7 @@ sudo docker run \
     --max-num-seqs 256 \
     --max-model-len 2300 \ 
     --gpu-memory-utilization 0.95 \
-    --tensor-parallel-size 8 \ 
+    --tensor-parallel-size 1 \ 
 ```
 For the 32B model on a G4 (1chip) instance, we recommend --max-num-batched-tokens 4096 --max-num-seqs 256 --max-model-len 2300.
 
@@ -99,7 +99,7 @@ Here's a breakdown of the arguments:
 -   `--kv-cache-dtype fp8`: Sets the data type for the key-value cache to FP8 to save GPU memory.
 -   `--max-num-batched-tokens 4096`: This sets the maximum total tokens (Input + Output) the GPU processes in one go. It limits the GPU's immediate computational load.
 -   `--max-num-seqs 256`: This sets the maximum number of concurrent requests (sequences) the VLLM scheduler keeps actively running in the GPU's KV cache. 
--   `--max-model-len 2300`: This defines the maximum total context size (Input tokens + output tokens + 100) allowed for any single request. It sets the model's context window limit.
+-   `--max-model-len 2300`: This defines the maximum total context size (Input tokens + Output tokens + 100) allowed for any single request. It sets the model's context window limit.
 -   `--gpu-memory-utilization 0.95`: The fraction of GPU memory to be used by vLLM.
 -   `--tensor-parallel-size 1`: It specifies the number of gpu's to use.
 
@@ -132,7 +132,7 @@ sudo docker run \
 
 Here's a breakdown of the arguments:
 -   `gpus all`: Exposes all 8 available GPUs to the Docker container.
--   `tensor-parallel-size 8`: This is the crucial setting, enabling Tensor Parallelism to split the 70B model weights and operations across all 8 GPUs.
+-   `tensor-parallel-size 8`: This is the crucial setting, enabling Tensor Parallelism to split the 32B model weights and operations across all 8 GPUs.
 
 For more information on the available engine arguments, you can refer to the [official vLLM documentation](https://docs.vllm.ai/en/latest/configuration/engine_args/), which includes different parallelism strategies that can be used with multi GPU setup.
 
