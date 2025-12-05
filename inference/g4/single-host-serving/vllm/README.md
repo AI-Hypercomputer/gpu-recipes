@@ -65,7 +65,7 @@ You can follow the official NVIDIA documentation to install the container toolki
 
 ##  Serve a Model
 
-### 1. Serving on Single-Chip (1-GPU):
+### 1. Serving on Single-Chip (1GPU):
 
 To run the vLLM server, you can use the following command:
 
@@ -82,11 +82,11 @@ sudo docker run \
     --kv-cache-dtype fp8 \
     --max-num-batched-tokens 4096 \
     --max-num-seqs 256 \
-    --max-model-len 8192 \ 
+    --max-model-len 2300 \ 
     --gpu-memory-utilization 0.95 \
     --tensor-parallel-size 8 \ 
 ```
-For the 32B model on a G4 (1-chip) instance, we recommend --max-num-batched-tokens 4096 --max-num-seqs 256 --max-model-len 8192.
+For the 32B model on a G4 (1chip) instance, we recommend --max-num-batched-tokens 4096 --max-num-seqs 256 --max-model-len 2300.
 
 Here's a breakdown of the arguments:
 -   `--runtime nvidia --gpus all`: This makes the NVIDIA GPUs available inside the container.
@@ -97,23 +97,19 @@ Here's a breakdown of the arguments:
 -   `vllm/vllm-openai:latest`: This is the name of the official vLLM docker image.
 -   `--model Qwen/Qwen3-32B-FP8`: The model to be served from Hugging Face.
 -   `--kv-cache-dtype fp8`: Sets the data type for the key-value cache to FP8 to save GPU memory.
--   `--max-num-batched-tokens 4096`: This sets the maximum total tokens (input+output) the GPU processes in one go. It limits the GPU's immediate computational load.
+-   `--max-num-batched-tokens 4096`: This sets the maximum total tokens (Input + Output) the GPU processes in one go. It limits the GPU's immediate computational load.
 -   `--max-num-seqs 256`: This sets the maximum number of concurrent requests (sequences) the VLLM scheduler keeps actively running in the GPU's KV cache. 
--   `--max-model-len 8192`: This defines the maximum total context size (I/tokens+O/tokens) allowed for any single request. It sets the model's context window limit.
+-   `--max-model-len 2300`: This defines the maximum total context size (Input tokens + output tokens) allowed for any single request. It sets the model's context window limit.
 -   `--gpu-memory-utilization 0.95`: The fraction of GPU memory to be used by vLLM.
 -   `--tensor-parallel-size 1`: It specifies the number of gpu's to use.
 
-### 2. Serving on Multi-Chip (8-GPU): 
+### 2. Serving on Multi-Chip (8GPU): 
 
-The system will use the full 8-GPU capacity, which requires explicitly exporting the NCCL peer-to-peer ([P2P documentation](https://cloud.google.com/blog/products/compute/g4-vms-p2p-fabric-boosts-multi-gpu-workloads/)) setting.
-
+G4 instances enhance multi-GPU workload performance by using direct GPU [peer-to-peer](https://cloud.google.com/blog/products/compute/g4-vms-p2p-fabric-boosts-multi-gpu-workloads/) communication. This capability allows GPUs that attach to the same G4 instance to exchange data directly over the PCIe bus, bypassing the need to transfer data through the CPU's main memory.
 
 
 ```
-The NCCL_P2P_LEVEL setting forces NVIDIA's communication library to utilize peer-to-peer transfers across the entire multi-GPU system, 
-including those linked through the CPU/NUMA interconnects, which is crucial for accelerating multi-GPU workloads like those on Google Cloud's G4 VMs.
-```
-```
+To configure NCCL, before you run your workloads, set the NCCL_P2P_LEVEL on your G4 instance by:
 export NCCL_P2P_LEVEL=SYS
 ```
 
