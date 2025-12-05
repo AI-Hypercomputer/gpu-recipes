@@ -93,7 +93,7 @@ Now you are inside the container.
 # Download the base model from Hugging Face
 apt-get update && apt-get install -y huggingface-cli
 
-huggingface-cli download Qwen/Qwen2-4B-Instruct --local-dir /scratch/models/Qwen3-4B
+huggingface-cli download Qwen/Qwen3-4B --local-dir /scratch/models/Qwen3-4B
 
 # Quantize the model using NVFP4
 python examples/llm_ptq/hf_ptq.py \
