@@ -87,7 +87,7 @@ sudo docker run \
     --tensor-parallel-size 1  
 ```
 
-For the 32B model on a G4 (1 chip) instance, we recommend "--max-num-batched-tokens 4096", "--max-num-seqs 256", and "--max-model-len 2300" for a 2048/128 workload.
+For the 32B model on a G4 (1 chip) instance, we recommend `--max-num-batched-tokens 4096`, `--max-num-seqs 256`, and `--max-model-len 2300` for a `2048/128` workload.
 
 Here's a breakdown of the arguments:
 -   `--runtime nvidia --gpus all`: This makes the NVIDIA GPUs available inside the container.
