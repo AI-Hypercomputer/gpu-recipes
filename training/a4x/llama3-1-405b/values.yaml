@@ -30,6 +30,9 @@ volumes:
   psVolumes: false
   ssdMountPath: "/ssd"
 workload:
+  nodeSelector:
+    cloud.google.com/gke-accelerator: nvidia-gb200
+    cloud.google.com/placement-policy-name: a4x-workload-policy-95cbc61c
   arguments[]: null
   configFile: llama3-1-405b-fp8cs-gbs2048-gpus64.py
   configPath: /workload/configs/
@@ -41,7 +44,7 @@ workload:
   - --compute_dtype=fp8
   - --fp8_recipe=cs
   - --global_batch_size=2048
-  - --max_steps=5
+  - --max_steps=30
   - --micro_batch_size=1
   - --tensor_parallel_size=2
   - --context_parallel_size=1

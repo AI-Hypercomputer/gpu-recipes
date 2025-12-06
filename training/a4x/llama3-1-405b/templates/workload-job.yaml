@@ -96,6 +96,8 @@ spec:
               {{- end }}
               {{- end }}
           spec:
+            nodeSelector:
+            {{- toYaml .Values.workload.nodeSelector | nindent 14 }}
             {{- if $root.Values.network.hostNetwork }}
             hostNetwork: true
             dnsPolicy: ClusterFirstWithHostNet
