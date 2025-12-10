@@ -1,0 +1,37 @@
+dwsSettings:
+  maxRunDurationSeconds: null
+network:
+  gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib-arm64:v1.0.7
+  hostNetwork: true
+  ncclSettings:
+  - name: NCCL_DEBUG
+    value: WARN
+  subnetworks[]: null
+nodeSelector:
+  cloud.google.com/gke-accelerator: nvidia-gb200
+  cloud.google.com/placement-policy-name: a4x-workload-policy-95cbc61c
+queue: null
+tasSettings:
+  topologyRequest:
+    kueue.x-k8s.io/podset-preferred-topology: kubernetes.io/hostname
+volumes:
+  gcsMounts:
+  - bucketName: null
+    mountPath: null
+  gcsVolumes: true
+  psVolumes: false
+workload:
+  arguments[]: null
+  configFile: llama3-1-70b-fp8cs-gbs2048-gpus256.py
+  configPath: /workload/configs/
+  defaultArguments[]: null
+  envs:
+  - name: ARTIFACT_DIR
+    value: null
+  - name: GLOO_SOCKET_IFNAME
+    value: eth0
+  - name: NEMO_LAUNCH_SCRIPT
+    value: /workload/configs/llama3-1-70b-fp8cs-gbs2048-gpus256.py
+  gpus: 256
+  image: nvcr.io/nvidia/nemo:25.07
+  serviceAccountName: null
