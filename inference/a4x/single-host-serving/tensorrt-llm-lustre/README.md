@@ -17,7 +17,6 @@ This guide walks you through setting up the necessary cloud infrastructure, conf
     - [3.3. Connect to your GKE Cluster](#33-connect-to-your-gke-cluster)
     - [3.4 Upload the Model Checkpoints](#34-upload-the-model-checkpoints)
     - [3.5 Create Persistent Volumes and Persistent Volume Claims](#35-create-persistent-volumes-and-persistent-volume-claims)
-    - [3.6 Enable Managed Lustre CSI Driver on an Existing GKE Cluster](#36-enable-managed-lustre-csi-driver-on-an-existing-gke-cluster)
   - [4. Run the recipe](#4-run-the-recipe)
     - [4.1. Inference benchmark for DeepSeek-R1 671B Model](#41-inference-benchmark-for-deepseek-r1-671b-model)
   - [5. Monitoring and Troubleshooting](#5-monitoring-and-troubleshooting)
@@ -43,6 +42,7 @@ This recipe has been optimized for and tested with the following configuration:
     * A GPU node pool with 1 [a4x-highgpu-4g](https://cloud.google.com/compute/docs/gpus) machine.
     * [Workload Identity Federation for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity) enabled.
     * [Cloud Storage FUSE CSI driver for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/cloud-storage-fuse-csi-driver) enabled.
+    * [Managed Lustre CSI driver for GKE](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/lustre-csi-driver-existing-instance#existing-cluster) enabled.
     * [DCGM metrics](https://cloud.google.com/kubernetes-engine/docs/how-to/dcgm-metrics) enabled.
     * [Kueue](https://kueue.sigs.k8s.io/docs/reference/kueue.v1beta1/) and [JobSet](https://jobset.sigs.k8s.io/docs/overview/) APIs installed.
     * Kueue configured to support [Topology Aware Scheduling](https://kueue.sigs.k8s.io/docs/concepts/topology_aware_scheduling/).
@@ -78,10 +78,10 @@ flowchart TD
     E["TensorRT-LLM container"]
     F["Service"]
   end
- subgraph storage["Managed Lustre"]
+ subgraph lustre["Managed Lustre"]
     G["Model Lustre Instance"]
   end
- subgraph storage["Cloud Storage"]
+ subgraph gcs["Cloud Storage"]
     H["Logs Bucket"]
   end
 
@@ -136,25 +136,12 @@ export CLUSTER_NAME=<YOUR_CLUSTER_NAME>
 export KUEUE_NAME=<YOUR_KUEUE_NAME>
 export GCS_BUCKET_LOGS=<YOUR_GCS_BUCKET_LOGS>
 export LUSTRE_INSTANCE_NAME_SERVING_MODEL=<YOUR_LUSTRE_INSTANCE_NAME_SERVING_MODEL>
-export LUSTER_FOLDER_SERVING_MODEL=<YOUR_LUSTRE_FOLDER_SERVING_MODEL>
+export LUSTRE_FOLDER_SERVING_MODEL=<YOUR_LUSTRE_FOLDER_SERVING_MODEL>
 export LUSTRE_CAPACITY_SERVING_MODEL=<YOUR_LUSTRE_CAPACITY_SERVING_MODEL>
-export LUSTRE_PROJECT_SERVING_MODEL=<YOUR_LUSTRE_PROJECT_ID_SERVING_MODEL>
+export LUSTRE_PROJECT_ID_SERVING_MODEL=<YOUR_LUSTRE_PROJECT_ID_SERVING_MODEL>
 export LUSTRE_LOCATION_SERVING_MODEL=<YOUR_LUSTRE_LOCATION_SERVING_MODEL>
 export LUSTRE_IP_ADDRESS_SERVING_MODEL=<YOUR_LUSTRE_IP_ADDRESS_SERVING_MODEL>
 export LUSTRE_FILE_SYSTEM_SERVING_MODEL=<YOUR_LUSTRE_FILE_SYSTEM_SERVING_MODEL>
-export TRTLLM_VERSION=1.2.0rc2
-
-export PROJECT_ID=supercomputer-testing
-export CLUSTER_REGION=us-central1
-export CLUSTER_NAME=a4x-baker
-export GCS_BUCKET_LOGS=tess-benchmark-outputs
-export LUSTRE_INSTANCE_NAME_SERVING_MODEL=a4x-baker
-export LUSTER_FOLDER_SERVING_MODEL=DeepSeek-R1-NVFP4-v2
-export LUSTRE_CAPACITY_SERVING_MODEL=126000Gi
-export LUSTRE_PROJECT_SERVING_MODEL=supercomputer-testing
-export LUSTRE_LOCATION_SERVING_MODEL=us-central1-b
-export LUSTRE_IP_ADDRESS_SERVING_MODEL=172.21.47.3
-export LUSTRE_FILE_SYSTEM_SERVING_MODEL=lustrefs
 export TRTLLM_VERSION=1.2.0rc2
 
 # Set the project for gcloud commands
@@ -171,23 +158,23 @@ Replace the following values:
 | `KUEUE_NAME` | The name of the Kueue local queue. The default queue created by the cluster toolkit is `a4x`. Verify the name in your cluster. | `a4x` |
 | `GCS_BUCKET_LOGS` | Name of your GCS logs bucket (do not include `gs://`). | `my-benchmark-logs-bucket` |
 | `LUSTRE_INSTANCE_NAME_SERVING_MODEL` | The name of your Lustre instance. | `my-benchmark-model-lustre` |
-| `LUSTER_FOLDER_SERVING_MODEL` | The path to the GCS model folder on the Lustre. | `my-benchmark-model-folder` |
-| `LUSTRE_CAPACITY_SERVING_MODEL` | The capacity of your Lustre instance. | `my-benchmark-model-folder` |
-| `LUSTRE_PROJECT_SERVING_MODEL` | The project where your Lustre instance resides. | `my-benchmark-model-folder` |
-| `LUSTRE_LOCATION_SERVING_MODEL` | The zonal location of your Lustre instance. | `my-benchmark-model-folder` |
-| `LUSTRE_IP_ADDRESS_SERVING_MODEL` | The IP address of your Lustre instance, it can be obtained from the mountPoint field.  | `my-benchmark-model-folder` |
-| `LUSTRE_FILE_SYSTEM_SERVING_MODEL` | The file system name of your Managed Lustre instance. | `my-benchmark-model-folder` |
+| `LUSTRE_FOLDER_SERVING_MODEL` | The path to the GCS model folder on the Lustre. | `my-benchmark-model-folder` |
+| `LUSTRE_CAPACITY_SERVING_MODEL` | The capacity of your Lustre instance. | `126000Gi` |
+| `LUSTRE_PROJECT_ID_SERVING_MODEL` | The project where your Lustre instance is located. | `gcp-project-12345` |
+| `LUSTRE_LOCATION_SERVING_MODEL` | The zonal location of your Lustre instance. | `us-central1-b` |
+| `LUSTRE_IP_ADDRESS_SERVING_MODEL` | The IP address of your Lustre instance: it can be obtained from the mountPoint field. | `172.21.47.3` |
+| `LUSTRE_FILE_SYSTEM_SERVING_MODEL` | The file system of your Lustre instance. | `lustrefs` |
 | `TRTLLM_VERSION` | The tag/version for the Docker image. Other verions can be found at https://catalog.ngc.nvidia.com/orgs/nvidia/teams/tensorrt-llm/containers/release | `1.2.0rc2` |
 
 To locate your Managed Lustre instance and collect the Lustre instance information, you can run the following command:
 
 ```
 gcloud lustre instances list \
-    --project=${LUSTRE_PROJECT_SERVING_MODEL} \
+    --project=${LUSTRE_PROJECT_ID_SERVING_MODEL} \
     --location=${LUSTRE_LOCATION_SERVING_MODEL}
 ```
 
-The output should look similar to the following. Before you proceed to the next step, make sure to note down the Managed Lustre instance name, filesystem, and the mountPoint fields.
+The output should look similar to the following.
 
 ```
 capacityGib: '9000'
@@ -217,8 +204,8 @@ gcloud container clusters get-credentials $CLUSTER_NAME --region $CLUSTER_REGION
 To download the model from HuggingFace, please follow the steps below:
 
 1.  Follow these [instructions](https://docs.cloud.google.com/managed-lustre/docs/connect-from-compute-engine) to create a compute
-    engine and mount your Lustre instance onto it.
-3.  Access into the mount point on compute engine and create the model folder.
+    engine and mount your Lustre instance on it.
+3.  Access the mount point on the compute engine and create the model folder.
 4.  Under the mount point,
     [download](https://huggingface.co/docs/hub/en/models-downloading) the model
     using the `hf` command:
@@ -239,7 +226,7 @@ instances using the
 ```bash
 helm install -f $REPO_ROOT/src/helm-charts/storage/lustre/values.yaml \
 --set lustreVolumes[0].instance_name=${LUSTRE_INSTANCE_NAME_SERVING_MODEL} \
---set lustreVolumes[0].project_id=${LUSTRE_PROJECT_SERVING_MODEL} \
+--set lustreVolumes[0].project_id=${LUSTRE_PROJECT_ID_SERVING_MODEL} \
 --set lustreVolumes[0].location=${LUSTRE_LOCATION_SERVING_MODEL} \
 --set lustreVolumes[0].ip_address=${LUSTRE_IP_ADDRESS_SERVING_MODEL} \
 --set lustreVolumes[0].capacity=${LUSTRE_CAPACITY_SERVING_MODEL} \
@@ -247,13 +234,6 @@ helm install -f $REPO_ROOT/src/helm-charts/storage/lustre/values.yaml \
 $USER-lustre-pv-pvc \
 $REPO_ROOT/src/helm-charts/storage/lustre
 ```
-
-<a name="enable-lustre-csi-driver"></a>
-### 3.6 Enable Managed Lustre CSI Driver on an Existing GKE Cluster
-
-If the Managed Lustre CSI driver is not enabled on your GKE cluster, please
-follow these [instructions](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/lustre-csi-driver-existing-instance#existing-cluster)
-to enable it.
 
 <a name="run-the-recipe"></a>
 ## 4. Run the recipe
@@ -288,7 +268,7 @@ The recipe uses [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/mai
     --set-file serving_config=$REPO_ROOT/src/frameworks/a4x/trtllm-configs/deepseek-r1-nvfp4.yaml \
     --set queue=${KUEUE_NAME} \
     --set "volumes.gcsMounts[0].bucketName=${GCS_BUCKET_LOGS}" \
-    --set "volumes.pvcMounts[0].subPath=${LUSTER_FOLDER_SERVING_MODEL}" \
+    --set "volumes.pvcMounts[0].subPath=${LUSTRE_FOLDER_SERVING_MODEL}" \
     --set workload.model.name=nvidia/DeepSeek-R1-NVFP4-v2 \
     --set workload.image=nvcr.io/nvidia/tensorrt-llm/release:${TRTLLM_VERSION} \
     $USER-serving-deepseek-r1-model \

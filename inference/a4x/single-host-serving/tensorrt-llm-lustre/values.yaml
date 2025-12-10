@@ -57,7 +57,3 @@ network:
   ncclSettings:
     - name: NCCL_DEBUG
       value: "VERSION"
-
-targetNodes:
-  - gke-a4x-baker-a4x-highgpu-4g-a4x-pool-42293301-2hvc
-
