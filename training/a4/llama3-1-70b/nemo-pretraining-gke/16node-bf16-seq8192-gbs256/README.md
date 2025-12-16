@@ -71,7 +71,7 @@ Clone the `gpu-recipes` repository and set a reference to the recipe folder.
 git clone https://github.com/ai-hypercomputer/gpu-recipes.git
 cd gpu-recipes
 export REPO_ROOT=`git rev-parse --show-toplevel`
-export RECIPE_ROOT=$REPO_ROOT/training/a4/llama3-1-70b/nemo-pretraining-gke/16_nodes
+export RECIPE_ROOT=$REPO_ROOT/training/a4/llama3-1-70b/nemo-pretraining-gke/16node-bf16-seq8192-gbs256
 cd $RECIPE_ROOT
 ```
 
@@ -89,7 +89,7 @@ your client:
 
     ```bash
     cd $RECIPE_ROOT
-    export WORKLOAD_NAME=$USER-a4-llama3-1-70b-16node
+    export WORKLOAD_NAME=$USER-a4-llama3-1-70b
     helm install $WORKLOAD_NAME . -f values.yaml \
     --set-file workload_launcher=launcher.sh \
     --set-file workload_config=llama3-1-70b-bf16-seq8192-gbs256-gpus128.py \
@@ -107,7 +107,7 @@ your client:
 
     ```bash
     cd $RECIPE_ROOT
-    export WORKLOAD_NAME=$USER-a4-llama3-1-70b-16node
+    export WORKLOAD_NAME=$USER-a4-llama3-1-70b
     helm install $WORKLOAD_NAME . -f values.yaml \
     --set-file workload_launcher=launcher.sh \
     --set-file workload_config=llama3-1-70b-bf16-seq8192-gbs256-gpus128.py \
@@ -124,7 +124,7 @@ your client:
 To check the status of pods in your job, run the following command:
 
 ```
-kubectl get pods | grep $USER-a4-llama3-1-70b-16node
+kubectl get pods | grep $USER-a4-llama3-1-70b
 ```
 
 Replace the following:
@@ -149,5 +149,5 @@ You can delete the job and other resources created by the Helm chart. To
 uninstall Helm, run the following command from your client:
 
 ```bash
-helm uninstall $USER-a4-llama3-1-70b-16node
+helm uninstall $USER-a4-llama3-1-70b
 ```
