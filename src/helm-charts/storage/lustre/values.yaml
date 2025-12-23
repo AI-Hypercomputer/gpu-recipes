@@ -15,14 +15,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+lustreVolumes:
+  - name: lustre-serving-model
+    instance_name:
+    project_id:
+    location:
+    ip_address:
+    capacity:
+    file_system:
 
-gcsVolumes:
-  - name: gcs-data
-    type: data
-    bucketName:
-  - name: gcs-checkpoints
-    type: checkpoints
-    bucketName:
-  - name: gcs-serving-model
-    type: serving-model
-    bucketName:

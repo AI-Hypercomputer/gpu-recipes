@@ -1,6 +1,3 @@
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 # Copyright 2025 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,14 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-gcsVolumes:
-  - name: gcs-data
-    type: data
-    bucketName:
-  - name: gcs-checkpoints
-    type: checkpoints
-    bucketName:
-  - name: gcs-serving-model
-    type: serving-model
-    bucketName:
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ .Release.Name }}"
+spec:
+  clusterIP: None
+  selector:
+    jobset.sigs.k8s.io/jobset-name: "{{ .Release.Name }}"

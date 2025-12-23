@@ -12,21 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-{{- range $gcs := .Values.gcsVolumes }}
-{{- if $gcs.bucketName }}
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: "{{ $gcs.name }}-pvc"
-  namespace: {{ default "default" $gcs.namespace }}
-spec:
-  accessModes:
-  - ReadWriteMany
-  resources:
-    requests:
-      storage: {{ default "2048Gi" $gcs.capacity }}
-  storageClassName: gcs-fuse-storage
-  volumeName: {{ $gcs.name }}-pv
+{{- range $lv := .Values.lustreVolumes }}
 ---
-{{- end }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: "{{ $lv.name }}-pv"
+spec:
+  storageClassName: ""
+  capacity:
+    storage: {{ $lv.capacity }}
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  volumeMode: Filesystem
+  claimRef:
+    namespace: default
+    name: "{{ $lv.name }}-pvc"
+  csi:
+    driver: lustre.csi.storage.gke.io
+    volumeHandle: {{ $lv.project_id }}/{{ $lv.location }}/{{ $lv.instance_name }}
+    volumeAttributes:
+      ip: {{ $lv.ip_address }}
+      filesystem: {{ $lv.file_system }}
+---
 {{- end }}
