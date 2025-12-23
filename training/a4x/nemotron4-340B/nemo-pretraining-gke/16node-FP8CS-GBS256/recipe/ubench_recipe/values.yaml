@@ -22,7 +22,7 @@ volumes:
   psVolumes: false
 workload:
   arguments[]: null
-  configFile: nemotron4-340b-fp8cs-gbs128-gpus64.py
+  configFile: nemotron4-340b-fp8cs-gbs256-gpus64.py
   configPath: /workload/configs/
   defaultArguments[]: null
   envs:
@@ -31,7 +31,7 @@ workload:
   - name: GLOO_SOCKET_IFNAME
     value: eth0
   - name: NEMO_LAUNCH_SCRIPT
-    value: /workload/configs/nemotron4-340b-fp8cs-gbs128-gpus64.py
+    value: /workload/configs/nemotron4-340b-fp8cs-gbs256-gpus64.py
   gpus: 64
   image: nvcr.io/nvidia/nemo:25.09
   serviceAccountName: null

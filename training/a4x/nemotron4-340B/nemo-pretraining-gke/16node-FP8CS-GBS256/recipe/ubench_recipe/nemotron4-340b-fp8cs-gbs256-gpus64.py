@@ -35,7 +35,7 @@ def recipe(
   num_nodes = 16
   num_gpus_per_node = 4
   mbs = 1
-  gbs = 128
+  gbs = 256
   max_steps = 100
   tp_size = 4
   pp_size = 16
