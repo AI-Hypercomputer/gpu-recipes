@@ -31,6 +31,6 @@ tqdm==4.67.1
 transformers==4.51.0
 typing_extensions==4.13.1
 tzdata==2025.2
-urllib3==2.3.0
+urllib3==2.6.0
 xxhash==3.5.0
 yarl==1.19.0
