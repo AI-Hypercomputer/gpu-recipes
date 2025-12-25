@@ -1,0 +1,46 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+model-path: /data/model/deepseek-ai/DeepSeek-R1
+served-model-name: deepseek-ai/DeepSeek-R1
+log-level: DEBUG
+tp: "8"
+dp-size: "8"
+trust-remote-code: true
+decode-log-interval: "1"
+page-size: "1"
+enable-dp-attention: true
+disaggregation-mode: prefill
+disaggregation-transfer-backend: nixl
+disaggregation-bootstrap-port: "30001"
+host: "0.0.0.0"
+port: "9090"
+max-running-requests: "6144"
+context-length: "2716"
+disable-radix-cache: true
+moe-a2a-backend: deepep
+load-balance-method: round_robin
+deepep-mode: normal
+moe-dense-tp-size: "1"
+enable-dp-lm-head: true
+disable-shared-experts-fusion: true
+ep-num-redundant-experts: "32"
+ep-dispatch-algorithm: static
+eplb-algorithm: deepseek
+attention-backend: cutlass_mla
+watchdog-timeout: "1000000"
+disable-cuda-graph: true
+chunked-prefill-size: "16384"
+max-total-tokens: "32768"
+mem-fraction-static: "0.8"
