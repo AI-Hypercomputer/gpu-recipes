@@ -101,7 +101,6 @@ spec:
       sharedMemory:
         size: 80Gi
       resources:
-        resources:
         limits:
           gpu: "4"
         claims:
@@ -138,20 +137,6 @@ spec:
                   operator: In
                   values:
                   - arm64
-        volumes:
-        - name: gcs-model-volume
-          csi:
-            driver: gcsfuse.csi.storage.gke.io
-            volumeAttributes:
-              bucketName: {{ .Values.volumes.gcsfuse.bucketName }}
-              mountOptions: implicit-dirs,file-cache:enable-parallel-downloads:true,file-cache:parallel-downloads-per-file:100,file-cache:max-parallel-downloads:-1,file-cache:download-chunk-size-mb:10,file-cache:max-size-mb:-1
-        - name: library-dir-host
-          hostPath:
-            path: /home/kubernetes/bin/nvidia
-        - name: gib
-          hostPath:
-            path: /home/kubernetes/bin/gib
-
         mainContainer:
           securityContext:
               privileged: true
@@ -260,6 +245,18 @@ spec:
               mountPath: /workload/launcher
             {{- end }}
         volumes:
+        - name: gcs-model-volume
+          csi:
+            driver: gcsfuse.csi.storage.gke.io
+            volumeAttributes:
+              bucketName: {{ .Values.volumes.gcsfuse.bucketName }}
+              mountOptions: implicit-dirs,file-cache:enable-parallel-downloads:true,file-cache:parallel-downloads-per-file:100,file-cache:max-parallel-downloads:-1,file-cache:download-chunk-size-mb:10,file-cache:max-size-mb:-1
+        - name: library-dir-host
+          hostPath:
+            path: /home/kubernetes/bin/nvidia
+        - name: gib
+          hostPath:
+            path: /home/kubernetes/bin/gib
         {{- if .Values.workload_launcher }}
         - name: serving-configuration
           configMap:
@@ -337,19 +334,6 @@ spec:
                   operator: In
                   values:
                   - arm64
-        volumes:
-        - name: gcs-model-volume
-          csi:
-            driver: gcsfuse.csi.storage.gke.io
-            volumeAttributes:
-              bucketName: {{ .Values.volumes.gcsfuse.bucketName }}
-              mountOptions: implicit-dirs,file-cache:enable-parallel-downloads:true,file-cache:parallel-downloads-per-file:100,file-cache:max-parallel-downloads:-1,file-cache:download-chunk-size-mb:10,file-cache:max-size-mb:-1
-        - name: library-dir-host
-          hostPath:
-            path: /home/kubernetes/bin/nvidia
-        - name: gib
-          hostPath:
-            path: /home/kubernetes/bin/gib
         mainContainer:
           securityContext:
               privileged: true
@@ -456,6 +440,18 @@ spec:
               mountPath: /workload/launcher
             {{- end }}
         volumes:
+        - name: gcs-model-volume
+          csi:
+            driver: gcsfuse.csi.storage.gke.io
+            volumeAttributes:
+              bucketName: {{ .Values.volumes.gcsfuse.bucketName }}
+              mountOptions: implicit-dirs,file-cache:enable-parallel-downloads:true,file-cache:parallel-downloads-per-file:100,file-cache:max-parallel-downloads:-1,file-cache:download-chunk-size-mb:10,file-cache:max-size-mb:-1
+        - name: library-dir-host
+          hostPath:
+            path: /home/kubernetes/bin/nvidia
+        - name: gib
+          hostPath:
+            path: /home/kubernetes/bin/gib
         {{- if .Values.workload_launcher }}
         - name: serving-configuration
           configMap:
