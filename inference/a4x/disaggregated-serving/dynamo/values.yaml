@@ -15,7 +15,7 @@
 dynamo:
   namespace: dynamo-cloud
   releaseVersion: "0.7.0"
-  deploymentName:
+  deploymentName: disagg2p2d-yijiaj
   computeDomain:
     name: yijiaj-a4x-domain
     numNodes: 4
