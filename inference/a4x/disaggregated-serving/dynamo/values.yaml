@@ -15,11 +15,11 @@
 dynamo:
   namespace: dynamo-cloud
   releaseVersion: "0.7.0"
-  deploymentName: disagg2p2d-yijiaj
+  deploymentName: disagg2p2d
   computeDomain:
-    name: yijiaj-a4x-domain
+    name: a4x-domain
     numNodes: 4
-    resourceClaimTemplateName: yijiaj-a4x-channel
+    resourceClaimTemplateName: a4x-channel
   frontend:
     image: nvcr.io/nvidia/ai-dynamo/sglang-runtime:0.6.1
     replicas: 1
@@ -185,6 +185,8 @@ workload:
   model: deepseek-ai/DeepSeek-R1
   gpus: 16
   framework: sglang
+  configFile: serving-args.yaml
+  configPath: /workload/configs
 
 network:
   subnetworks: []
