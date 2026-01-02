@@ -12,7 +12,7 @@ For this recipe, the following setup is used:
 - Job configuration and deployment - Helm chart is used to configure and deploy the
   [Kubernetes Index Job](https://kubernetes.io/blog/2021/04/19/introducing-indexed-jobs).
   This job encapsulates the
-  [NVIDIA NeMo Megatron GPT pretraining workload](https://github.com/NVIDIA/NeMo/blob/main/examples/nlp/language_modeling/megatron_gpt_pretraining.py).
+  [NVIDIA NeMo Megatron GPT pretraining workload](https://github.com/NVIDIA-NeMo/NeMo/blob/v2.4.0/examples/nlp/language_modeling/megatron_gpt_pretraining.py).
   The chart generates the job's manifest, adhering to best practices for using GPUDirect-TCPXO
   with Google Kubernetes Engine (GKE), which includes setting optimal values for NVIDIA NCCL
   and the TCPXO NCCL plugin.

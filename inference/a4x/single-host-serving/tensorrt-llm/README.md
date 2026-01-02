@@ -207,12 +207,12 @@ The recipe does the following steps to run the benchmarking:
 1. Download the full DeepSeek-R1 model checkpoints from [Hugging Face](https://huggingface.co/nvidia/DeepSeek-R1-NVFP4-v2).
 2. Run the throughput and/or latency benchmarking.
 
-The recipe uses [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/performance/perf-benchmarking.md), a command-line tool from NVIDIA to benchmark the performance of TensorRT-LLM engine. For more information about `trtllm-bench`, see the [TensorRT-LLM documentation](https://github.com/NVIDIA/TensorRT-LLM).
+The recipe uses [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/legacy/performance/perf-benchmarking.md), a command-line tool from NVIDIA to benchmark the performance of TensorRT-LLM engine. For more information about `trtllm-bench`, see the [TensorRT-LLM documentation](https://github.com/NVIDIA/TensorRT-LLM).
 
 > [!NOTE]
 > The config file directly exposes the settings within TensorRT-LLM's llm_args.py class, which are passed to `trtllm-bench` or `trtllm-serve`, you can modify these as needed in [`src/frameworks/a4x/trtllm-configs/deepseek-r1-nvfp4.yaml`](../../../../src/frameworks/a4x/trtllm-configs/deepseek-r1-nvfp4.yaml)
 
-1. Install the helm chart to prepare and benchmark the model using [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/performance/perf-benchmarking.md) tool:
+1. Install the helm chart to prepare and benchmark the model using [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/legacy/performance/perf-benchmarking.md) tool:
 
     ```bash
     cd $RECIPE_ROOT
