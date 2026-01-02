@@ -216,7 +216,7 @@ The `<JOB_ID>` has the following format:
 - `$USER--llama31-70b-gcs-[YYYY]-[MM]-[DD]-[hh]-[mm]-[ss]`, where the suffix of the ID is a day and time when the job was started.
 
 
-The NeMo log files include information about checkpoint operations on each rank. You can use the [checkpointing_metrics](../../../../src/utils/checkpointint_metrics) utility to calculate statistics for checkpoint write times.
+The NeMo log files include information about checkpoint operations on each rank. You can use the [checkpointing_metrics](../../../../src/utils/checkpointing_metrics) utility to calculate statistics for checkpoint write times.
 
 To calculate statistics:
 
