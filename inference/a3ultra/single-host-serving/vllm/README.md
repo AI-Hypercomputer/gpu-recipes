@@ -486,7 +486,7 @@ Llama 4 models are offered in various sizes and precision. This recipe is compat
 
 #### 4.2.4. Benchmark Llama 4 Models
 
-1.  Run the [vLLM benchmarking tool](https://docs.vllm.ai/references/benchmark_and_profiling.html) directly inside the running deployment. For example, to run benchmarks for the model `Llama-4-Scout-17B-16E-Instruct` with deployment `$USER-serving-llama-4-scout-serving`:
+1.  Run the [vLLM benchmarking tool](https://github.com/vllm-project/vllm/blob/main/docs/contributing/profiling.md) directly inside the running deployment. For example, to run benchmarks for the model `Llama-4-Scout-17B-16E-Instruct` with deployment `$USER-serving-llama-4-scout-serving`:
 
     ```bash
     kubectl exec -it deployment/$USER-serving-llama-4-scout-model -- /bin/sh -c \
@@ -594,7 +594,7 @@ Upon launching the vLLM server, it performs the following steps:
 <a name="benchmark-gpt-oss-120b"></a>
 #### 4.3.3. Benchmark GPT OSS 120B
 
-1.  Run the [vLLM benchmarking tool](https://docs.vllm.ai/references/benchmark_and_profiling.html) directly inside the running deployment:
+1.  Run the [vLLM benchmarking tool](https://github.com/vllm-project/vllm/blob/main/docs/contributing/profiling.md) directly inside the running deployment:
 
       ```bash
       kubectl exec -it deployment/$USER-serving-gpt-oss -- /bin/sh -c \

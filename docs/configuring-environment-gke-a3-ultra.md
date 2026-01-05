@@ -312,7 +312,7 @@ Replace the following:
 
 ### Remove Artifact Registry
 
-To delete the Artfiact Registry:
+To delete the Artifact Registry:
 
 ```
 gcloud artifacts repositories delete REPOSITORY --location=LOCATION

@@ -101,7 +101,7 @@ def process_ckpt_write_times(
           if generate_warnings:
             print(
                 f"Warning: Duplicate checkpoint write start time at step {step}"
-                f" in file {file_path}. We only keep the first occurence."
+                f" in file {file_path}. We only keep the first occurrence."
             )
           continue
 
@@ -115,15 +115,15 @@ def process_ckpt_write_times(
 
         if ckpt_write_times.get(step, {}).get("start_time") is None:
           raise ValueError(
-              f"Checkpoing write at step {step} has the end time"
+              f"Checkpointing write at step {step} has the end time"
               f" reported prior to its start time in file {file_path}"
           )
 
         if ckpt_write_times.get(step, {}).get("end_time"):
           if generate_warnings:
             print(
-                f"Warning: Duplicate checkpoing write end time at step {step}"
-                f" in file {file_path}. We only keep the first occurence."
+                f"Warning: Duplicate checkpointing write end time at step {step}"
+                f" in file {file_path}. We only keep the first occurrence."
             )
           continue
 
@@ -183,7 +183,7 @@ def compute_write_duration_per_step(write_times: list[dict[str, any]]):
 
   if not write_duration_per_step:
     print(
-        "Warning: Write time list is empty, cannnot process checkpoint"
+        "Warning: Write time list is empty, cannot process checkpoint"
         " write time results."
     )
     return
