@@ -86,7 +86,7 @@ gcloud container clusters get-credentials $CLUSTER_NAME --region $CLUSTER_REGION
 To execute the job with the default settings, run the following command from
 your client:
 
-    ```bash
+    bash
     cd $RECIPE_ROOT
     export WORKLOAD_NAME=a4x-llama3-1-8b-fp8cs-gbs128-gpus64-16node
     helm install $WORKLOAD_NAME . -f values.yaml \
@@ -97,7 +97,6 @@ your client:
     --set volumes.gcsMounts[0].mountPath=/job-logs \
     --set workload.envs[0].value=/job-logs/$WORKLOAD_NAME \
     --set queue=${KUEUE_NAME}
-    ```
 
 **Examples**
 
