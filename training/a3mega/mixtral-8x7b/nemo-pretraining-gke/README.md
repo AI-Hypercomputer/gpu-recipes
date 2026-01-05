@@ -212,7 +212,7 @@ kubectl logs POD_NAME
 ### Analyze results
 
 When completed, the job creates several artifacts, including logs and traces,
-and places them in the configured Google Cloud Storage bucker as follows:
+and places them in the configured Google Cloud Storage buckets as follows:
 
 ```
 gs://${GCS_BUCKET}/nemo-experiments/<JOB_ID>
