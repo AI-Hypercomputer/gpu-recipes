@@ -14,7 +14,7 @@ Before running a NCCL test, ensure your environment is configured as follows:
   - kubectl
 
 To prepare the required environment, see
-[GKE environment setup guide](../../../../docs/configuring-environment-gke-a3-ultra.md).
+[GKE environment setup guide](../../../docs/configuring-environment-gke-a3-ultra.md).
 
 ## Run the recipe
 

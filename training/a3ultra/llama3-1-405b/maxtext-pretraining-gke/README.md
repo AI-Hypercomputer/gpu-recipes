@@ -11,7 +11,7 @@ For this recipe, the following setup is used:
 - Orchestration - [Google Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine).
 - Pretraining job configuration and deployment - A Helm chart is used to configure and deploy the
   [Kubernetes Jobset]((https://kubernetes.io/blog/2025/03/23/introducing-jobset) resource which manages the
-  execution  of the [MaxText pretraining workload](https://github.com/AI-Hypercomputer/maxtext/blob/main/MaxText/train.py).
+  execution  of the [MaxText pretraining workload](https://github.com/AI-Hypercomputer/maxtext/blob/main/src/MaxText/train.py).
 
 ## Test environment
 

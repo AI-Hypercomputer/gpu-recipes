@@ -13,7 +13,7 @@ Before running a NCCL test, ensure your environment is configured as follows:
   - Helm
   - kubectl
 
-To prepare the required environment, see the [GKE with A3 Mega node pools setup guide](../../../docs/configuring-environment-gke-a3-mega.md).
+To prepare the required environment, see the [GKE with A3 Mega node pools setup guide](../../../../docs/configuring-environment-gke-a3-mega.md).
 
 ## Configure environment settings
 
