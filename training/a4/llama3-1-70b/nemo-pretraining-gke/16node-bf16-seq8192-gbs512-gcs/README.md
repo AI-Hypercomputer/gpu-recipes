@@ -148,7 +148,6 @@ $REPO_ROOT/src/helm-charts/storage/gcs-fuse
 To execute the job with the default settings, run the following command from
 your client:
 
-    ```bash
     cd $RECIPE_ROOT
     export WORKLOAD_NAME=a4-llama3-1-70b-gpus128
     helm install $WORKLOAD_NAME . -f values.yaml \
@@ -157,7 +156,6 @@ your client:
     --set workload.image=nvcr.io/nvidia/nemo:25.07 \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET_LOGS} \
     --set volumes.gcsMounts[0].mountPath=/job-logs
-    ```
 
 **Examples**
 
