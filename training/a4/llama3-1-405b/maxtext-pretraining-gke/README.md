@@ -74,7 +74,6 @@ Set the default project:
 
 Clone the `gpu-recipes` repository and set a reference to the recipe folder.
 ```
-cd
 git clone https://github.com/ai-hypercomputer/gpu-recipes.git
 cd gpu-recipes
 export REPO_ROOT=`git rev-parse --show-toplevel`
