@@ -122,7 +122,7 @@ First, you'll configure your local environment. These steps are required once be
 ### 3.1. Clone the Repository
 
 ```bash
-git clone [https://github.com/ai-hypercomputer/gpu-recipes.git](https://github.com/ai-hypercomputer/gpu-recipes.git)
+git clone https://github.com/ai-hypercomputer/gpu-recipes.git
 cd gpu-recipes
 export REPO_ROOT=$(pwd)
 export RECIPE_ROOT=$REPO_ROOT/inference/a3ultra/single-host-serving/vllm
