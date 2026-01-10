@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-model-path: /data/model/deepseek-ai/DeepSeek-R1
 served-model-name: deepseek-ai/DeepSeek-R1
 log-level: DEBUG
 tp: "8"
