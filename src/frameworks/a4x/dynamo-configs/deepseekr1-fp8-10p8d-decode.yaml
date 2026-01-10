@@ -1,0 +1,50 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+served-model-name: deepseek-ai/DeepSeek-R1
+disaggregation-mode: decode
+disaggregation-bootstrap-port: "30001"
+host: "0.0.0.0"
+port: "9090"
+trust-remote-code: true
+skip-tokenizer-init: true
+tp-size: "32"
+dp-size: "32"
+ep-size: "32" 
+quantization: "fp8"
+# page-size: "1"
+enable-dp-attention: true
+attention-backend: "trtllm_mla"
+kv-cache-dtype: "fp8_e4m3"
+disable-radix-cache: true
+stream-interval: "50"
+# disaggregation-transfer-backend: nixl
+decode-log-interval: "1000"
+max-running-requests: "8192"
+context-length: "9300"
+watchdog-timeout: "1000000"
+disable-shared-experts-fusion: true
+eplb-algorithm: deepseek
+mem-fraction-static: "0.82"
+chunked-prefill-size: "36864"
+moe-a2a-backend: "deepep"
+deepep-mode: "low_latency"
+ep-dispatch-algorithm: static
+moe-dense-tp-size: "1"
+enable-dp-lm-head: true
+prefill-round-robin-balance: true
+ep-num-redundant-experts: "32"
+cuda-graph-max-bs: "256"
+# disable-cuda-graph: true
+deepep-config: '{"normal_dispatch": {"num_sms": 128,"num_max_nvl_chunked_send_tokens": 28,"num_max_nvl_chunked_recv_tokens": 256,"num_max_rdma_chunked_send_tokens": 6,"num_max_rdma_chunked_recv_tokens": 256}, "normal_combine": {"num_sms": 128,"num_max_nvl_chunked_send_tokens": 15,"num_max_nvl_chunked_recv_tokens": 256,"num_max_rdma_chunked_send_tokens": 6,"num_max_rdma_chunked_recv_tokens": 128}}'
