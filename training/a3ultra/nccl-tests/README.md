@@ -14,7 +14,7 @@ Before running a NCCL test, ensure your environment is configured as follows:
   - kubectl
 
 To prepare the required environment, see
-[GKE environment setup guide](../../../../docs/configuring-environment-gke-a3-ultra.md).
+[GKE environment setup guide](../../../docs/configuring-environment-gke-a3-ultra.md).
 
 ## Run the recipe
 
@@ -123,9 +123,7 @@ For example, to run the `alltoall` test with messages ranging from 10K to 32G, p
 
 ```
 helm install -f $RECIPE_ROOT/values.yaml \
-...
 --set workload.arguments[0]="--benchmark alltoall --begin_msg_size 10K --end_msg_size 32G --run_iters 200 --warmup_iters 100"
-...
 ```
 
 

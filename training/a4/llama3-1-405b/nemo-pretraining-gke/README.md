@@ -12,7 +12,7 @@ For this recipe, the following setup is used:
 - Pretraining job configuration and deployment - A Helm chart is used to configure and deploy
   the [Kubernetes Jobset](https://kubernetes.io/blog/2025/03/23/introducing-jobset)
   resource which manages the execution  of the
-  [NeMo pretraining workload](https://github.com/NVIDIA/NeMo/blob/main/examples/nlp/language_modeling/megatron_gpt_pretraining.py).
+  [NeMo pretraining workload](https://github.com/NVIDIA-NeMo/NeMo/blob/v2.4.0/examples/nlp/language_modeling/megatron_gpt_pretraining.py).
 
 ## Test environment
 

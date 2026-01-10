@@ -2,7 +2,7 @@
 
 This document outlines the steps to deploy and serve Large Language Models (LLMs) using [NVIDIA Dynamo](https://github.com/ai-dynamo/dynamo) disaggregated inference platform on [A3 Ultra GKE Node pools](https://cloud.google.com/kubernetes-engine).
 
-Dynamo provides a disaggregated architecture that separates prefill and decode operations for optimized inference performance, supporting both single-node (8 GPUs) and multi-node (16 GPUs) configurations. Dynamo also supports various inference framework backends like [vLLM](https://docs.nvidia.com/dynamo/latest/components/backends/vllm/README.html) and [SGLang](https://docs.nvidia.com/dynamo/latest/components/backends/sglang/README.html). In this recipe, we will focus on serving using the vLLM backend. 
+Dynamo provides a disaggregated architecture that separates prefill and decode operations for optimized inference performance, supporting both single-node (8 GPUs) and multi-node (16 GPUs) configurations. Dynamo also supports various inference framework backends like [vLLM](https://docs.nvidia.com/dynamo/latest/backends/vllm/README.html) and [SGLang](https://docs.nvidia.com/dynamo/latest/backends/sglang/README.html). In this recipe, we will focus on serving using the vLLM backend. 
 
 <a name="table-of-contents"></a>
 ## Table of Contents

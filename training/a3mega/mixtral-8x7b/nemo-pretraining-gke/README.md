@@ -11,7 +11,7 @@ For this recipe, the following setup is used:
 - Orchestration - [Google Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine)
 - Job configuration and deployment - Helm chart is used to configure and deploy
   the [Kubernetes JobSet](https://kubernetes.io/blog/2025/03/23/introducing-jobset)
-  - This job encapsulates the [NVIDIA NeMo Megatron GPT pretraining workload](https://github.com/NVIDIA/NeMo/blob/main/examples/nlp/language_modeling/megatron_gpt_pretraining.py).
+  - This job encapsulates the [NVIDIA NeMo Megatron GPT pretraining workload](https://github.com/NVIDIA-NeMo/NeMo/blob/v2.4.0/examples/nlp/language_modeling/megatron_gpt_pretraining.py).
   - The chart generates the job's manifest, adhering to best practices for using
     GPUDirect-TCPXO with Google Kubernetes Engine (GKE), which includes setting
     optimal values for NVIDIA NCCL and the TCPXO NCCL plugin.
@@ -212,7 +212,7 @@ kubectl logs POD_NAME
 ### Analyze results
 
 When completed, the job creates several artifacts, including logs and traces,
-and places them in the configured Google Cloud Storage bucker as follows:
+and places them in the configured Google Cloud Storage buckets as follows:
 
 ```
 gs://${GCS_BUCKET}/nemo-experiments/<JOB_ID>

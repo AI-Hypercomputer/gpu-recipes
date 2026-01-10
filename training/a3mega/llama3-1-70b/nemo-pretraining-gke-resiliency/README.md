@@ -90,7 +90,7 @@ To configure all-or-nothing scheduling execute the following commands:
 
 3.  Check the new configuration
 
-    You can check the new configuration by running: `bash kubectl get configmap
+    You can check the new configuration by running: `kubectl get configmap
     kueue-manager-config -n kueue-system -o yaml`
 
     In the output, you should see the `waitForPodsReady` section updated in the
