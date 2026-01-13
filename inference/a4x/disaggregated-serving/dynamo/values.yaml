@@ -13,17 +13,17 @@
 # limitations under the License.
 
 dynamo:
-  namespace: yijiaj-test
+  namespace: dynamo-cloud
   releaseVersion: "0.7.0"
-  deploymentName: disagg2p2d-yijiaj
+  deploymentName: disagg10p8d
   computeDomain:
-    name: yijiaj-a4x-domain
-    numNodes: 4
-    resourceClaimTemplateName: yijiaj-a4x-channel
-  serviceAccountName: dynamo-platform-dynamo-operator-component
+    name: a4x-domain
+    numNodes: 18
+    resourceClaimTemplateName: a4x-channel
+  serviceAccountName:
   frontend:
     image: nvcr.io/nvidia/ai-dynamo/sglang-runtime:0.7.0
-    replicas: 1
+    replicas: 9
     livenessProbe:
       initialDelaySeconds: 3000
       periodSeconds: 60
@@ -36,8 +36,7 @@ dynamo:
       failureThreshold: 100
   decodeWorker:
     image: us-central1-docker.pkg.dev/linglinll-gke-dev/dynamo/dynamo-base:dynamo-wideep-gb200-v0.7.0-sglang-0.5.5.post2-timeout 
-    #image: us-central1-docker.pkg.dev/linglinll-gke-dev/dynamo/dynamo-base:dynamo-wideep-gb200-v0.6.1
-    nodeCount: 2
+    nodeCount: 8
     replicas: 1
     envs:
     - name: HF_TOKEN
@@ -53,16 +52,12 @@ dynamo:
       value: eth0
     - name: TP_SOCKET_IFNAME
       value: eth0
-    # - name: SGLANG_ENABLE_JIT_DEEPGEMM
-    #   value: "1"
     - name: DYN_SKIP_SGLANG_LOG_FORMATTING
       value: "1"
     - name: SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK
       value: "256"
     - name: MC_TE_METRIC
       value: "true"
-    # - name: SGLANG_ENABLE_FLASHINFER_GEMM
-    #   value: "1"
     - name: SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE
       value: "100000"
     - name: SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT
@@ -87,14 +82,6 @@ dynamo:
       value: "1"
     - name: PYTHONUNBUFFERED
       value: "1"
-    # - name: NCCL_DEBUG
-    #   value: INFO
-    # - name: NCCL_DEBUG_SUBSYS
-    #   value: INIT,BOOTSTRAP,ENV,NET,GRAPH
-    # - name: NCCL_SOCKET_FAMILY
-    #   value: "AF_INET"
-    # - name: GLOO_SOCKET_FAMILY
-    #   value: "AF_INET"
     livenessProbe:
       initialDelaySeconds: 3000
       periodSeconds: 60
@@ -112,9 +99,8 @@ dynamo:
       failureThreshold: 3000
   prefillWorker:
     image: us-central1-docker.pkg.dev/linglinll-gke-dev/dynamo/dynamo-base:dynamo-wideep-gb200-v0.7.0-sglang-0.5.5.post2-timeout 
-    #image: us-central1-docker.pkg.dev/linglinll-gke-dev/dynamo/dynamo-base:dynamo-wideep-gb200-v0.6.1
     nodeCount: 2
-    replicas: 1
+    replicas: 5
     envs:
       - name: HF_TOKEN
         valueFrom:
@@ -131,14 +117,10 @@ dynamo:
         value: eth0
       - name: TP_SOCKET_IFNAME
         value: eth0
-      # - name: SGLANG_ENABLE_JIT_DEEPGEMM
-      #   value: "1"
       - name: DYN_SKIP_SGLANG_LOG_FORMATTING
         value: "1"
       - name: MC_TE_METRIC
         value: "true"
-      # - name: SGLANG_ENABLE_FLASHINFER_GEMM
-      #   value: "1"
       - name: SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE
         value: "100000"
       - name: SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT

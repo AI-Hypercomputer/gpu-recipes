@@ -23,13 +23,11 @@ tp-size: "32"
 dp-size: "32"
 ep-size: "32" 
 quantization: "fp8"
-# page-size: "1"
 enable-dp-attention: true
 attention-backend: "trtllm_mla"
 kv-cache-dtype: "fp8_e4m3"
 disable-radix-cache: true
 stream-interval: "50"
-# disaggregation-transfer-backend: nixl
 decode-log-interval: "1000"
 max-running-requests: "8192"
 context-length: "9300"
@@ -46,5 +44,4 @@ enable-dp-lm-head: true
 prefill-round-robin-balance: true
 ep-num-redundant-experts: "32"
 cuda-graph-max-bs: "256"
-# disable-cuda-graph: true
 deepep-config: '{"normal_dispatch": {"num_sms": 128,"num_max_nvl_chunked_send_tokens": 28,"num_max_nvl_chunked_recv_tokens": 256,"num_max_rdma_chunked_send_tokens": 6,"num_max_rdma_chunked_recv_tokens": 256}, "normal_combine": {"num_sms": 128,"num_max_nvl_chunked_send_tokens": 15,"num_max_nvl_chunked_recv_tokens": 256,"num_max_rdma_chunked_send_tokens": 6,"num_max_rdma_chunked_recv_tokens": 128}}'

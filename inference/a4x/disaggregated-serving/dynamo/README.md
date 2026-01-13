@@ -14,6 +14,7 @@ Dynamo provides a disaggregated architecture that separates prefill and decode o
   * [2.3. Connect to your GKE Cluster](#connect-cluster)
   * [2.4. Create Secrets](#create-secrets)
   * [2.5. Install Dynamo Platform](#install-platform)
+  * [2.6. Setup GCS Bucket for GKE ](#setup-gcsfuse)
 * [3. Deploy with SGLang Backend](#deploy-sglang)
   * [3.1. Multi-Node SGLang Deployment (16 GPUs)](#sglang-multi-node)
 * [4. Inference Request](#inference-request)
@@ -62,6 +63,7 @@ export NAMESPACE=dynamo-cloud
 export NGC_API_KEY=<YOUR_NGC_API_KEY>
 export HF_TOKEN=<YOUR_HF_TOKEN>
 export RELEASE_VERSION=0.7.0
+export GCS_BUCKET=<YOUR_CGS_BUCKET>
 
 # Set the project for gcloud commands
 gcloud config set project $PROJECT_ID
@@ -76,6 +78,7 @@ Replace the following values:
 | `CLUSTER_NAME` | The name of your GKE cluster | `a4x-cluster` |
 | `NGC_API_KEY` | Your NVIDIA NGC API key (get from [NGC](https://ngc.nvidia.com)) | `nvapi-xxx...` |
 | `HF_TOKEN` | Your Hugging Face access token | `hf_xxx...` |
+| `GCS_BUCKET` | Your GCS bucket name | `gs://xxx` |
 
 <a name="connect-cluster"></a>
 ### 2.3. Connect to your GKE Cluster
@@ -146,6 +149,32 @@ kubectl get pods -n ${NAMESPACE}
 
 Wait until all pods show a `Running` status before proceeding.
 
+<a name="setup-gcsfuse"></a>
+### 2.6. Setup GCS Bucket for GKE (One-Time Setup)
+
+It is recommended to utilize [gcsfuse](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/cloud-storage-fuse-csi-driver-setup) to facilitate model access and mitigate [huggingface rate limiting](https://huggingface.co/docs/hub/en/rate-limits#hub-rate-limits) issues.
+
+Find the service account (usually annotated to default):
+```bash
+kubectl get serviceaccounts ${NAMESPACE} -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.annotations.iam\.gke\.io/gcp-service-account}{"\n"}{end}'
+```
+
+Authorize the service account:
+```bash
+gcloud iam service-accounts add-iam-policy-binding xxx@project_id.iam.gserviceaccount.com \
+    --role roles/iam.workloadIdentityUser \
+    --member "serviceAccount:project_id.svc.id.goog[${NAMESPACE}/default]"
+```
+
+Grant read access to the bucket:
+```bash
+gcloud storage buckets add-iam-policy-binding ${GCS_BUCKET} \
+    --member "serviceAccount:xxx@project_id.iam.gserviceaccount.com" \
+    --role "roles/storage.objectViewer"
+```
+
+Downloading model files into the gcs bucket.
+
 <a name="deploy-sglang"></a>
 ## 3. Deploy with SGLang Backend
 
@@ -154,9 +183,9 @@ Wait until all pods show a `Running` status before proceeding.
 Deploy Dynamo with SGLang backend for high-performance inference.
 
 <a name="sglang-multi-node"></a>
-### 3.1. Multi-Node vLLM Deployment (16 GPUs)
+### 3.1. Multi-Node SGLang Deployment (72 GPUs)
 
-Multi-node deployment uses 16 GPUs across 4 A4X machines, providing increased capacity for larger models or higher throughput.
+Multi-node deployment uses 72 GPUs across 18 A4X machines, providing increased capacity for larger models or higher throughput.
 
 #### DeepSeekR1 671B Model
 
@@ -165,8 +194,8 @@ Deploy DeepSeekR1-671B across multiple nodes for production workloads. Note the 
 ```bash
 cd $RECIPE_ROOT
 helm install -f values.yaml \
---set-file prefill_serving_config=$REPO_ROOT/src/frameworks/a4x/dynamo-configs/deepseekr1-fp8-multi-node-prefill.yaml \
---set-file decode_serving_config=$REPO_ROOT/src/frameworks/a4x/dynamo-configs/deepseekr1-fp8-multi-node-decode.yaml \
+--set-file prefill_serving_config=$REPO_ROOT/src/frameworks/a4x/dynamo-configs/deepseekr1-fp8-10p8d-prefill.yaml \
+--set-file decode_serving_config=$REPO_ROOT/src/frameworks/a4x/dynamo-configs/deepseekr1-fp8-10p8d-decode.yaml \
 $USER-dynamo-a4x-multi-node \
 $REPO_ROOT/src/helm-charts/a4x/inference-templates/dynamo-deployment
 ```
