@@ -169,7 +169,7 @@ secrets:
 volumes:
   useGcs: true
   gcsfuse:
-    bucketName: "yijiaj-test"
+    bucketName: your-gcs-bucket-name
   ssdMountPath: "/ssd"
   gcsMounts:
     mountPath: "/data/model"

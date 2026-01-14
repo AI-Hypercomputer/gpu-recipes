@@ -13,7 +13,7 @@
 # limitations under the License.
 
 dynamo:
-  namespace: yijiaj-test
+  namespace: dynamo-cloud
   releaseVersion: "0.7.0"
   deploymentName: dynamo-disagg1p1d
   computeDomain:
@@ -175,7 +175,7 @@ secrets:
 volumes:
   useGcs: true
   gcsfuse:
-    bucketName: "yijiaj-test"
+    bucketName: your-gcs-bucket-name
   ssdMountPath: "/ssd"
   gcsMounts:
     mountPath: "/data/model"

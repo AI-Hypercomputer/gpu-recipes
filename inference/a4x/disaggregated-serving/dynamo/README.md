@@ -174,7 +174,7 @@ gcloud storage buckets add-iam-policy-binding ${GCS_BUCKET} \
     --role "roles/storage.objectViewer"
 ```
 
-Downloading model files into the gcs bucket.
+Downloading model files into the gcs bucket and set your gcs bucket name in values.yaml file.
 
 <a name="deploy-sglang"></a>
 ## 3. Deploy with SGLang Backend
@@ -223,51 +223,25 @@ $REPO_ROOT/src/helm-charts/a4x/inference-templates/dynamo-deployment
 ## 4. Inference Request
 [Back to Top](#table-of-contents)
 
-To make an inference request to test the server, we can first run a health check against the server using `curl`
+Check if the pods are in `Running` status before sending inference requests. 
 
 ```bash
-kubectl exec -it -n ${NAMESPACE} deployment/$USER-dynamo-a4x-multi-node -- curl http://localhost:8000/health | jq
+kubectl get pods -n ${NAMESPACE}
 ```
 
-You should see a server status like this. Wait for it to be in a `healthy` state.
+We can then deploy the benchmark clint and send benchark request.
+Deploy the benchmark clint like this:
+```bash
+kubectl apply -f bench_clint.yaml -n ${NAMESPACE}
+```
 
-```json
-{
-  "instances": [
-    {
-      "component": "backend",
-      "endpoint": "load_metrics",
-      "instance_id": 3994861215823793160,
-      "namespace": "dynamo",
-      "transport": {
-        "nats_tcp": "dynamo_backend.load_metrics-3770991c30298c08"
-      }
-    },
-    {
-      "component": "prefill",
-      "endpoint": "clear_kv_blocks",
-      "instance_id": 3994861215823793153,
-      "namespace": "dynamo",
-      "transport": {
-        "nats_tcp": "dynamo_prefill.clear_kv_blocks-3770991c30298c01"
-      }
-    },
-    {
-      "component": "prefill",
-      "endpoint": "generate",
-      "instance_id": 3994861215823793153,
-      "namespace": "dynamo",
-      "transport": {
-        "nats_tcp": "dynamo_prefill.generate-3770991c30298c01"
-      }
-    }
-  ],
-  "message": "No endpoints available",
-  "status": "unhealthy"
-}
-``` 
+And send the request like this: 
 
-Then we can send a benchmark request with like this:
+```bash
+kubectl exec -it bench-client -- bash -c "cd /workspace/dynamo/examples/backends/sglang/slurm_jobs/scripts/vllm && python3 -u benchmark_serving.py     --host $USER-dynamo-a4x-1p1d-frontend   --port 8000     --model deepseek-ai/DeepSeek-R1     --tokenizer deepseek-ai/DeepSeek-R1     --backend 'dynamo'     --endpoint /v1/completions     --disable-tqdm     --dataset-name random     --num-prompts 2560     --random-input-len 8192     --random-output-len 1024     --random-range-ratio 0.8     --ignore-eos     --request-rate inf     --percentile-metrics ttft,tpot,itl,e2el     --max-concurrency 512"
+```
+
+Or we can send a benchmark request to a frontend pod like this:
 
 ```bash
 kubectl exec -n ${NAMESPACE} $USER-dynamo-multi-node-serving-frontend -- python3 -u -m sglang.bench_serving    --backend sglang-oai-chat    --base-url http://localhost:8000    --model "deepseek-ai/DeepSeek-R1"    --tokenizer /data/model/deepseek-ai/DeepSeek-R1    --dataset-name random    --num-prompts 10240   --random-input-len 8192  --random-range-ratio 0.8   --random-output-len 1024   --max-concurrency 2048
