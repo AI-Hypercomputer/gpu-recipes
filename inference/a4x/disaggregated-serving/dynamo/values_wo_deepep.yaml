@@ -13,12 +13,12 @@
 # limitations under the License.
 
 dynamo:
-  namespace: dynamo-cloud
+  namespace: yijiaj-test
   releaseVersion: "0.7.0"
-  deploymentName: disagg10p8d
+  deploymentName: dynamo-disagg1p1d
   computeDomain:
     name: a4x-domain
-    numNodes: 18
+    numNodes: 2
     resourceClaimTemplateName: a4x-channel
   serviceAccountName:
   frontend:
@@ -36,7 +36,7 @@ dynamo:
       failureThreshold: 100
   decodeWorker:
     image: us-central1-docker.pkg.dev/linglinll-gke-dev/dynamo/dynamo-base:dynamo-wideep-gb200-v0.7.0-sglang-0.5.5.post2-timeout 
-    nodeCount: 8
+    nodeCount: 1
     replicas: 1
     envs:
     - name: HF_TOKEN
@@ -52,12 +52,14 @@ dynamo:
       value: eth0
     - name: TP_SOCKET_IFNAME
       value: eth0
+    - name: PYTHONUNBUFFERED
+      value: "1"
     - name: DYN_SKIP_SGLANG_LOG_FORMATTING
       value: "1"
-    - name: SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK
-      value: "256"
-    - name: MC_TE_METRIC
-      value: "true"
+    - name: SGLANG_ENABLE_JIT_DEEPGEMM
+      value: "false"
+    - name: SGLANG_ENABLE_FLASHINFER_GEMM
+      value: "1"
     - name: SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE
       value: "100000"
     - name: SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT
@@ -70,37 +72,37 @@ dynamo:
       value: "1"
     - name: SGLANG_MOONCAKE_CUSTOM_MEM_POOL
       value: "True"
+    - name: SGLANG_USE_MESSAGE_QUEUE_BROADCASTER
+      value: "0"
+    - name: SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK
+      value: "1"
+    - name: MC_TE_METRIC
+      value: "true"
     - name: MC_FORCE_MNNVL
       value: "1"
     - name: NCCL_MNNVL_ENABLE
       value: "1"
     - name: NCCL_CUMEM_ENABLE
       value: "1"
-    - name: SGLANG_USE_MESSAGE_QUEUE_BROADCASTER
-      value: "0"
-    - name: SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK
-      value: "1"
-    - name: PYTHONUNBUFFERED
-      value: "1"
     livenessProbe:
-      initialDelaySeconds: 3000
+      initialDelaySeconds: 600
       periodSeconds: 60
-      timeoutSeconds: 150
-      failureThreshold: 100
+      timeoutSeconds: 30
+      failureThreshold: 60
     readinessProbe:
-      initialDelaySeconds: 3000
+      initialDelaySeconds: 60
       periodSeconds: 60
-      timeoutSeconds: 300
-      failureThreshold: 100
+      timeoutSeconds: 30
+      failureThreshold: 60
     startupProbe:
       initialDelaySeconds: 3000
       periodSeconds: 60
-      timeoutSeconds: 600
-      failureThreshold: 3000
+      timeoutSeconds: 30
+      failureThreshold: 1800
   prefillWorker:
     image: us-central1-docker.pkg.dev/linglinll-gke-dev/dynamo/dynamo-base:dynamo-wideep-gb200-v0.7.0-sglang-0.5.5.post2-timeout 
-    nodeCount: 2
-    replicas: 5
+    nodeCount: 1
+    replicas: 1
     envs:
       - name: HF_TOKEN
         valueFrom:
@@ -117,10 +119,14 @@ dynamo:
         value: eth0
       - name: TP_SOCKET_IFNAME
         value: eth0
+      - name: PYTHONUNBUFFERED
+        value: "1"
       - name: DYN_SKIP_SGLANG_LOG_FORMATTING
         value: "1"
-      - name: MC_TE_METRIC
-        value: "true"
+      - name: SGLANG_ENABLE_JIT_DEEPGEMM
+        value: "false"
+      - name: SGLANG_ENABLE_FLASHINFER_GEMM
+        value: "1"
       - name: SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE
         value: "100000"
       - name: SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT
@@ -129,33 +135,33 @@ dynamo:
         value: "100000"
       - name: SGLANG_MOONCAKE_CUSTOM_MEM_POOL
         value: "True"
+      - name: SGLANG_USE_MESSAGE_QUEUE_BROADCASTER
+        value: "0"
+      - name: SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK
+        value: "1"
+      - name: MC_TE_METRIC
+        value: "true"
       - name: MC_FORCE_MNNVL
         value: "1"
       - name: NCCL_MNNVL_ENABLE
         value: "1"
       - name: NCCL_CUMEM_ENABLE
         value: "1"
-      - name: SGLANG_USE_MESSAGE_QUEUE_BROADCASTER
-        value: "0"
-      - name: SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK
-        value: "1"
-      - name: PYTHONUNBUFFERED
-        value: "1"
     livenessProbe:
       initialDelaySeconds: 3000
       periodSeconds: 60
-      timeoutSeconds: 150
-      failureThreshold: 100
+      timeoutSeconds: 30
+      failureThreshold: 60
     readinessProbe:
       initialDelaySeconds: 3000
       periodSeconds: 60
-      timeoutSeconds: 300
-      failureThreshold: 100
+      timeoutSeconds: 30
+      failureThreshold: 60
     startupProbe:
       initialDelaySeconds: 3000
       periodSeconds: 60
-      timeoutSeconds: 600
-      failureThreshold: 3000
+      timeoutSeconds: 30
+      failureThreshold: 1800
  
 
 secrets:
@@ -170,8 +176,6 @@ volumes:
   useGcs: true
   gcsfuse:
     bucketName: "yijiaj-test"
-    fileCacheCapacity: "500G"
-    cachePath: "/gcs-cache"
   ssdMountPath: "/ssd"
   gcsMounts:
     mountPath: "/data/model"
@@ -184,7 +188,6 @@ service:
 
 workload:
   model: deepseek-ai/DeepSeek-R1
-  gpus: 16
   framework: sglang
   configFile: serving-args.yaml
   configPath: /workload/configs

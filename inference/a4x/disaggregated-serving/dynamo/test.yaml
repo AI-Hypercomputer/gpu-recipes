@@ -1,0 +1,389 @@
+apiVersion: resource.nvidia.com/v1beta1
+kind: ComputeDomain
+metadata:
+  name: a4x-compute-domain-test
+  namespace: yijiaj-test
+spec:
+  numNodes: 2
+  channel:
+    resourceClaimTemplate:
+      name: a4x-compute-domain-channel-test
+---
+apiVersion: nvidia.com/v1alpha1
+kind: DynamoGraphDeployment
+metadata:
+  name: yijiaj-test-1p1d
+spec:
+  services:
+    Frontend:
+      dynamoNamespace: yijiaj-test
+      componentType: frontend
+      replicas: 9
+      resources:
+        requests:
+          cpu: "5"
+          memory: "50Gi"
+        limits:
+          cpu: "5"
+          memory: "50Gi"
+      extraPodSpec:
+        mainContainer:
+          image: nvcr.io/nvidia/ai-dynamo/sglang-runtime:0.7.0
+          workingDir: /sgl-workspace/dynamo/components/backends/sglang
+          stdin: true
+          tty: true
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - "python3 -m dynamo.frontend --http-port 8000"
+    Decode:
+      envFromSecret: hf-token-secret
+      livenessProbe:
+        httpGet:
+          path: /live
+          port: system
+        initialDelaySeconds: 600
+        periodSeconds: 30
+        timeoutSeconds: 15
+        failureThreshold: 5
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: system
+        initialDelaySeconds: 60
+        timeoutSeconds: 30
+        periodSeconds: 60
+        failureThreshold: 60
+      dynamoNamespace: yijiaj-test
+      componentType: worker
+      replicas: 1
+      resources:
+        limits:
+          gpu: "4"
+        claims:
+          - name: compute-domain-channel
+      sharedMemory:
+        size: 80Gi
+      envs:
+      - name: LD_LIBRARY_PATH
+        value: "/usr/local/ucx/lib:/usr/local/ucx/lib/ucx:/opt/nvidia/nvda_nixl/lib/aarch64-linux-gnu:/opt/nvidia/nvda_nixl/lib/aarch64-linux-gnu/plugins:/usr/local/nvidia/lib64"
+      - name: GLOO_SOCKET_IFNAME
+        value: eth0
+      - name: TP_SOCKET_IFNAME
+        value: eth0
+
+      - name: PYTHONUNBUFFERED
+        value: "1"
+      - name: DYN_SKIP_SGLANG_LOG_FORMATTING
+        value: "1"
+      - name: SGLANG_ENABLE_JIT_DEEPGEMM
+        value: "false"
+      - name: SGLANG_ENABLE_FLASHINFER_GEMM
+        value: "1"
+      - name: SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE
+        value: "100000"
+      - name: SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT
+        value: "100000"
+      - name: SGLANG_DISAGGREGATION_WAITING_TIMEOUT
+        value: "100000"
+      - name: SGLANG_DECODE_BOOTSTRAP_TIMEOUT
+        value: "1000"
+      - name: SGLANG_HACK_SEQ_BOOTSTRAP_ROOM
+        value: "1"
+      - name: SGLANG_MOONCAKE_CUSTOM_MEM_POOL
+        value: "True"
+      - name: SGLANG_USE_MESSAGE_QUEUE_BROADCASTER
+        value: "0"
+      - name: SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK
+        value: "1"
+      - name: MC_TE_METRIC
+        value: "true"
+      - name: MC_FORCE_MNNVL
+        value: "1"
+      - name: NCCL_MNNVL_ENABLE
+        value: "1"
+      - name: NCCL_CUMEM_ENABLE
+        value: "1"
+
+
+      extraPodMetadata:
+        annotations:
+          gke-gcsfuse/cpu-limit: "0"
+          gke-gcsfuse/ephemeral-storage-limit: "0"
+          gke-gcsfuse/memory-limit: "0"
+          gke-gcsfuse/volumes: "true"
+          networking.gke.io/default-interface: 'eth0'
+          networking.gke.io/interfaces: |
+            [
+              {"interfaceName":"eth0","network":"default"},
+              {"interfaceName":"eth2","network":"rdma-0"},
+              {"interfaceName":"eth3","network":"rdma-1"},
+              {"interfaceName":"eth4","network":"rdma-2"},
+              {"interfaceName":"eth5","network":"rdma-3"}
+            ]
+      extraPodSpec:
+        resourceClaims:
+          - name: compute-domain-channel
+            resourceClaimTemplateName: a4x-compute-domain-channel-test
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+              - matchExpressions:
+                - key: kubernetes.io/arch
+                  operator: In
+                  values:
+                  - arm64
+        volumes:
+        - name: model-src
+          csi:
+            driver: gcsfuse.csi.storage.gke.io
+            volumeAttributes:
+              bucketName: yijiaj-test
+              mountOptions: implicit-dirs,file-cache:enable-parallel-downloads:true,file-cache:parallel-downloads-per-file:100,file-cache:max-parallel-downloads:-1,file-cache:download-chunk-size-mb:10,file-cache:max-size-mb:-1
+        - name: library-dir-host
+          hostPath:
+            path: /home/kubernetes/bin/nvidia
+        - name: gib
+          hostPath:
+            path: /home/kubernetes/bin/gib
+        mainContainer:
+          securityContext:
+            privileged: true
+          startupProbe:
+            failureThreshold: 1800
+            httpGet:
+              path: /live
+              port: system
+            periodSeconds: 10
+            timeoutSeconds: 5
+          image: us-central1-docker.pkg.dev/linglinll-gke-dev/dynamo/dynamo-base:dynamo-wideep-gb200-v0.7.0-sglang-0.5.5.post2-timeout
+          workingDir: /sgl-workspace/dynamo/components/backends/sglang
+          command: ["/bin/bash", "-c"]
+          stdin: true
+          tty: true
+          volumeMounts:
+          - mountPath: /data/model
+            name: model-src
+          - name: library-dir-host
+            mountPath: /usr/local/nvidia
+          - name: gib
+            mountPath: /usr/local/gib
+          args:
+            - |
+              set -e
+
+              nvidia-smi
+              . /usr/local/gib/scripts/set_nccl_env.sh
+
+              echo "--- VERIFYING NCCL ENV VARS IN SHELL ---"
+              env | grep NCCL_
+              echo "--- END VERIFICATION ---"
+
+              exec python3 -m dynamo.sglang \
+                --enable-metrics \
+                --model-path /data/model/deepseek-ai/DeepSeek-R1 \
+                --served-model-name deepseek-ai/DeepSeek-R1 \
+                --disaggregation-bootstrap-port 30001 \
+                --disaggregation-mode decode \
+                --host 0.0.0.0 \
+                --port 8000 \
+                --disable-radix-cache \
+                --tensor-parallel-size 4 \
+                --data-parallel-size 1 \
+                --expert-parallel-size 1 \
+                --trust-remote-code \
+                --kv-cache-dtype fp8_e4m3 \
+                --attention-backend trtllm_mla \
+                --quantization fp8 \
+                --moe-runner-backend flashinfer_trtllm \
+                --disable-radix-cache \
+                --watchdog-timeout 1000000 \
+                --context-length 9600 \
+                --mem-fraction-static 0.95 \
+                --chunked-prefill-size 8192 \
+                --cuda-graph-max-bs 512 \
+                --max-running-requests 512 \
+                --scheduler-recv-interval 10 \
+                --enable-flashinfer-allreduce-fusion \
+                --enable-symm-mem \
+                --moe-dense-tp-size 1 \
+                --prefill-round-robin-balance
+
+    Prefill:
+      envFromSecret: hf-token-secret
+      livenessProbe:
+        exec:
+          command:
+            - /bin/sh
+            - -c
+            - "exit 0"
+        periodSeconds: 60
+        timeoutSeconds: 30
+        failureThreshold: 10
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: system
+        initialDelaySeconds: 60
+        timeoutSeconds: 30
+        periodSeconds: 60
+        failureThreshold: 60
+      dynamoNamespace: yijiaj-test
+      componentType: worker
+      replicas: 1
+      resources:
+        requests:
+          cpu: "130"
+          memory: "800Gi"
+        limits:
+          gpu: "4"
+        claims:
+          - name: compute-domain-channel
+      sharedMemory:
+        size: 80Gi
+      envs:
+      - name: LD_LIBRARY_PATH
+        value: "/usr/local/ucx/lib:/usr/local/ucx/lib/ucx:/opt/nvidia/nvda_nixl/lib/aarch64-linux-gnu:/opt/nvidia/nvda_nixl/lib/aarch64-linux-gnu/plugins:/usr/local/nvidia/lib64"
+      - name: UCX_TLS
+        value: "^tcp"
+      - name: GLOO_SOCKET_IFNAME
+        value: eth0
+      - name: TP_SOCKET_IFNAME
+        value: eth0
+
+
+      - name: PYTHONUNBUFFERED
+        value: "1"
+      - name: DYN_SKIP_SGLANG_LOG_FORMATTING
+        value: "1"
+      - name: SGLANG_ENABLE_JIT_DEEPGEMM
+        value: "false"
+      - name: SGLANG_ENABLE_FLASHINFER_GEMM
+        value: "1"
+      - name: SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE
+        value: "100000"
+      - name: SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT
+        value: "100000"
+      - name: SGLANG_DISAGGREGATION_WAITING_TIMEOUT
+        value: "100000"
+      - name: SGLANG_MOONCAKE_CUSTOM_MEM_POOL
+        value: "True"
+      - name: SGLANG_USE_MESSAGE_QUEUE_BROADCASTER
+        value: "0"
+      - name: SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK
+        value: "1"
+      - name: MC_TE_METRIC
+        value: "true"
+      - name: MC_FORCE_MNNVL
+        value: "1"
+      - name: NCCL_MNNVL_ENABLE
+        value: "1"
+      - name: NCCL_CUMEM_ENABLE
+        value: "1"
+
+      extraPodMetadata:
+        annotations:
+          gke-gcsfuse/cpu-limit: "0"
+          gke-gcsfuse/ephemeral-storage-limit: "0"
+          gke-gcsfuse/memory-limit: "0"
+          gke-gcsfuse/volumes: "true"
+          networking.gke.io/default-interface: 'eth0'
+          networking.gke.io/interfaces: |
+            [
+              {"interfaceName":"eth0","network":"default"},
+              {"interfaceName":"eth2","network":"rdma-0"},
+              {"interfaceName":"eth3","network":"rdma-1"},
+              {"interfaceName":"eth4","network":"rdma-2"},
+              {"interfaceName":"eth5","network":"rdma-3"}
+            ]
+      extraPodSpec:
+        resourceClaims:
+          - name: compute-domain-channel
+            resourceClaimTemplateName: a4x-compute-domain-channel-test
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+              - matchExpressions:
+                - key: kubernetes.io/arch
+                  operator: In
+                  values:
+                  - arm64
+        volumes:
+        - name: model-src
+          csi:
+            driver: gcsfuse.csi.storage.gke.io
+            volumeAttributes:
+              bucketName: yijiaj-test
+              mountOptions: implicit-dirs,file-cache:enable-parallel-downloads:true,file-cache:parallel-downloads-per-file:100,file-cache:max-parallel-downloads:-1,file-cache:download-chunk-size-mb:10,file-cache:max-size-mb:-1
+        - name: library-dir-host
+          hostPath:
+            path: /home/kubernetes/bin/nvidia
+        - name: gib
+          hostPath:
+            path: /home/kubernetes/bin/gib
+        mainContainer:
+          startupProbe:
+            failureThreshold: 1800
+            httpGet:
+              path: /live
+              port: system
+            periodSeconds: 10
+            timeoutSeconds: 5
+          securityContext:
+            privileged: true
+          stdin: true
+          tty: true
+          volumeMounts:
+          - mountPath: /data/model
+            name: model-src
+          - name: library-dir-host
+            mountPath: /usr/local/nvidia
+          - name: gib
+            mountPath: /usr/local/gib
+          image: us-central1-docker.pkg.dev/linglinll-gke-dev/dynamo/dynamo-base:dynamo-wideep-gb200-v0.7.0-sglang-0.5.5.post2-timeout
+          workingDir: /sgl-workspace/dynamo/components/backends/sglang
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -e
+
+              nvidia-smi
+              . /usr/local/gib/scripts/set_nccl_env.sh
+
+              echo "--- VERIFYING NCCL ENV VARS IN SHELL ---"
+              env | grep NCCL_
+              echo "--- END VERIFICATION ---"
+
+              exec python3 -m dynamo.sglang \
+                --enable-metrics \
+                --model-path /data/model/deepseek-ai/DeepSeek-R1 \
+                --served-model-name deepseek-ai/DeepSeek-R1 \
+                --disaggregation-bootstrap-port 30001 \
+                --disaggregation-mode prefill \
+                --host 0.0.0.0 \
+                --port 8000 \
+                --disable-radix-cache \
+                --tensor-parallel-size 4 \
+                --data-parallel-size 1 \
+                --expert-parallel-size 1 \
+                --trust-remote-code \
+                --kv-cache-dtype fp8_e4m3 \
+                --attention-backend trtllm_mla \
+                --quantization fp8 \
+                --moe-runner-backend flashinfer_trtllm \
+                --disable-radix-cache \
+                --watchdog-timeout 1000000 \
+                --context-length 9600 \
+                --mem-fraction-static 0.95 \
+                --max-total-tokens 32768 \
+                --chunked-prefill-size 24576 \
+                --cuda-graph-max-bs 512 \
+                --max-running-requests 512 \
+                --load-balance-method round_robin \
+                --scheduler-recv-interval 10 \
+                --enable-flashinfer-allreduce-fusion \
+                --moe-dense-tp-size 1
+

@@ -16,7 +16,8 @@ Dynamo provides a disaggregated architecture that separates prefill and decode o
   * [2.5. Install Dynamo Platform](#install-platform)
   * [2.6. Setup GCS Bucket for GKE ](#setup-gcsfuse)
 * [3. Deploy with SGLang Backend](#deploy-sglang)
-  * [3.1. Multi-Node SGLang Deployment (16 GPUs)](#sglang-multi-node)
+  * [3.1. SGLang Deployment without DeepEP(8 GPUs)](#sglang-wo-deepep)
+  * [3.2. SGLang Deployment with DeepEP(72 GPUs)](#sglang-deepep)
 * [4. Inference Request](#inference-request)
 * [5. Monitoring and Troubleshooting](#monitoring)
 * [6. Cleanup](#cleanup)
@@ -180,16 +181,34 @@ Downloading model files into the gcs bucket.
 
 [Back to Top](#table-of-contents)
 
-Deploy Dynamo with SGLang backend for high-performance inference.
+Deploy Dynamo with SGLang backend for high-performance inference. 
 
-<a name="sglang-multi-node"></a>
-### 3.1. Multi-Node SGLang Deployment (72 GPUs)
+<a name="sglang-wo-deepep"></a>
+### 3.1. SGLang Deployment without DeepEP (8 GPUs)
 
-Multi-node deployment uses 72 GPUs across 18 A4X machines, providing increased capacity for larger models or higher throughput.
+Two nodes deployment uses 8 GPUs across 2 A4X machines, targeting low latency. 
 
 #### DeepSeekR1 671B Model
 
-Deploy DeepSeekR1-671B across multiple nodes for production workloads. Note the use of `--set-file prefill_serving_config` and `--set-file decode_serving_config` pointing to the correct model config file for a multi node deployment scenario: 
+Deploy DeepSeekR1-671B across 2 nodes for testing and validation.  Note the use of `--set-file prefill_serving_config` and `--set-file decode_serving_config` pointing to the correct model config file.
+
+```bash
+cd $RECIPE_ROOT
+helm install -f values_wo_deepep.yaml \
+--set-file prefill_serving_config=$REPO_ROOT/src/frameworks/a4x/dynamo-configs/deepseekr1-fp8-1p1d-prefill.yaml \
+--set-file decode_serving_config=$REPO_ROOT/src/frameworks/a4x/dynamo-configs/deepseekr1-fp8-1p1d-decode.yaml \
+$USER-dynamo-a4x-1p1d \
+$REPO_ROOT/src/helm-charts/a4x/inference-templates/dynamo-deployment
+```
+
+<a name="sglang-deepep"></a>
+### 3.2. SGLang Deployment with DeepEP (72 GPUs)
+
+Multi-node deployment uses 72 GPUs across 18 A4X machines, providing increased capacity for larger models or higher throughput. 
+
+#### DeepSeekR1 671B Model
+
+Deploy DeepSeekR1-671B across 18 nodes for production workloads. Note the use of `--set-file prefill_serving_config` and `--set-file decode_serving_config` pointing to the correct model config file for a multi node deployment scenario: 
 
 ```bash
 cd $RECIPE_ROOT
@@ -251,7 +270,7 @@ You should see a server status like this. Wait for it to be in a `healthy` state
 Then we can send a benchmark request with like this:
 
 ```bash
-kubectl exec -n ${NAMESPACE} $USER-dynamo-multi-node-serving-frontend -- python3 -u -m sglang.bench_serving    --backend sglang-oai-chat    --base-url http://localhost:8000    --model "deepseek-ai/DeepSeek-R1"    --tokenizer /data/model/deepseek-ai/DeepSeek-R1    --dataset-name random    --num-prompts 2048    --random-input-len 2048    --random-output-len 512    --max-concurrency 512
+kubectl exec -n ${NAMESPACE} $USER-dynamo-multi-node-serving-frontend -- python3 -u -m sglang.bench_serving    --backend sglang-oai-chat    --base-url http://localhost:8000    --model "deepseek-ai/DeepSeek-R1"    --tokenizer /data/model/deepseek-ai/DeepSeek-R1    --dataset-name random    --num-prompts 10240   --random-input-len 8192  --random-range-ratio 0.8   --random-output-len 1024   --max-concurrency 2048
 ```
 
 <a name="monitoring"></a>
