@@ -160,9 +160,14 @@ Find the service account (usually annotated to default):
 kubectl get serviceaccounts ${NAMESPACE} -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.annotations.iam\.gke\.io/gcp-service-account}{"\n"}{end}'
 ```
 
+Config the service account email:
+```bash
+export SERVICE_ACCOUNT_EMAIL=$(kubectl get serviceaccount/default -n ${NAMESPACE} -o jsonpath='{.metadata.annotations.iam\.gke\.io/gcp-service-account}')
+```
+
 Authorize the service account:
 ```bash
-gcloud iam service-accounts add-iam-policy-binding xxx@project_id.iam.gserviceaccount.com \
+gcloud iam service-accounts add-iam-policy-binding ${SERVICE_ACCOUNT_EMAIL} \
     --role roles/iam.workloadIdentityUser \
     --member "serviceAccount:project_id.svc.id.goog[${NAMESPACE}/default]"
 ```
@@ -170,7 +175,7 @@ gcloud iam service-accounts add-iam-policy-binding xxx@project_id.iam.gserviceac
 Grant read access to the bucket:
 ```bash
 gcloud storage buckets add-iam-policy-binding ${GCS_BUCKET} \
-    --member "serviceAccount:xxx@project_id.iam.gserviceaccount.com" \
+    --member "serviceAccount:${SERVICE_ACCOUNT_EMAIL}" \
     --role "roles/storage.objectViewer"
 ```
 
