@@ -276,7 +276,7 @@ This recipe does the following steps to run the benchmarking:
     --set queue=${KUEUE_NAME} \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     --set workload.model.name=deepseek-ai/DeepSeek-R1 \
-    --set workload.image=${ARTIFACT_REGISTRY}/${VLLM_IMAGE}:${VLLM_VERSION} \
+    --set workload.image=${ARTIFACT_REGISTRY}/${VLLM_IMAGE}:vllm${VLLM_VERSION}-ngcvllm${NGC_VLLM_VERSION} \
     --set workload.framework=vllm \
     $USER-serving-deepseek-r1-model \
     $REPO_ROOT/src/helm-charts/a4x/inference-templates/deployment
