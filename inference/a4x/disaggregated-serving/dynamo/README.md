@@ -2,7 +2,7 @@
 
 This document outlines the steps to deploy and serve Large Language Models (LLMs) using [NVIDIA Dynamo](https://github.com/ai-dynamo/dynamo) disaggregated inference platform on [A4X GKE Node pools](https://cloud.google.com/kubernetes-engine).
 
-Dynamo provides a disaggregated architecture that separates prefill and decode operations for optimized inference performance, supporting both single-node (8 GPUs) and multi-node (16 GPUs) configurations. Dynamo also supports various inference framework backends like [vLLM](https://docs.nvidia.com/dynamo/latest/components/backends/vllm/README.html) and [SGLang](https://docs.nvidia.com/dynamo/latest/components/backends/sglang/README.html). In this recipe, we will focus on serving using the SGLang backend. 
+Dynamo provides a disaggregated architecture that separates prefill and decode operations for optimized inference performance, supporting both single-node (4 GPUs) and multi-node NVL72 (72 GPUs) configurations. Dynamo also supports various inference framework backends like [vLLM](https://docs.nvidia.com/dynamo/latest/components/backends/vllm/README.html) and [SGLang](https://docs.nvidia.com/dynamo/latest/components/backends/sglang/README.html). In this recipe, we will focus on serving using the SGLang backend. 
 
 <a name="table-of-contents"></a>
 ## Table of Contents
@@ -229,10 +229,10 @@ Check if the pods are in `Running` status before sending inference requests.
 kubectl get pods -n ${NAMESPACE}
 ```
 
-We can then deploy the benchmark clint and send benchark request.
-Deploy the benchmark clint like this:
+We can then deploy the benchmark client and send benchark request.
+Deploy the benchmark client like this:
 ```bash
-kubectl apply -f bench_clint.yaml -n ${NAMESPACE}
+kubectl apply -f bench_client.yaml -n ${NAMESPACE}
 ```
 
 And send the request like this: 
