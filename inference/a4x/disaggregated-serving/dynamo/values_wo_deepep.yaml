@@ -13,7 +13,7 @@
 # limitations under the License.
 
 dynamo:
-  namespace: dynamo-cloud
+  namespace: yijiaj-test
   releaseVersion: "0.7.0"
   deploymentName: dynamo-disagg1p1d
   computeDomain:
@@ -35,7 +35,6 @@ dynamo:
       timeoutSeconds: 300
       failureThreshold: 100
   decodeWorker:
-    image: us-central1-docker.pkg.dev/linglinll-gke-dev/dynamo/dynamo-base:dynamo-wideep-gb200-v0.7.0-sglang-0.5.5.post2-timeout 
     nodeCount: 1
     replicas: 1
     envs:
@@ -100,7 +99,6 @@ dynamo:
       timeoutSeconds: 30
       failureThreshold: 1800
   prefillWorker:
-    image: us-central1-docker.pkg.dev/linglinll-gke-dev/dynamo/dynamo-base:dynamo-wideep-gb200-v0.7.0-sglang-0.5.5.post2-timeout 
     nodeCount: 1
     replicas: 1
     envs:
@@ -175,7 +173,7 @@ secrets:
 volumes:
   useGcs: true
   gcsfuse:
-    bucketName: your-gcs-bucket-name
+    bucketName: yijiaj-test
   ssdMountPath: "/ssd"
   gcsMounts:
     mountPath: "/data/model"
@@ -188,6 +186,7 @@ service:
 
 workload:
   model: deepseek-ai/DeepSeek-R1
+  image:
   framework: sglang
   configFile: serving-args.yaml
   configPath: /workload/configs

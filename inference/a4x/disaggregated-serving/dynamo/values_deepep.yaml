@@ -35,7 +35,6 @@ dynamo:
       timeoutSeconds: 300
       failureThreshold: 100
   decodeWorker:
-    image: us-central1-docker.pkg.dev/linglinll-gke-dev/dynamo/dynamo-base:dynamo-wideep-gb200-v0.7.0-sglang-0.5.5.post2-timeout 
     nodeCount: 8
     replicas: 1
     envs:
@@ -98,7 +97,6 @@ dynamo:
       timeoutSeconds: 30
       failureThreshold: 1800
   prefillWorker:
-    image: us-central1-docker.pkg.dev/linglinll-gke-dev/dynamo/dynamo-base:dynamo-wideep-gb200-v0.7.0-sglang-0.5.5.post2-timeout 
     nodeCount: 2
     replicas: 5
     envs:
@@ -182,6 +180,7 @@ service:
 
 workload:
   model: deepseek-ai/DeepSeek-R1
+  image:
   framework: sglang
   configFile: serving-args.yaml
   configPath: /workload/configs

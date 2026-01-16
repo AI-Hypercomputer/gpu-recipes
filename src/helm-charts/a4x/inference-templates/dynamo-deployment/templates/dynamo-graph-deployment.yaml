@@ -158,7 +158,7 @@ spec:
         mainContainer:
           securityContext:
               privileged: true
-          image: {{ .Values.dynamo.decodeWorker.image }}
+          image: {{ .Values.workload.image }}
           workingDir: /sgl-workspace/dynamo/components/backends/sglang
           startupProbe:
             failureThreshold: {{ .Values.dynamo.decodeWorker.startupProbe.failureThreshold }}
@@ -329,7 +329,7 @@ spec:
               privileged: true
           stdin: true
           tty: true
-          image: {{ .Values.dynamo.prefillWorker.image }}
+          image: {{ .Values.workload.image }}
           workingDir: /sgl-workspace/dynamo/components/backends/sglang
           startupProbe:
             failureThreshold: {{ .Values.dynamo.prefillWorker.startupProbe.failureThreshold }}

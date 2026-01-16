@@ -15,6 +15,7 @@ Dynamo provides a disaggregated architecture that separates prefill and decode o
   * [2.4. Create Secrets](#create-secrets)
   * [2.5. Install Dynamo Platform](#install-platform)
   * [2.6. Setup GCS Bucket for GKE ](#setup-gcsfuse)
+  * [2.7. Build Dynamo Image ](#build-dyanmo-image)
 * [3. Deploy with SGLang Backend](#deploy-sglang)
   * [3.1. SGLang Deployment without DeepEP(8 GPUs)](#sglang-wo-deepep)
   * [3.2. SGLang Deployment with DeepEP(72 GPUs)](#sglang-deepep)
@@ -181,6 +182,21 @@ gcloud storage buckets add-iam-policy-binding ${GCS_BUCKET} \
 
 Downloading model files into the gcs bucket and set your gcs bucket name in values.yaml file.
 
+<a name="build-dynamo-image"></a>
+### 2.7. Build Dynamo Image
+
+Follow the [Dynamo container guide](https://github.com/ai-dynamo/dynamo/blob/main/container/README.md) to build the image, then push it to your artifact registry. 
+
+Build the image like this:
+```bash
+docker build -f container/Dockerfile.sglang . -t dynamo-wideep --no-cache --build-arg DYNAMO_VERSION=0.7.0 --platform linux/arm64
+```
+
+Config the docker image:
+```bash
+export ARTIFACT_REGISTRY=<YOUR_IMAGE_ARTIFACT_REGISTRY>
+```
+
 <a name="deploy-sglang"></a>
 ## 3. Deploy with SGLang Backend
 
@@ -200,6 +216,7 @@ Deploy DeepSeekR1-671B across 2 nodes for testing and validation.  Note the use 
 ```bash
 cd $RECIPE_ROOT
 helm install -f values_wo_deepep.yaml \
+--set workload.image=${ARTIFACT_REGISTRY} \
 --set-file prefill_serving_config=$REPO_ROOT/src/frameworks/a4x/dynamo-configs/deepseekr1-fp8-1p1d-prefill.yaml \
 --set-file decode_serving_config=$REPO_ROOT/src/frameworks/a4x/dynamo-configs/deepseekr1-fp8-1p1d-decode.yaml \
 $USER-dynamo-a4x-1p1d \
@@ -217,7 +234,8 @@ Deploy DeepSeekR1-671B across 18 nodes for production workloads. Note the use of
 
 ```bash
 cd $RECIPE_ROOT
-helm install -f values.yaml \
+helm install -f values_deepep.yaml \
+--set workload.image=${ARTIFACT_REGISTRY} \
 --set-file prefill_serving_config=$REPO_ROOT/src/frameworks/a4x/dynamo-configs/deepseekr1-fp8-10p8d-prefill.yaml \
 --set-file decode_serving_config=$REPO_ROOT/src/frameworks/a4x/dynamo-configs/deepseekr1-fp8-10p8d-decode.yaml \
 $USER-dynamo-a4x-multi-node \
@@ -284,6 +302,7 @@ Common issues:
 * **Pods stuck in Pending**: Check if nodes have sufficient resources (especially for multi-node deployments)
 * **Model download slow**: Large models like DeepSeekR1 671B can take 30 minutes to download
 * **Multi-node issues**: Verify network connectivity between nodes and proper subnet configuration
+* **Deepep timeout issue**: Recompile DeepEP to patch NUM_CPU_TIMEOUT_SECS and NUM_TIMEOUT_CYCLES in csrc/kernels/configs.cuh during the image build.
 
 <a name="cleanup"></a>
 ## 6. Cleanup
