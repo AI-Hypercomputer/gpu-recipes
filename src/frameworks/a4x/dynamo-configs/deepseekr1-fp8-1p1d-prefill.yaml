@@ -1,0 +1,40 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+enable-metrics: true
+served-model-name: deepseek-ai/DeepSeek-R1
+disaggregation-bootstrap-port: "30001"
+disaggregation-mode: prefill
+host: "0.0.0.0"
+port: "9090"
+disable-radix-cache: true
+tensor-parallel-size: 4
+data-parallel-size: 1
+expert-parallel-size: 1
+trust-remote-code: true
+kv-cache-dtype: "fp8_e4m3"
+attention-backend: "trtllm_mla"
+quantization: "fp8"
+moe-runner-backend: "flashinfer_trtllm"
+watchdog-timeout: "1000000"
+context-length: "9600"
+mem-fraction-static: "0.95"
+max-total-tokens: "32768"
+chunked-prefill-size: "24576"
+cuda-graph-max-bs: "512"
+max-running-requests: "512"
+load-balance-method: round_robin
+scheduler-recv-interval: "10"
+enable-flashinfer-allreduce-fusion: true
+moe-dense-tp-size: "1"
