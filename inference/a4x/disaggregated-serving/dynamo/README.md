@@ -217,6 +217,7 @@ Deploy DeepSeekR1-671B across 2 nodes for testing and validation.  Note the use 
 cd $RECIPE_ROOT
 helm install -f values_wo_deepep.yaml \
 --set workload.image=${ARTIFACT_REGISTRY} \
+--set volumes.gcsfuse.bucketName=${GCS_BUCKET} \
 --set-file prefill_serving_config=$REPO_ROOT/src/frameworks/a4x/dynamo-configs/deepseekr1-fp8-1p1d-prefill.yaml \
 --set-file decode_serving_config=$REPO_ROOT/src/frameworks/a4x/dynamo-configs/deepseekr1-fp8-1p1d-decode.yaml \
 $USER-dynamo-a4x-1p1d \
@@ -236,6 +237,7 @@ Deploy DeepSeekR1-671B across 18 nodes for production workloads. Note the use of
 cd $RECIPE_ROOT
 helm install -f values_deepep.yaml \
 --set workload.image=${ARTIFACT_REGISTRY} \
+--set volumes.gcsfuse.bucketName=${GCS_BUCKET} \
 --set-file prefill_serving_config=$REPO_ROOT/src/frameworks/a4x/dynamo-configs/deepseekr1-fp8-10p8d-prefill.yaml \
 --set-file decode_serving_config=$REPO_ROOT/src/frameworks/a4x/dynamo-configs/deepseekr1-fp8-10p8d-decode.yaml \
 $USER-dynamo-a4x-multi-node \

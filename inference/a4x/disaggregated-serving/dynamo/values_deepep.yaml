@@ -167,7 +167,7 @@ secrets:
 volumes:
   useGcs: true
   gcsfuse:
-    bucketName: your-gcs-bucket-name
+    bucketName:
   ssdMountPath: "/ssd"
   gcsMounts:
     mountPath: "/data/model"
