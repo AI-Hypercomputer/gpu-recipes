@@ -36,7 +36,7 @@ This recipe has been optimized for and tested with the following configuration:
 
 * **GKE Cluster**:
     * A [regional standard cluster](https://cloud.google.com/kubernetes-engine/docs/concepts/configuration-overview) version: `1.33.4-gke.1036000` or later.
-    * A GPU node pool with 1 [a4x-highgpu-4g](https://cloud.google.com/compute/docs/gpus) machine.
+    * A GPU node pool with 1 [a4x-highgpu-4g](https://docs.cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) machine.
     * [Workload Identity Federation for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity) enabled.
     * [Cloud Storage FUSE CSI driver for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/cloud-storage-fuse-csi-driver) enabled.
     * [DCGM metrics](https://cloud.google.com/kubernetes-engine/docs/how-to/dcgm-metrics) enabled.
