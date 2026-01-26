@@ -274,7 +274,7 @@ This recipe does the following steps to run the benchmarking:
     --set-file workload_launcher=$REPO_ROOT/src/launchers/vllm-launcher.sh \
     --set-file serving_config=$REPO_ROOT/src/frameworks/a4x/vllm-configs/deepseek-r1-671b.yaml \
     --set queue=${KUEUE_NAME} \
-    --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
+    --set "volumes.gcsMounts[0].bucketName=${GCS_BUCKET}" \
     --set workload.model.name=deepseek-ai/DeepSeek-R1 \
     --set workload.image=${ARTIFACT_REGISTRY}/${VLLM_IMAGE}:vllm${VLLM_VERSION}-ngcvllm${NGC_VLLM_VERSION} \
     --set workload.framework=vllm \
