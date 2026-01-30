@@ -1,0 +1,33 @@
+dwsSettings:
+  maxRunDurationSeconds: null
+network:
+  gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib-arm64:v1.1.0
+  hostNetwork: true
+  ncclSettings:
+  - name: NCCL_DEBUG
+    value: WARN
+  subnetworks[]: null
+queue: null
+tasSettings:
+  topologyRequest:
+      kueue.x-k8s.io/podset-required-topology: "cloud.google.com/gce-topology-block"
+      kueue.x-k8s.io/podset-slice-required-topology: "cloud.google.com/gce-topology-subblock"
+      kueue.x-k8s.io/podset-slice-size: "16"
+volumes:
+  gcsMounts:
+  - bucketName: null
+    mountPath: null
+  gcsVolumes: true
+  psVolumes: false
+workload:
+  arguments[]: null
+  configFile: null
+  configPath: null
+  defaultArguments[]: null
+  envs:
+  - name: ARTIFACT_DIR
+    value: null
+  - name: GLOO_SOCKET_IFNAME
+    value: eth0
+  gpus: 64
+  image: nvcr.io/nvidia/nemo:25.11.00
