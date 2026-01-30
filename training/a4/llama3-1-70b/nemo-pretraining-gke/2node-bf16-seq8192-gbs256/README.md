@@ -1,5 +1,5 @@
 <!-- mdformat global-off -->
-# Pretrain llama3-1-70b workloads on a4 GKE Node pools with Nvidia NeMo Framework
+# Pretrain llama3-1-70b workloads on a4 GKE Node pools with Nvidia NeMo Framework (Intelligence)
 
 This recipe outlines the steps for running a llama3-1-70b pretraining
 workload on [a4 GKE Node pools](https://cloud.google.com/kubernetes-engine) by using the
