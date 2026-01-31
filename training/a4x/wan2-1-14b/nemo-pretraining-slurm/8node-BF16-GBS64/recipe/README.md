@@ -3,7 +3,7 @@
 
 This recipe outlines the steps for running a wan2.1-14b pretraining
 workload on [a4x Slurm](https://docs.cloud.google.com/ai-hypercomputer/docs/create/create-slurm-cluster) by using the
-[NVIDIA NeMo framework](https://github.com/NVIDIA/nemo).
+[NVIDIA NeMo framework](https://github.com/NVIDIA-NeMo/Megatron-Bridge).
 
 ## Orchestration and deployment tools
 
