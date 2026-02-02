@@ -32,7 +32,6 @@ volumes:
 workload:
   nodeSelector:
     cloud.google.com/gke-accelerator: nvidia-gb200
-    cloud.google.com/placement-policy-name: a4x-workload-policy-95cbc61c
   arguments[]: null
   configFile: llama3-1-405b-fp8cs-gbs2048-gpus64.py
   configPath: /workload/configs/

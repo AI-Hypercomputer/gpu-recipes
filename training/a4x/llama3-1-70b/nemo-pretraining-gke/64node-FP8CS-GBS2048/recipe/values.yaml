@@ -9,7 +9,6 @@ network:
   subnetworks[]: null
 nodeSelector:
   cloud.google.com/gke-accelerator: nvidia-gb200
-  cloud.google.com/placement-policy-name: a4x-workload-policy-95cbc61c
 queue: null
 tasSettings:
   topologyRequest:
