@@ -1,7 +1,7 @@
 <!-- mdformat global-off -->
 # Pretrain wan2-1-14b-fp8cs-gbs64-gpus32 workloads on a4x GKE Node pools with NVIDIA DFM & Megatron-Bridge
 
-This recipe outlines the steps for running a wan2-1-14b-fp8cs-gbs64-gpus32 pretraining workload on a4x GKE Node pools by using the NVIDIA DFM (Digital Fingerprint Model) Framework and Megatron-Bridge.
+This recipe outlines the steps for running a wan2-1-14b-fp8cs-gbs64-gpus32 pretraining workload on a4x GKE Node pools by using the NeMo DFM (Diffusion Foundation Models) and Megatron-Bridge within Nemo Framework.
 
 ## Orchestration and deployment tools
 
