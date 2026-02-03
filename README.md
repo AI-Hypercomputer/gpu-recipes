@@ -54,6 +54,9 @@ Models             | GPU Machine Type                                           
 **Llama-3.1-8B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)      | NeMo   | Pre-training  | GKE          | [Link](./training/a4x/llama3-1-8b/nemo-pretraining-gke/)
 **Llama-3.1-70B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)      | NeMo      | Pre-training  | GKE          | [Link](./training/a4x/llama3-1-70b/nemo-pretraining-gke/)
 **Llama-3.1-405B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)      | NeMo      | Pre-training  | GKE          | [Link](./training/a4x/llama3-1-405b/nemo-pretraining-gke/)
+**Nemotron-4-340B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)      | NeMo      | Pre-training  | GKE          | [Link](./training/a4x/nemotron4-340B/nemo-pretraining-gke/)
+**Wan-2.1-14B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)      | NeMo      | Pre-training  | GKE          | [Link](./training/a4x/wan2-1-14b/nemo-pretraining-gke/)
+**Wan-2.1-14B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)      | NeMo      | Pre-training  | Slurm          | [Link](./training/a4x/wan2-1-14b/nemo-pretraining-slurm/)
 
 ### Inference benchmarks A3 Mega
 
