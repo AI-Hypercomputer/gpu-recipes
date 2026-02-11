@@ -71,7 +71,7 @@ Clone the `gpu-recipes` repository and set a reference to the recipe folder.
 git clone https://github.com/ai-hypercomputer/gpu-recipes.git
 cd gpu-recipes
 export REPO_ROOT=`git rev-parse --show-toplevel`
-export RECIPE_ROOT=$REPO_ROOT/training/a4x/llama3-1-405b/nemo-pretraining-gke/32node-FP8CS-GBS2048/recipe
+export RECIPE_ROOT=$REPO_ROOT/training/a4x/llama3-1-405b/nemo-pretraining-gke/64node-FP8CS-GBS2048/recipe
 cd $RECIPE_ROOT
 ```
 
@@ -91,7 +91,7 @@ your client:
     export WORKLOAD_NAME=$USER-a4x-llama3-1-405b
     helm install $WORKLOAD_NAME . -f values.yaml \
     --set-file workload_launcher=launcher.sh \
-    --set-file workload_config=llama3-1-405b-fp8cs-gbs2048-gpus128.py \
+    --set-file workload_config=llama3-1-405b-fp8cs-gbs2048-gpus64.py \
     --set workload.image=nvcr.io/nvidia/nemo:25.07 \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     --set volumes.gcsMounts[0].mountPath=/job-logs \
@@ -108,7 +108,7 @@ cd $RECIPE_ROOT
 export WORKLOAD_NAME=$USER-a4x-llama3-1-405b
 helm install $WORKLOAD_NAME . -f values.yaml \
 --set-file workload_launcher=launcher.sh \
---set-file workload_config=llama3-1-405b-fp8cs-gbs2048-gpus128.py \
+--set-file workload_config=llama3-1-405b-fp8cs-gbs2048-gpus64.py \
 --set workload.image=nvcr.io/nvidia/nemo:25.07 \
 --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
 --set volumes.gcsMounts[0].mountPath=/job-logs \
