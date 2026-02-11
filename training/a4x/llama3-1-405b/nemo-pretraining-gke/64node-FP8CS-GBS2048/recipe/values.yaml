@@ -1,0 +1,82 @@
+dwsSettings:
+  maxRunDurationSeconds: null
+network:
+  gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib-arm64:v1.1.0
+  hostNetwork: true
+  ncclSettings:
+  - name: NCCL_DEBUG
+    value: VERSION
+  - name: NCCL_ALGO
+    value: "Ring,Tree"
+  - name: NCCL_NET_GDR_LEVEL
+    value: PIX
+  - name: NCCL_NET_GDR_C2C
+    value: "1"
+  - name: NCCL_P2P_NET_CHUNKSIZE
+    value: "2097152"
+  - name: NCCL_NVLS_ENABLE
+    value: "0"
+  subnetworks[]: null
+queue: tas-lq
+# targetNodepools: null
+targetNodepools: null
+  # - a4x-highgpu-4g-a4x-pool-0
+  # - a4x-highgpu-4g-a4x-pool-1
+
+
+# tasSettings:
+#   topologyRequest:
+#     kueue.x-k8s.io/podset-preferred-topology: kubernetes.io/hostname
+
+tasSettings:
+  topologyRequest:
+    kueue.x-k8s.io/podset-required-topology: "cloud.google.com/gce-topology-block"
+    kueue.x-k8s.io/podset-slice-required-topology: "cloud.google.com/gce-topology-subblock"
+    kueue.x-k8s.io/podset-slice-size: "16"
+
+volumes:
+  gcsMounts:
+  - bucketName: null
+    mountPath: null
+  gcsVolumes: true
+  psVolumes: false
+  ssdMountPath: "/ssd"
+workload:
+  nodeSelector:
+    cloud.google.com/gke-accelerator: nvidia-gb200
+  arguments[]: null
+  configFile: llama3-1-405b-fp8cs-gbs2048-gpus256.py
+  configPath: /workload/configs/
+  defaultArguments:
+  - --account=none
+  - --partition=none
+  - --gpu=gb200
+  - --num_gpus=256
+  - --compute_dtype=fp8
+  - --fp8_recipe=cs
+  - --global_batch_size=2048
+  - --max_steps=30
+  - --micro_batch_size=1
+  - --tensor_parallel_size=2
+  - --context_parallel_size=1
+  - --expert_parallel_size=1
+  - --expert_tensor_parallel_size=1
+  - --pipeline_parallel_size=1
+  - --virtual_pipeline_parallel_size=1
+  - --use_mcore_fsdp=1
+  - --cuda_graphs=0
+  - --activation_offload_layers=95
+  - --log_dir=/job-logs/nemo-logs
+  envs:
+  - name: ARTIFACT_DIR
+    value: null
+  - name: PL_TORCH_DISTRIBUTED_BACKEND
+    value: "nccl"
+  - name: GLOO_SOCKET_IFNAME
+    value: eth0
+  - name: TORCH_NCCL_HIGH_PRIORITY
+    value: "1"
+  - name: NEMO_LAUNCH_SCRIPT
+    value: /workload/configs/llama3-1-405b-fp8cs-gbs2048-gpus256.py
+  gpus: 256
+  image: nvcr.io/nvidia/nemo:25.07
