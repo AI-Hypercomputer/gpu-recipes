@@ -1,9 +1,9 @@
 <!-- mdformat global-off -->
-# Pretrain wan2.1-14b workloads on a4x Slurm with Nvidia NeMo Framework
+# Pretrain llama3-8b workloads on a4x Slurm with Nvidia Megatron-Bridge Framework
 
-This recipe outlines the steps for running a wan2.1-14b pretraining
+This recipe outlines the steps for running a llama3-8b pretraining
 workload on [a4x Slurm](https://docs.cloud.google.com/ai-hypercomputer/docs/create/create-slurm-cluster) by using the
-[NVIDIA NeMo framework](https://github.com/NVIDIA/nemo).
+[NVIDIA Megatron-Bridge framework](https://github.com/NVIDIA-NeMo/Megatron-Bridge).
 
 ## Orchestration and deployment tools
 
@@ -21,7 +21,7 @@ to create your a4x SLURM cluster.
 
 ## Training dataset
 
-This recipe uses a mock pretraining dataset provided by the NeMo framework.
+This recipe uses a mock pretraining dataset provided by the Megatron-Bridge framework.
 
 ## Docker container image
 
@@ -65,18 +65,19 @@ Clone the `gpu-recipes` repository and set a reference to the recipe folder.
 git clone https://github.com/ai-hypercomputer/gpu-recipes.git
 cd gpu-recipes
 export REPO_ROOT=`git rev-parse --show-toplevel`
-export RECIPE_ROOT=$REPO_ROOT/training/a4x/wan2-1-14b/nemo-pretraining-slurm/8node-BF16-GBS64/recipe
+export RECIPE_ROOT=$REPO_ROOT/training/a4x/llama3-8b/megatron-bridge-pretraining-slurm/2node-FP8CS-GBS128/recipe
 cd $RECIPE_ROOT
 ```
 
 ### Configure and submit a pretraining job
 
-#### Using 8 node (32 gpus) precision
+#### Using 2 node (8 gpus) precision
 To execute the job with the default settings, run the following command from
 your client:
 
 ```bash
-sbatch wan_14b_benchmark.sh
+cd ..
+sbatch ./recipe/sbatch_script.sh
 ```
 
 ### Monitor the job
@@ -91,7 +92,7 @@ squeue --me
 To get the logs for the job, run the following command:
 
 ```
-tail -f wan-14b-benchmark_{jobID}.out
+tail -f slurm_{jobID}.out
 ```
 
 ### Uninstall the job
