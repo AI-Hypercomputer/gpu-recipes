@@ -16,7 +16,8 @@ This guide walks you through setting up the necessary cloud infrastructure, conf
   * [3.4. Get Hugging Face Token](#get-hf-token)
   * [3.5. Create Hugging Face Kubernetes Secret](#setup-hf-secret)
 * [4. Run the Recipe](#run-the-recipe)
-  * [4.1. Inference benchmark for DeepSeek-R1 671B](#serving-deepseek-r1-671b)
+  * [4.1. Supported Models](#supported-models)
+  * [4.2. Deploy and Benchmark a Model](#deploy-model)
 * [5. Monitoring and Troubleshooting](#monitoring)
   * [5.1. Check Deployment Status](#check-status)
   * [5.2. View Logs](#view-logs)
@@ -188,60 +189,69 @@ kubectl create secret generic hf-secret \
 
 [Back to Top](#table-of-contents)
 
-This recipe supports the deployment of the following models:
-
-1.  [DeepSeek-R1-NVFP4-v2](#serving-deepseek-r1)
-
 > [!NOTE]
 > After running the recipe with `helm install`, it can take **up to 30 minutes** for the deployment to become fully available. This is because the GKE node must first pull the Docker image and then download the model weights from Hugging Face.
 
-<a name="serving-deepseek-r1"></a>
-### 4.1. Inference benchmark for DeepSeek-R1 671B Model
+<a name="supported-models"></a>
+### 4.1. Supported Models
 
 [Back to Top](#table-of-contents)
 
-The recipe runs inference benchmark for [DeepSeek-R1 671B NVFP4 model](https://huggingface.co/nvidia/DeepSeek-R1-NVFP4-v2) which is Nvidia's pre-quantized FP4 checkpoint of the original [DeepSeek-R1 671B model](https://huggingface.co/deepseek-ai/DeepSeek-R1).
+This recipe supports the following models. You can easily swap between them by changing the environment variables in the next step.
 
-The recipe does the following steps to run the benchmarking:
+| Model Name | Hugging Face ID | Configuration File | Release Name Suffix |
+| :--- | :--- | :--- | :--- |
+| **DeepSeek-R1 671B** | `nvidia/DeepSeek-R1-NVFP4-v2` | `deepseek-r1-nvfp4.yaml` | `deepseek-r1-model` |
+| **Llama 3.1 70B** | `meta-llama/Llama-3.1-70B-Instruct` | `llama-3.1-70b.yaml` | `llama-3-1-70b` |
+| **Llama 3.1 8B** | `meta-llama/Llama-3.1-8B-Instruct` | `llama-3.1-8b.yaml` | `llama-3-1-8b` |
+| **Qwen 3 32B** | `Qwen/Qwen3-32B` | `qwen3-32b.yaml` | `qwen3-32b` |
+| **Qwen 3 4B** | `Qwen/Qwen3-4B` | `qwen3-4b.yaml` | `qwen3-4b` |
 
-1. Download the full DeepSeek-R1 model checkpoints from [Hugging Face](https://huggingface.co/nvidia/DeepSeek-R1-NVFP4-v2).
-2. Run the throughput and/or latency benchmarking.
+> [!TIP]
+> **DeepSeek-R1 671B** uses Nvidia's pre-quantized FP4 checkpoint. For more information, see the [Hugging Face model card](https://huggingface.co/nvidia/DeepSeek-R1-NVFP4-v2).
 
-The recipe uses [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/legacy/performance/perf-benchmarking.md), a command-line tool from NVIDIA to benchmark the performance of TensorRT-LLM engine. For more information about `trtllm-bench`, see the [TensorRT-LLM documentation](https://github.com/NVIDIA/TensorRT-LLM).
+> [!TIP]
+> You can use the [NVIDIA Model Optimizer](https://github.com/NVIDIA/Model-Optimizer/tree/main/examples/llm_ptq) to quantize these models to FP8 or NVFP4 for improved performance.
 
-> [!NOTE]
-> The config file directly exposes the settings within TensorRT-LLM's llm_args.py class, which are passed to `trtllm-bench` or `trtllm-serve`, you can modify these as needed in [`src/frameworks/a4x/trtllm-configs/deepseek-r1-nvfp4.yaml`](../../../../src/frameworks/a4x/trtllm-configs/deepseek-r1-nvfp4.yaml)
+<a name="deploy-model"></a>
+### 4.2. Deploy and Benchmark a Model
 
-1. Install the helm chart to prepare and benchmark the model using [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/legacy/performance/perf-benchmarking.md) tool:
+[Back to Top](#table-of-contents)
+
+The recipe uses [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/main/docs/source/legacy/performance/perf-benchmarking.md), a command-line tool from NVIDIA to benchmark the performance of TensorRT-LLM engine.
+
+1.  **Configure model-specific variables.** Choose a model from the [table above](#supported-models) and set the variables:
+
+    ```bash
+    # Example for Llama 3.1 70B
+    export HF_MODEL_ID="meta-llama/Llama-3.1-70B-Instruct"
+    export CONFIG_FILE="llama-3.1-70b.yaml"
+    export RELEASE_NAME="$USER-serving-llama-3-1-70b"
+    ```
+
+2.  **Install the helm chart:**
 
     ```bash
     cd $RECIPE_ROOT
     helm install -f values.yaml \
     --set-file workload_launcher=$REPO_ROOT/src/launchers/trtllm-launcher.sh \
-    --set-file serving_config=$REPO_ROOT/src/frameworks/a4x/trtllm-configs/deepseek-r1-nvfp4.yaml \
+    --set-file serving_config=$REPO_ROOT/src/frameworks/a4x/trtllm-configs/${CONFIG_FILE} \
     --set queue=${KUEUE_NAME} \
     --set "volumes.gcsMounts[0].bucketName=${GCS_BUCKET}" \
-    --set workload.model.name=nvidia/DeepSeek-R1-NVFP4-v2 \
+    --set workload.model.name=${HF_MODEL_ID} \
     --set workload.image=nvcr.io/nvidia/tensorrt-llm/release:${TRTLLM_VERSION} \
     --set workload.framework=trtllm \
-    $USER-serving-deepseek-r1-model \
+    ${RELEASE_NAME} \
     $REPO_ROOT/src/helm-charts/a4x/inference-templates/deployment
     ```
 
-  This creates a Helm release and a Deployment named `$USER-serving-deepseek-r1-model`, and a Service named `$USER-serving-deepseek-r1-model-svc`.
-
-2.  **Check the deployment status.**
+3.  **Check the deployment status:**
 
     ```bash
-    kubectl get deployment/$USER-serving-deepseek-r1-model
+    kubectl get deployment/${RELEASE_NAME}
     ```
 
     Wait until the `READY` column shows `1/1`. See the [Monitoring and Troubleshooting](#monitoring) section to view the deployment logs.
-
-  > [!NOTE]
-  > - This helm chart is configured to run only a single benchmarking experiment for 1k requests for 128 tokens of input/output lengths. To run other experiments, you can add the various combinations provided in the [values.yaml](values.yaml) file.
-  > - This deployment process can take **up to 30 minutes** as it downloads the model weights from Hugging Face and then the server loads the model weights.
-
 
 <a name="monitoring"></a>
 ## 5. Monitoring and Troubleshooting
