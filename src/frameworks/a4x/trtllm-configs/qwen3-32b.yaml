@@ -1,0 +1,4 @@
+tp_size: 1
+pp_size: 1
+backend: pytorch
+kv_cache_free_gpu_mem_fraction: 0.90
