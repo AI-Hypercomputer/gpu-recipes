@@ -213,7 +213,7 @@ run_benchmark() {
     fi
 
     cat $output_file
-    gsutil cp $output_file /gcs/benchmark_logs/trtllm/
+    gcloud storage cp $output_file /gcs/benchmark_logs/trtllm/
 
     rm -rf $engine_dir
     rm -f $dataset_file

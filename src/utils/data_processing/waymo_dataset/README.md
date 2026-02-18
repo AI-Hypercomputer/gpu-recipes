@@ -111,4 +111,3 @@ print(processed_dataset[0])
     -   Make sure your GCP user or service account has `Storage Object Viewer` permissions on the `gs://waymo_open_dataset_v_2_0_1/` bucket.
 
 3.  **Corrupted Files**: If a specific Parquet file fails to process, it might be corrupted. The script is designed to be robust and will log an error and skip the corrupted segment, continuing with the rest of the data.
-
