@@ -26,7 +26,7 @@ Before running the script, ensure you have the following prerequisites installed
 
 #### Google Cloud SDK
 
-The `gsutil` command-line tool is required to download the dataset from Google Cloud Storage.
+The `gcloud storage` command-line tool is required to download the dataset from Google Cloud Storage.
 
 1.  Install the Google Cloud SDK.
 2.  Authenticate with Google Cloud:
@@ -103,7 +103,7 @@ print(processed_dataset[0])
 
 ### 5. Common Issues
 
-1.  **`gsutil` Command Not Found**: This error occurs if the Google Cloud SDK is not installed or not in your system's `PATH`. Please follow the installation instructions in the Prerequisites section.
+1.  **`gcloud storage` Command Not Found**: This error occurs if the Google Cloud SDK is not installed or not in your system's `PATH`. Please follow the installation instructions in the Prerequisites section.
 
 2.  **GCS Access Denied / 401 Errors**: This indicates an authentication or permission issue.
     -   Ensure you have registered for the Waymo dataset.
