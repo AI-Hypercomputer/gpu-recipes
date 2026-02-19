@@ -95,7 +95,7 @@ def process_ckpt_write_times(
       start_match = re.search(log_patterns.CHECKPOINT_WRITE_START, line)
       if start_match:
         step = start_match.group(1)
-        start_time = utils.parse_nemo_timestamp(line)
+        start_time = float(start_match.group(2))
 
         if ckpt_write_times.get(step, {}).get("start_time"):
           if generate_warnings:
@@ -110,7 +110,8 @@ def process_ckpt_write_times(
 
       end_match = re.search(log_patterns.CHECKPOINT_WRITE_END, line)
       if end_match:
-        step = end_match.group(1)
+        # NeMo 2 reports step = iteration + 1 in the end message.
+        step = str(int(end_match.group(1)) - 1)
         end_time = utils.parse_nemo_timestamp(line)
 
         if ckpt_write_times.get(step, {}).get("start_time") is None:
