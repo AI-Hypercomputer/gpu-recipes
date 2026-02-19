@@ -94,14 +94,14 @@ worker_command=$(cat <<- EOM
     --model_family_name qwen \
     --model_recipe_name qwen3_235b_a22b \
     --gpus_per_node 4 \
-    --num_gpus 64 \
+    --num_gpus 128 \
     --seq_length 4096 \
     --compute_dtype bf16 \
-    --global_batch_size 1024 \
+    --global_batch_size 2048 \
     --tensor_model_parallel_size 1 \
     --pipeline_model_parallel_size 8 \
     --context_parallel_size 1 \
-    --expert_model_parallel_size 8 \
+    --expert_model_parallel_size 16 \
     --virtual_pipeline_model_parallel_size 3 \
     --micro_batch_size 1 \
     --cuda_graph_impl transformer_engine \
