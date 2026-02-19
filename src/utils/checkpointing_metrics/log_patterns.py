@@ -21,7 +21,10 @@ NEMO_LOG_FILE_NAME = r"nemo_log_globalrank-(\d+)_localrank-(\d+)"
 NEMO_LOG_TIMESTAMP = r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})"
 
 # The pattern of the checkpoint saving start log.
-CHECKPOINT_WRITE_START = r"Checkpoint save for step (\d+) started"
+CHECKPOINT_WRITE_START = (
+    r"Global Checkpoint Save : Rank: \d+ : Iteration: (\d+)"
+    r" : Start time: ([\d.]+)s : Save duration: ([\d.]+)s"
+)
 # The pattern of the checkpoint saving end log.
 CHECKPOINT_WRITE_END = (
     r"Async checkpoint save for step (\d+) .* finalized successfully"
