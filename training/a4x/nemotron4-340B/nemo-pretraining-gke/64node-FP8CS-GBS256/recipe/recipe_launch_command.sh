@@ -1,0 +1,1 @@
+helm install mutianzhu-ubench-rzju . -f values.yaml --set-file workload_launcher=launcher.sh --set-file workload_config=nemotron4-340b-fp8cs-gbs256-gpus256.py --set workload.image=nvcr.io/nvidia/nemo:25.09 --set volumes.gcsMounts[0].bucketName=ubench-logs --set volumes.gcsMounts[0].mountPath=/job-logs --set workload.envs[0].value=/job-logs/mutianzhu-ubench-rzju --set queue=tas-lq
