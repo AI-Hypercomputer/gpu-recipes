@@ -26,7 +26,7 @@ Before running the script, ensure you have the following prerequisites installed
 
 #### Google Cloud SDK
 
-The `gsutil` command-line tool is required to download the dataset from Google Cloud Storage.
+The `gcloud storage` command-line tool is required to download the dataset from Google Cloud Storage.
 
 1.  Install the Google Cloud SDK.
 2.  Authenticate with Google Cloud:
@@ -103,7 +103,7 @@ print(processed_dataset[0])
 
 ### 5. Common Issues
 
-1.  **`gsutil` Command Not Found**: This error occurs if the Google Cloud SDK is not installed or not in your system's `PATH`. Please follow the installation instructions in the Prerequisites section.
+1.  **`gcloud storage` Command Not Found**: This error occurs if the Google Cloud SDK is not installed or not in your system's `PATH`. Please follow the installation instructions in the Prerequisites section.
 
 2.  **GCS Access Denied / 401 Errors**: This indicates an authentication or permission issue.
     -   Ensure you have registered for the Waymo dataset.
@@ -111,4 +111,3 @@ print(processed_dataset[0])
     -   Make sure your GCP user or service account has `Storage Object Viewer` permissions on the `gs://waymo_open_dataset_v_2_0_1/` bucket.
 
 3.  **Corrupted Files**: If a specific Parquet file fails to process, it might be corrupted. The script is designed to be robust and will log an error and skip the corrupted segment, continuing with the rest of the data.
-
