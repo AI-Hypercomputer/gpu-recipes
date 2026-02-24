@@ -23,17 +23,30 @@ import statistics
 from google.cloud import storage
 import log_patterns
 import utils
+from log_parser import get_parser, available_parsers, detect_format_from_line, default_filename_validator
+import nemo1_parser
+import nemo2_parser
 
 
 def process_metrics_from_logs(
     gcs_logs_path: str,
+    log_format: str = "auto",
 ):
   """Process NeMo logs stored in a GCS bucket and calculate checkpointing
   metrics.
 
   Args:
     gcs_logs_path: The path to the NeMo logs in a GCS bucket.
+    log_format: The log format to parse ('nemo1', 'nemo2', 'auto', etc.).
+        When 'auto', the format is detected from the log content.
   """
+
+  if log_format == "auto":
+    parser = None
+    filename_val = default_filename_validator
+  else:
+    parser = get_parser(log_format)
+    filename_val = parser.validate_filename
 
   storage_client = storage.Client()
   logs_bucket_name = gcs_logs_path.split("/")[2]
@@ -43,11 +56,10 @@ def process_metrics_from_logs(
   ckpt_write_times = utils.process_logs_files(
       logs_bucket=logs_bucket,
       match_glob=match_glob,
-      process_logs_file=process_ckpt_write_times,
-      filename_val=lambda file_path: re.search(
-          log_patterns.NEMO_LOG_FILE_NAME, file_path
-      )
-      is not None,
+      process_logs_file=lambda bucket, path: process_ckpt_write_times(
+          bucket, path, parser
+      ),
+      filename_val=filename_val,
   )
 
   compute_write_duration_per_step(ckpt_write_times)
@@ -56,6 +68,7 @@ def process_metrics_from_logs(
 def process_ckpt_write_times(
     logs_bucket: storage.bucket.Bucket,
     file_path: str,
+    parser=None,
 ):
   """Process checkpoint write times from NeMo logs.
 
@@ -63,12 +76,15 @@ def process_ckpt_write_times(
       logs_bucket: The bucket which contains the logs from
         the benchmark run.
       file_path: The path to the NeMo log file.
+      parser: A LogParser instance for framework-specific parsing.
 
   Returns:
       A list of dictionaries, representing ckpt write data per global_rank.
 
   """
   global generate_warnings
+
+  auto_detect = parser is None
 
   ckpt_write_results = []
   ckpt_write_times = {}
@@ -78,7 +94,13 @@ def process_ckpt_write_times(
     content = blob.download_as_string()
     stream = io.TextIOWrapper(io.BytesIO(content), encoding="utf-8")
 
-    file_path_match = re.search(log_patterns.NEMO_LOG_FILE_NAME, file_path)
+    # For auto-detect mode, find file path match using any parser.
+    if auto_detect:
+      file_path_match = re.search(
+          log_patterns.NEMO_LOG_FILE_NAME, file_path
+      )
+    else:
+      file_path_match = re.search(parser.log_file_pattern, file_path)
     if not file_path_match:
       raise ValueError(
           f"Invalid file path: {file_path}. Valid pattern:"
@@ -92,10 +114,21 @@ def process_ckpt_write_times(
     )
 
     for line in stream:
-      start_match = re.search(log_patterns.CHECKPOINT_WRITE_START, line)
+      # Auto-detect: try all parsers until one matches.
+      if auto_detect:
+        detected_parser, start_match = detect_format_from_line(line)
+        if detected_parser:
+          parser = detected_parser
+          auto_detect = False
+          print(f"Auto-detected log format: {parser.name}")
+        else:
+          start_match = None
+      else:
+        start_match = parser.checkpoint_start_pattern.search(line)
+
       if start_match:
-        step = start_match.group(1)
-        start_time = float(start_match.group(2))
+        step = parser.extract_step_from_start(start_match)
+        start_time = parser.extract_start_time(start_match, line)
 
         if ckpt_write_times.get(step, {}).get("start_time"):
           if generate_warnings:
@@ -108,11 +141,14 @@ def process_ckpt_write_times(
         ckpt_write_times[step] = {"start_time": start_time}
         continue
 
-      end_match = re.search(log_patterns.CHECKPOINT_WRITE_END, line)
+      # Only check end pattern if a parser has been determined.
+      if parser is None:
+        continue
+
+      end_match = parser.checkpoint_end_pattern.search(line)
       if end_match:
-        # NeMo 2 reports step = iteration + 1 in the end message.
-        step = str(int(end_match.group(1)) - 1)
-        end_time = utils.parse_nemo_timestamp(line)
+        step = parser.extract_step_from_end(end_match)
+        end_time = parser.extract_end_time(end_match, line)
 
         if ckpt_write_times.get(step, {}).get("start_time") is None:
           raise ValueError(
@@ -202,19 +238,27 @@ def compute_write_duration_per_step(write_times: list[dict[str, any]]):
 
 
 if __name__ == "__main__":
-  parser = argparse.ArgumentParser(
+  arg_parser = argparse.ArgumentParser(
       description="Process checkpointing metrics from the logs."
   )
-  parser.add_argument(
+  arg_parser.add_argument(
       "--gcs_logs_path",
       required=True,
+      help="The path to the NeMo logs in a GCS bucket.",
+  )
+  arg_parser.add_argument(
+      "--log_format",
+      choices=["auto"] + available_parsers(),
+      default="auto",
       help=(
-          "The path to the NeMo logs in a GCS bucket"
+          "The log format to parse. Available formats: auto, "
+          + ", ".join(available_parsers())
+          + ". (default: auto)"
       ),
   )
 
-  args = parser.parse_args()
+  args = arg_parser.parse_args()
 
   generate_warnings = os.getenv("GENERATE_LOG_WARNINGS", "False").lower() == "true"
 
-  process_metrics_from_logs(args.gcs_logs_path)
+  process_metrics_from_logs(args.gcs_logs_path, log_format=args.log_format)
