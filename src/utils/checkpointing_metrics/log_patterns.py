@@ -20,9 +20,5 @@ NEMO_LOG_FILE_NAME = r"nemo_log_globalrank-(\d+)_localrank-(\d+)"
 # The timestamp pattern in NeMo logs.
 NEMO_LOG_TIMESTAMP = r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})"
 
-# The pattern of the checkpoint saving start log.
-CHECKPOINT_WRITE_START = r"Checkpoint save for step (\d+) started"
-# The pattern of the checkpoint saving end log.
-CHECKPOINT_WRITE_END = (
-    r"Async checkpoint save for step (\d+) .* finalized successfully"
-)
+# Note: Framework-specific checkpoint start/end patterns are defined
+# in the parser classes under parsers/.
