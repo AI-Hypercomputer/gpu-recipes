@@ -20,7 +20,7 @@ This recipe has been optimized for and tested with the following configuration:
 
 Please follow the instructions in the [Cluster Toolkit A3U Example README](https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/examples/machine-learning/a3-ultragpu-8g) to provision an A3 ultra Slurm cluster.
 
-Commit hash of the blueprint to create the slurm cluster is `d0947cc`
+Version of the blueprint to create the slurm cluster is `v1.82.0`
 
 ## Docker container image
 
