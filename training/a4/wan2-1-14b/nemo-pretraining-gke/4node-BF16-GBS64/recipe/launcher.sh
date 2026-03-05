@@ -111,9 +111,9 @@ worker_command=$(cat <<- EOM
     --training-mode pretrain \
     --mock \
     checkpoint.save_interval=0 \
-    model.tensor_model_parallel_size=4 \
+    model.tensor_model_parallel_size=1 \
     model.context_parallel_size=2 \
-    model.sequence_parallel=true \
+    model.sequence_parallel=false \
     model.recompute_granularity=full \
     model.recompute_method=block \
     model.recompute_num_layers=40 \
