@@ -1,7 +1,7 @@
 <!-- mdformat global-off -->
-# Pretrain wan2-1-14b-bf16-gbs64-gpus32 workloads on a4x GKE Node pools with NVIDIA DFM & Megatron-Bridge
+# Pretrain wan2-1-14b-bf16-gbs64-gpus32 workloads on a4 GKE Node pools with NVIDIA DFM & Megatron-Bridge
 
-This recipe outlines the steps for running a wan2-1-14b-bf16-gbs64-gpus32 pretraining workload on a4x GKE Node pools by using the NeMo DFM (Diffusion Foundation Models) and Megatron-Bridge within Nemo Framework.
+This recipe outlines the steps for running a wan2-1-14b-bf16-gbs64-gpus32 pretraining workload on a4 GKE Node pools by using the NeMo DFM (Diffusion Foundation Models) and Megatron-Bridge within Nemo Framework.
 
 ## Orchestration and deployment tools
 
@@ -14,7 +14,7 @@ For this recipe, the following setup is used:
 
 This recipe has been optimized for and tested with the following configuration:
 
-- GKE cluster: Please follow Cluster Toolkit [instructions](https://github.com/GoogleCloudPlatform/cluster-toolkit/tree/main/examples/gke-a4x) to create your a4x GKE cluster.
+- GKE cluster: Please follow Cluster Toolkit [instructions](https://github.com/GoogleCloudPlatform/cluster-toolkit/tree/main/examples/gke-a4) to create your a4 GKE cluster.
 - Node Configuration: 4 nodes (8 GPUs per node, 32 GPUs total).
 - GPU Architecture: NVIDIA Blackwell B200.
 
@@ -51,7 +51,7 @@ Replace the following values:
 - `<CLUSTER_REGION>`: the region where your cluster is located.
 - `<CLUSTER_NAME>`: the name of your GKE cluster.
 - `<GCS_BUCKET>`: the name of your Cloud Storage bucket. Don't include the gs:// prefix.
-- `<KUEUE_NAME>`: the name of the Kueue local queue. The default queue created by the cluster toolkit is a4x.
+- `<KUEUE_NAME>`: the name of the Kueue local queue. The default queue created by the cluster toolkit is a4.
 
 Set the default project:
 
