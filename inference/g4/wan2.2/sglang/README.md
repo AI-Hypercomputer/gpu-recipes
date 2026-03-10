@@ -76,7 +76,7 @@ export IMAGE_URL="us-docker.pkg.dev/gke-ai-infra/gpu-recipes/sglang:latest"
 
 # Run the Docker container
 mkdir -p /scratch/cache
-docker run --gpus all -it --rm \
+docker run \
   -v /scratch:/scratch \
   -v /scratch/cache:/root/.cache \
   --ipc=host \
