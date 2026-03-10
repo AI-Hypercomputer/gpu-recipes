@@ -104,19 +104,19 @@ huggingface-cli download Wan-AI/Wan2.2-I2V-A14B --local-dir /scratch/models/Wan2
 
 Use the following commands to test video generation. These examples show how to run the model on a single GPU or across multiple GPUs using Tensor Parallelism (--tp-size). Download Image from internet to run the benchmark to test Image to Video generation.
 
-****# Benchmark: Text-to-Video on 1 GPU****
+*# Benchmark: Text-to-Video on 1 GPU*
 ```bash
 sglang generate --model-path Wan-AI/Wan2.2-T2V-A14B-Diffusers  --dit-layerwise-offload false --text-encoder-cpu-offload false --vae-cpu-offload false --pin-cpu-memory --dit-cpu-offload false     --prompt "Summer beach vacation style, a white cat wearing sunglasses sits on a surfboard. The fluffy-furred feline gazes directly at the camera with a relaxed expression. Blurred beach scenery forms the background featuring crystal-clear waters, distant green hills, and a blue sky dotted with white clouds. The cat assumes a naturally relaxed posture, as if savoring the sea breeze and warm sunlight. A close-up shot highlights the feline's intricate details and the refreshing atmosphere of the seaside." --save-output --num-gpus 1 --num-frames 81
 ```
-**# Benchmark: Text-to-Video on 4 GPU**
+*# Benchmark: Text-to-Video on 4 GPU*
 ```bash
 sglang generate --model-path Wan-AI/Wan2.2-T2V-A14B-Diffusers  --dit-layerwise-offload false --text-encoder-cpu-offload false --vae-cpu-offload false --pin-cpu-memory --dit-cpu-offload false     --prompt "Summer beach vacation style, a white cat wearing sunglasses sits on a surfboard. The fluffy-furred feline gazes directly at the camera with a relaxed expression. Blurred beach scenery forms the background featuring crystal-clear waters, distant green hills, and a blue sky dotted with white clouds. The cat assumes a naturally relaxed posture, as if savoring the sea breeze and warm sunlight. A close-up shot highlights the feline's intricate details and the refreshing atmosphere of the seaside." --save-output --num-gpus 4  --tp-size 4 --num-frames 93
 ```
-**# Benchmark: Image-to-Video on 1 GPU**
+*# Benchmark: Image-to-Video on 1 GPU*
 ```bash
 sglang generate --model-path Wan-AI/Wan2.2-I2V-A14B-Diffusers --image-path assets/logo.png --dit-layerwise-offload false --text-encoder-cpu-offload false --vae-cpu-offload false --pin-cpu-memory --dit-cpu-offload false --prompt "A curious raccoon" --save-output --num-gpus 1 --num-frames 81
 ```
-**# Benchmark: Image-to-Video on 4 GPU**
+*# Benchmark: Image-to-Video on 4 GPU*
 ```bash
 sglang generate --model-path Wan-AI/Wan2.2-I2V-A14B-Diffusers --image-path assets/logo.png --dit-layerwise-offload false --text-encoder-cpu-offload false --vae-cpu-offload false --pin-cpu-memory --dit-cpu-offload false --prompt "A curious raccoon" --save-output --num-gpus 4 --tp-size 4 --num-frames 93
 ```
