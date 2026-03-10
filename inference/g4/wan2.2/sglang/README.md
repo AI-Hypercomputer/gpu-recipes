@@ -71,7 +71,7 @@ This prepares the host for model storage and starts the SGLang Docker container.
 mkdir -p /scratch/cache
 
 # Define the SGLang development image
-export IMAGE_URL="lmsysorg/sglang"
+export IMAGE_URL="lmsysorg/sglang:v0.4.7-cu124"
 
 # Start the container with GPU support and persistent volume mounts
 docker run -it \
