@@ -75,7 +75,7 @@ cd Wan2.2
 mkdir -p /scratch/cache
 
 # Define the SGLang development image
-export IMAGE_URL="lmsysorg/sglang:dev"
+export IMAGE_URL="lmsysorg/sglang"
 
 # Start the container with GPU support and persistent volume mounts
 docker run -it \
