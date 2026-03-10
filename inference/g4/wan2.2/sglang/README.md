@@ -103,9 +103,12 @@ huggingface-cli download Wan-AI/Wan2.2-I2V-A14B --local-dir /scratch/models/Wan2
 ## Run Benchmarks
 
 Use the following commands to test video generation. These examples show how to run the model on a single GPU or across multiple GPUs using Tensor Parallelism (--tp-size). Download Image from internet to run the benchmark to test Image to Video generation.
+
+```bash
 export HF_HOME="/scratch/cache"
-export CUDA_VISIBLE_DEVICES=0 to run the benchmark on single gpu
-export CUDA_VISIBLE_DEVICES=0,1,2,3 to run the benchmark on 4gpu's
+export CUDA_VISIBLE_DEVICES=0  #To run the benchmark on single gpu
+export CUDA_VISIBLE_DEVICES=0,1,2,3  #To run the benchmark on 4gpu's
+```
 
 *# Benchmark: Text-to-Video on 1 GPU*
 ```bash
