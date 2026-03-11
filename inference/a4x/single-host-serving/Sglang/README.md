@@ -272,11 +272,11 @@ Upon launching the SGLang server, it performs the following steps:
     --set workload.model.name=Wan-AI/Wan2.2-T2V-A14B-Diffusers \
     --set workload.image=${ARTIFACT_REGISTRY}/${SGLANG_IMAGE}:${SGLANG_VERSION} \
     --set workload.framework=sglang \
-    $USER-serving-wan2.2-model \
+    $USER-serving-wan2-2-model \
     $REPO_ROOT/src/helm-charts/a4x/inference-templates/deployment
     ```
 
-    This creates a Helm release and a Deployment named `$USER-serving-wan2.2-model`, and a Service named `$USER-serving-wan2.2-model-svc`.
+    This creates a Helm release and a Deployment named `$USER-serving-wan2-2-model`, and a Service named `$USER-serving-wan2-2-model-svc`.
 
 2.  **Check the deployment status.**
 
