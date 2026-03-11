@@ -298,16 +298,16 @@ Upon launching the SGLang server, it performs the following steps:
 
     ```bash
     kubectl exec -it deployment/$USER-serving-wan2-2-model -- \
-curl http://localhost:8000/v1/videos \
--H "Content-Type: application/json" \
--d '{
-  "model": "Wan-AI/Wan2.2-T2V-A14B-Diffusers",
-  "prompt": "A cinematic, high-detailed shot of a futuristic city with flying vehicles at sunset, 4k resolution.",
-  "num_frames": 81,
-  "fps": 16, 
-  "size": "1280x720",
-  "seed": 1024
-}'
+    curl http://localhost:8000/v1/videos \
+    -H "Content-Type: application/json" \
+    -d '{
+    "model": "Wan-AI/Wan2.2-T2V-A14B-Diffusers",
+    "prompt": "A cinematic, high-detailed shot of a futuristic city with flying vehicles at sunset, 4k resolution.",
+    "num_frames": 81,
+    "fps": 16, 
+    "size": "1280x720",
+    "seed": 1024
+    }'
     ```
     
 2.  **Generate a Video via Utility Script:**
@@ -331,18 +331,18 @@ curl http://localhost:8000/v1/videos \
 
     ```bash
     kubectl exec -it deployment/$USER-serving-wan2.2-model -- /bin/sh -c \
-'mkdir -p /gcs/benchmark_logs/sglang && sglang generate \
-  --model-path Wan-AI/Wan2.2-T2V-A14B-Diffusers \
-  --num-gpus 4 \
-  --tp-size 4 \
-  --num-frames 93 \
-  --dit-layerwise-offload false \
-  --text-encoder-cpu-offload false \
-  --vae-cpu-offload false \
-  --dit-cpu-offload false \
-  --pin-cpu-memory \
-  --prompt "Summer beach vacation style, a white cat wearing sunglasses sits on a surfboard. The fluffy-furred feline gazes directly at the camera with a relaxed expression. Blurred beach scenery forms the background featuring crystal-clear waters, distant green hills, and a blue sky dotted with white clouds. The cat assumes a naturally relaxed posture, as if savoring the sea breeze and warm sunlight. A close-up shot highlights the felines intricate details and the refreshing atmosphere of the seaside." \
-  --save-output'
+    'mkdir -p /gcs/benchmark_logs/sglang && sglang generate \
+    --model-path Wan-AI/Wan2.2-T2V-A14B-Diffusers \
+    --num-gpus 4 \
+    --tp-size 4 \
+    --num-frames 93 \
+    --dit-layerwise-offload false \
+    --text-encoder-cpu-offload false \
+    --vae-cpu-offload false \
+    --dit-cpu-offload false \
+    --pin-cpu-memory \
+    --prompt "Summer beach vacation style, a white cat wearing sunglasses sits on a surfboard. The fluffy-furred feline gazes directly at the camera with a relaxed expression. Blurred beach scenery forms the background featuring crystal-clear waters, distant green hills, and a blue sky dotted with white clouds. The cat assumes a naturally relaxed posture, as if savoring the sea breeze and warm sunlight. A close-up shot highlights the felines intricate details and the refreshing atmosphere of the seaside." \
+    --save-output'
     ```
 
     Benchmark results are displayed in the logs.
