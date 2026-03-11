@@ -19,6 +19,7 @@ service:
     http: 8000
 
 workload:
+  # Supported: "Wan-AI/Wan2.2-T2V-A14B-Diffusers" or "Wan-AI/Wan2.2-I2V-A14B-Diffusers"
   model:
     name: "Wan-AI/Wan2.2-T2V-A14B-Diffusers"
   gpus: 4 
@@ -35,10 +36,8 @@ workload:
       value: "/workload/configs/serving-args.yaml"
     - name: HF_HOME
       value: "/ssd"
-  extraArgs: [
-    "--tp", "4",
-    "--trust-remote-code"
-  ]
+  # extraArgs left empty as launch-workload.sh now handles TP dynamically
+  extraArgs: []
 
 network:
   subnetworks:
@@ -48,9 +47,6 @@ network:
     - rdma-1
     - rdma-2
     - rdma-3
-  ncclSettings:
-    - name: NCCL_DEBUG
-      value: "WARN"
 
 tolerations:
   - key: "kubernetes.io/arch"
