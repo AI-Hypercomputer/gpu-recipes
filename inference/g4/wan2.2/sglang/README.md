@@ -1,6 +1,6 @@
 # Single host inference benchmark of Wan2.2 with Sglang on G4
 
-This recipe shows how to serve and benchmark the Wan-AI/Wan2.2-T2V-A14B & Wan-AI/Wan2.2-I2V-A14B model using [SGLang](https://github.com/sgl-project/sglang/tree/main) on a single GCP VM with G4 GPUs. For more information on G4 machine types, see the [GCP documentation](https://cloud.google.com/compute/docs/accelerator-optimized-machines#g4-machine-types).
+This recipe shows how to serve and benchmark the Wan-AI/Wan2.2-T2V-A14B & Wan-AI/Wan2.2-I2V-A14B model using [SGLang](https://github.com/sgl-project/sglang/tree/main) on a single GCP G4 VM with RTX PRO 6000 GPUs. For more information on G4 machine types, see the [GCP documentation](https://cloud.google.com/compute/docs/accelerator-optimized-machines#g4-machine-types).
 
 ## Before you begin
 
