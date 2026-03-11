@@ -160,7 +160,7 @@ Replace the following values:
 | `KUEUE_NAME` | The name of the Kueue local queue. The default queue created by the cluster toolkit is `a4x`. Verify the name in your cluster. | `a4x` |
 | `ARTIFACT_REGISTRY` | Full path to your Artifact Registry repository. | `us-central1-docker.pkg.dev/gcp-project-12345/my-repo` |
 | `GCS_BUCKET` | Name of your GCS bucket (do not include `gs://`). | `my-benchmark-logs-bucket` |
-| `SGLANG_IMAGE` | The name for the Docker image to be built. | `sglang` |
+| `SGLANG_IMAGE` | The name for the Docker image to be built. | `lmsysorg/sglang:latest` |
 | `SGLANG_VERSION` | The tag/version for the Docker image. | `blackwell` |
 
 
