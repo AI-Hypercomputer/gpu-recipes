@@ -1,4 +1,4 @@
-# Single Host Model Serving with SGLang on A4 GKE Node Pool
+# Single host inference benchmark of Wan2.2 with Sglang on A4 GKE Node Pool
 
 This document outlines the steps to serve and benchmark various Large Language Models (LLMs) using the [SGLang](https://github.com/sgl-project/sglang/tree/main) framework on a single [A4 GKE Node pool](https://cloud.google.com/kubernetes-engine).
 
@@ -126,7 +126,7 @@ First, you'll configure your local environment. These steps are required once be
 git clone https://github.com/ai-hypercomputer/gpu-recipes.git
 cd gpu-recipes
 export REPO_ROOT=$(pwd)
-export RECIPE_ROOT=$REPO_ROOT/inference/a4/single-host-serving/sglang
+export RECIPE_ROOT=$REPO_ROOT/inference/a4x/single-host-serving/Sglang
 ```
 
 <a name="configure-vars"></a>
@@ -156,7 +156,7 @@ Replace the following values:
 | `PROJECT_ID` | Your Google Cloud Project ID. | `gcp-project-12345` |
 | `REGION` | The GCP region to run the Cloud Build job. | `us-central1` |
 | `CLUSTER_REGION` | The GCP region where your GKE cluster is located. | `us-central1` |
-| `CLUSTER_NAME` | The name of your GKE cluster. | `a4-gke-cluster` |
+| `CLUSTER_NAME` | The name of your GKE cluster. | `a4x-gke-cluster` |
 | `KUEUE_NAME` | The name of the Kueue local queue. The default queue created by the cluster toolkit is `a4`. Verify the name in your cluster. | `a4` |
 | `ARTIFACT_REGISTRY` | Full path to your Artifact Registry repository. | `us-central1-docker.pkg.dev/gcp-project-12345/my-repo` |
 | `GCS_BUCKET` | Name of your GCS bucket (do not include `gs://`). | `my-benchmark-logs-bucket` |
@@ -237,28 +237,28 @@ gcloud builds log $BUILD_ID --stream --region=$REGION
 
 This recipe supports the deployment of the following models:
 
-1.  [DeepSeek R1 671B](#serving-deepseek)
+1.  [Wan2.2](#serving-wan-model)
 
 Now, select a model to deploy. Each section below is self-contained for deploying a specific model.
 
 > [!NOTE]
 > After running the recipe with `helm install`, it can take **up to 30 minutes** for the deployment to become fully available. This is because the GKE node must first pull the Docker image and then download the model weights from Hugging Face.
 
-<a name="serving-deepseek"></a>
-### 4.1. Serving DeepSeek R1 671B
+<a name="serving-wan-model"></a>
+### 4.1. Serving Wan2.2
 
 [Back to Top](#table-of-contents)
 
-This recipe serves the [DeepSeek R1 671B model](https://huggingface.co/deepseek-ai/DeepSeek-R1) using SGLang framework on a single A4 node in native FP8 mode.
+This recipe serves the [DeepSeek R1 671B model](https://huggingface.co/deepseek-ai/DeepSeek-R1) using SGLang framework on a single A4x node.
 
 Upon launching the SGLang server, it performs the following steps:
 
-1.  Downloads the full DeepSeek R1 671B model checkpoints from Hugging Face.
+1.  Downloads the full Wan2.2 model checkpoints from Hugging Face.
 2.  Loads the model checkpoints and applies SGLang optimizations.
 3.  Server is ready to respond to requests.
 
-<a name="deploy-deepseek-r1-671b"></a>
-#### 4.1.1. Deploy DeepSeek R1 671B
+<a name="deploy-wan-model"></a>
+#### 4.1.1. Deploy Wan2.2
 
 1.  **Install the helm chart to prepare and serve the model using SGLang framework:**
 
@@ -266,22 +266,22 @@ Upon launching the SGLang server, it performs the following steps:
     cd $RECIPE_ROOT
     helm install -f values.yaml \
     --set-file workload_launcher=$REPO_ROOT/src/launchers/sglang-launcher.sh \
-    --set-file serving_config=$REPO_ROOT/src/frameworks/a4/sglang-configs/deepseek-r1-671b.yaml \
+    --set-file serving_config=$REPO_ROOT/src/frameworks/a4/sglang-configs/wan2.2.yaml \
     --set queue=${KUEUE_NAME} \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
-    --set workload.model.name=deepseek-ai/DeepSeek-R1 \
+    --set workload.model.name=Wan-AI/Wan2.2-T2V-A14B \
     --set workload.image=${ARTIFACT_REGISTRY}/${SGLANG_IMAGE}:${SGLANG_VERSION} \
     --set workload.framework=sglang \
-    $USER-serving-deepseek-r1-model \
-    $REPO_ROOT/src/helm-charts/a4/inference-templates/deployment
+    $USER-serving-wan2.2-model \
+    $REPO_ROOT/src/helm-charts/a4x/inference-templates/deployment
     ```
 
-    This creates a Helm release and a Deployment named `$USER-serving-deepseek-r1-model`, and a Service named `$USER-serving-deepseek-r1-model-svc`.
+    This creates a Helm release and a Deployment named `$USER-serving-wan2.2-model`, and a Service named `$USER-serving-wan2.2-model-svc`.
 
 2.  **Check the deployment status.**
 
     ```bash
-    kubectl get deployment/$USER-serving-deepseek-r1-model
+    kubectl get deployment/$USER-serving-wan2.2-model
     ```
 
     Wait until the `READY` column shows `1/1`. See the [Monitoring and Troubleshooting](#monitoring) section to view the deployment logs.
@@ -290,14 +290,14 @@ Upon launching the SGLang server, it performs the following steps:
   > This deployment process can take **up to 30 minutes** as it downloads the model weights from Hugging Face and then the server loads the model weights.
 
 <a name="interact-with-deepseek-r1-671b"></a>
-#### 4.1.2. Interact with DeepSeek R1 671B model
+#### 4.1.2. Interact with Wan2.2 model
 
 1.  **Make an API request:**
 
     Send a chat message and receive a JSON response from the model:
 
     ```bash
-    kubectl exec -it deployment/$USER-serving-deepseek-r1-model -- \
+    kubectl exec -it deployment/$USER-serving-wan2.2-model -- \
     curl http://localhost:8000/v1/chat/completions \
     -H "Content-Type: application/json" \
     -d '{
@@ -324,7 +324,7 @@ Upon launching the SGLang server, it performs the following steps:
     First, open a new terminal session and forward a local port to the service to allow your local machine to communicate with the model server:
 
     ```bash
-    kubectl port-forward svc/$USER-serving-deepseek-r1-model-svc 8000:8000
+    kubectl port-forward svc/$USER-serving-wan2.2-model-svc 8000:8000
     ```
 
     In a separate terminal, run the `stream_chat.sh` utility script:
@@ -333,13 +333,13 @@ Upon launching the SGLang server, it performs the following steps:
     $RECIPE_ROOT/stream_chat.sh "Which is bigger 9.9 or 9.11 ?"
     ```
 
-<a name="benchmark-deepseek-r1-671b"></a>
-#### 4.1.3. Benchmark DeepSeek R1 671B
+<a name="benchmark-wan2.2"></a>
+#### 4.1.3. Benchmark Wan2.2
 
 1.  Run the [SGLang benchmarking tool](https://docs.sglang.ai/references/benchmark_and_profiling.html) directly inside the running deployment:
 
     ```bash
-    kubectl exec -it deployment/$USER-serving-deepseek-r1-model -- /bin/sh -c \
+    kubectl exec -it deployment/$USER-serving-wan2.2-model -- /bin/sh -c \
     'mkdir -p /gcs/benchmark_logs/sglang && python3 -m sglang.bench_serving \
       --backend sglang \
       --dataset-name random \
@@ -360,7 +360,7 @@ Upon launching the SGLang server, it performs the following steps:
 
 [Back to Top](#table-of-contents)
 
-After the model is deployed via Helm as described in the sections [above](#run-the-recipe), use the following steps to monitor the deployment and interact with the model. Replace `<deployment-name>` and `<service-name>` with the appropriate names from the model-specific deployment instructions (e.g., `$USER-serving-deepseek-r1-model` and `$USER-serving-deepseek-r1-model-svc`).
+After the model is deployed via Helm as described in the sections [above](#run-the-recipe), use the following steps to monitor the deployment and interact with the model. Replace `<deployment-name>` and `<service-name>` with the appropriate names from the model-specific deployment instructions (e.g., `$USER-serving-wan2.2-model` and `$USER-serving-wan2.2-model-svc`).
 
 
 <a name="check-status"></a>
@@ -369,8 +369,8 @@ After the model is deployed via Helm as described in the sections [above](#run-t
 Check the status of your deployment. Replace the name if you deployed a different model.
 
 ```bash
-# Example for DeepSeek
-kubectl get deployment/$USER-serving-deepseek-r1-model
+# Example for Wan2.2
+kubectl get deployment/$USER-serving-wan2.2-model
 ```
 
 Wait until the `READY` column shows `1/1`. If it shows `0/1`, the pod is still starting up.
@@ -384,7 +384,7 @@ Wait until the `READY` column shows `1/1`. If it shows `0/1`, the pod is still s
 To see the logs from the SGLang server (useful for debugging), use the `-f` flag to follow the log stream:
 
 ```bash
-kubectl logs -f deployment/$USER-serving-deepseek-r1-model
+kubectl logs -f deployment/$USER-serving-wan2.2-model
 ```
 
 You should see logs indicating SGLang server downloading/loading the model, and then starting the API server, similar to this:
