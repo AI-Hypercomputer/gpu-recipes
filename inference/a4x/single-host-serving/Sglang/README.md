@@ -297,17 +297,16 @@ Upon launching the SGLang server, it performs the following steps:
     Submit a text-to-video generation job. Note that video generation is asynchronous; the initial response will provide a Job ID.
 
     ```bash
-    # Corrected Command
-kubectl exec -it deployment/$USER-serving-wan2-2-model -- \
+    kubectl exec -it deployment/$USER-serving-wan2-2-model -- \
 curl http://localhost:8000/v1/videos \
 -H "Content-Type: application/json" \
 -d '{
   "model": "Wan-AI/Wan2.2-T2V-A14B-Diffusers",
   "prompt": "A cinematic, high-detailed shot of a futuristic city with flying vehicles at sunset, 4k resolution.",
-  "seconds": 5,
+  "num_frames": 81,
+  "fps": 16, 
   "size": "1280x720",
   "seed": 1024
-}'
 }'
     ```
     
