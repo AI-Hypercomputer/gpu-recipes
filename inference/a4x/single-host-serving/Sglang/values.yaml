@@ -1,10 +1,5 @@
-# Copyright 2025 Google LLC
-# Licensed under the Apache License, Version 2.0
-
-queue: tas-cq  # Updated to the typical A4X queue name from your lead's patch
-
-dwsSettings:
-  maxRunDurationSeconds:
+# values.yaml
+queue: <YOUR_KUEUE_NAME>
 
 huggingface:
   secretName: hf-secret
@@ -15,7 +10,7 @@ volumes:
   gcsVolumes: true
   ssdMountPath: "/ssd"
   gcsMounts:
-    - bucketName: chaitanyapk-supercomputer-logs # Added your verified bucket
+    - bucketName: <YOUR_GCS_BUCKET_NAME>
       mountPath: "/gcs"
 
 service:
@@ -25,9 +20,9 @@ service:
 
 workload:
   model:
-    name: "Wan-AI/Wan2.2-T2V-A14B-Diffusers" # Updated for Wan2.2
-  gpus: 4  # Matches your A4X (4-GPU) Baker topology
-  image: "lmsysorg/sglang:latest" # Using the verified image that fixes kernel crashes
+    name: "Wan-AI/Wan2.2-T2V-A14B-Diffusers"
+  gpus: 4 
+  image: "lmsysorg/sglang:latest"
   framework: "sglang"
   configFile: serving-args.yaml
   configPath: /workload/configs
@@ -40,28 +35,23 @@ workload:
       value: "/workload/configs/serving-args.yaml"
     - name: HF_HOME
       value: "/ssd"
-    - name: LD_LIBRARY_PATH
-      value: "/usr/local/nvidia/lib64:/usr/local/lib/"
-  # Added these to support Wan2.2 MoE and Blackwell architecture
   extraArgs: [
     "--tp", "4",
-    "--trust-remote-code", 
+    "--trust-remote-code"
   ]
 
 network:
-  subnetworks: # Fixed the bracket syntax from your lead's patch
+  subnetworks:
     - default
     - gvnic-1
     - rdma-0
     - rdma-1
     - rdma-2
     - rdma-3
-  # Removed gibVersion per lead's advice (it can cause crashes on ARM)
   ncclSettings:
     - name: NCCL_DEBUG
       value: "WARN"
 
-# Added ARM64 toleration to ensure it schedules on Blackwell nodes
 tolerations:
   - key: "kubernetes.io/arch"
     operator: "Equal"
