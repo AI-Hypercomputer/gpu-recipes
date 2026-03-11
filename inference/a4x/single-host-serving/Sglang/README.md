@@ -434,10 +434,14 @@ INFO:     The server is fired up and ready to roll!
 * **Error: `denied: requested access to the resource is denied` during Cloud Build**
 
     This almost always means the `ARTIFACT_REGISTRY` environment variable is incorrect. It **must** be the full path: `<location>-docker.pkg.dev/<project-id>/<repository-name>`.
+* **Error: `Missing input_reference "`**
+
+    Ensure you are providing an image URL when using the Wan2.2-I2V-A14B-Diffusers model.
 
 * **Error: `deployments.apps "..." not found`**
 
     This indicates a typo in the deployment name. Use `helm list` to see the correct release names or `kubectl get deployments` to see all available deployment names.
+
 
 <a name="cleanup"></a>
 ## 6. Cleanup
