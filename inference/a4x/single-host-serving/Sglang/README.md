@@ -17,7 +17,7 @@ This guide walks you through setting up the necessary cloud infrastructure, conf
   * [3.5. Create Hugging Face Kubernetes Secret](#setup-hf-secret)
   * [3.6. Build the SGLang Serving Image](#build-image)
 * [4. Run the Recipe](#run-the-recipe)
-  * [4.1. Serving DeepSeek R1 671B](#serving-deepseek)
+  * [4.1. Serving Wan2.2](#serving-wan2.2)
 * [5. Monitoring and Troubleshooting](#monitoring)
   * [5.1. Check Deployment Status](#check-status)
   * [5.2. View Logs](#view-logs)
@@ -292,45 +292,34 @@ Upon launching the SGLang server, it performs the following steps:
 <a name="interact-with-deepseek-r1-671b"></a>
 #### 4.1.2. Interact with Wan2.2 model
 
-1.  **Make an API request:**
+1.  **Make a Video Generation API request:**
 
-    Send a chat message and receive a JSON response from the model:
+    Submit a text-to-video generation job. Note that video generation is asynchronous; the initial response will provide a Job ID.
 
     ```bash
     kubectl exec -it deployment/$USER-serving-wan2.2-model -- \
-    curl http://localhost:8000/v1/chat/completions \
-    -H "Content-Type: application/json" \
-    -d '{
-    "model":"default",
-    "messages":[
-        {
-            "role":"system",
-            "content":"You are a helpful AI assistant"
-        },
-        {
-            "role":"user",
-            "content":"How many r are there in strawberry ?"
-        }
-    ],
-    "temperature":0.6,
-    "top_p":0.95,
-    "max_tokens":2048
-    }'
+curl http://localhost:8000/v1/videos \
+-H "Content-Type: application/json" \
+-d '{
+  "model": "Wan-AI/Wan2.2-T2V-A14B",
+  "prompt": "A cinematic, high-detailed shot of a futuristic city with flying vehicles at sunset, 4k resolution.",
+  "size": "1280x720",
+  "num_frames": 81
+}'
     ```
-    You should receive a JSON response from the model.
+    
+2.  **Generate a Video via Utility Script:**
 
-2.  **Stream a chat response:**
-
-    First, open a new terminal session and forward a local port to the service to allow your local machine to communicate with the model server:
+    For a more automated experience, use the provided stream_video.sh script. First, forward the local port in one terminal:
 
     ```bash
     kubectl port-forward svc/$USER-serving-wan2.2-model-svc 8000:8000
     ```
 
-    In a separate terminal, run the `stream_chat.sh` utility script:
+    In a separate terminal, run the `stream_video.sh` utility script:
 
     ```bash
-    $RECIPE_ROOT/stream_chat.sh "Which is bigger 9.9 or 9.11 ?"
+    $RECIPE_ROOT/stream_video.sh "A curious raccoon in a field of sunflowers."
     ```
 
 <a name="benchmark-wan2.2"></a>
@@ -340,16 +329,18 @@ Upon launching the SGLang server, it performs the following steps:
 
     ```bash
     kubectl exec -it deployment/$USER-serving-wan2.2-model -- /bin/sh -c \
-    'mkdir -p /gcs/benchmark_logs/sglang && python3 -m sglang.bench_serving \
-      --backend sglang \
-      --dataset-name random \
-      --random-range-ratio 1 \
-      --num-prompt 1100 \
-      --random-input 1000 \
-      --random-output 1000 \
-      --host 0.0.0.0 \
-      --port 8000 \
-      --output-file /gcs/benchmark_logs/sglang/ds_1000_1000_1100_output.jsonl'
+'mkdir -p /gcs/benchmark_logs/sglang && sglang generate \
+  --model-path Wan-AI/Wan2.2-T2V-A14B-Diffusers \
+  --num-gpus 4 \
+  --tp-size 4 \
+  --num-frames 93 \
+  --dit-layerwise-offload false \
+  --text-encoder-cpu-offload false \
+  --vae-cpu-offload false \
+  --dit-cpu-offload false \
+  --pin-cpu-memory \
+  --prompt "Summer beach vacation style, a white cat wearing sunglasses sits on a surfboard. The fluffy-furred feline gazes directly at the camera with a relaxed expression. Blurred beach scenery forms the background featuring crystal-clear waters, distant green hills, and a blue sky dotted with white clouds. The cat assumes a naturally relaxed posture, as if savoring the sea breeze and warm sunlight. A close-up shot highlights the feline''s intricate details and the refreshing atmosphere of the seaside." \
+  --save-output'
     ```
 
     Benchmark results are displayed in the logs.
@@ -376,7 +367,7 @@ kubectl get deployment/$USER-serving-wan2.2-model
 Wait until the `READY` column shows `1/1`. If it shows `0/1`, the pod is still starting up.
 
 > [!NOTE]
-> In the GKE UI on Cloud Console, you might see a status of "Does not have minimum availability" during startup. This is normal and will resolve once the pod is ready.
+> For Wan2.2, the pod may show Running before the model is fully loaded. Monitor the logs (Section 5.2) and wait for the message: The server is fired up and ready to roll! before sending requests.
 
 <a name="view-logs"></a>
 ### 5.2. View Logs
