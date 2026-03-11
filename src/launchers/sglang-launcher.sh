@@ -1,12 +1,13 @@
+cat << 'EOF' > $REPO_ROOT/src/launchers/sglang-launcher.sh
 #!/bin/bash
 set -eux
 
-# Critical: Force visibility and distributed discovery for B200
+# Force visibility
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 export SGLANG_AUTO_FORGE_TP=4
 export HF_HOME=/ssd
 
-# Standard Blackwell NCCL settings for GKE/A4X
+# Standard Blackwell NCCL settings
 export NCCL_DEBUG=INFO
 export NCCL_IB_DISABLE=0
 export NCCL_NET_GDR_LEVEL=PIX
@@ -18,14 +19,16 @@ fi
 
 echo "Launching SGLang for Wan2.2 on 4x B200 GPUs (Blackwell)"
 
+# Extract ONLY the IPv4 address to avoid the IPv6 space bug
+export MY_IP=$(hostname -I | awk '{print $1}')
+
 sglang serve \
   --model-path "$MODEL_NAME" \
   --host 0.0.0.0 \
   --port 8000 \
   --tp 4 \
-  --sp-degree 4 \
-  --ulysses-degree 2 \
-  --ring-degree 2 \
   --trust-remote-code \
   --dist-backend nccl \
+  --dist-init-addr "$MY_IP:6000" \
   --text-encoder-cpu-offload
+EOF
