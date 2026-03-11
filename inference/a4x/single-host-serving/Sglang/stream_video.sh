@@ -1,53 +1,40 @@
 #!/bin/bash
-# stream_video.sh - Optimized for Wan2.2 on Blackwell
+# stream_video.sh - Utility to poll and download generated video
 
-[ $# -eq 0 ] && {
-    echo "Usage: $0 \"Your video prompt here\""
-    exit 1
-}
+[ $# -eq 0 ] && { echo "Usage: $0 \"Your prompt\""; exit 1; }
 
 PROMPT="$1"
-MODEL_NAME="Wan-AI/Wan2.2-T2V-A14B-Diffusers"
 API_URL="http://localhost:8000/v1/videos"
 
-echo "Submitting Video Job for: $PROMPT"
+echo "Submitting Video Job..."
 
-# 1. Submit the Job
 RESPONSE=$(curl -s -X POST "$API_URL" \
     -H "Content-Type: application/json" \
     -d "{
-        \"model\": \"$MODEL_NAME\",
+        \"model\": \"Wan-AI/Wan2.2-T2V-A14B-Diffusers\",
         \"prompt\": \"$PROMPT\",
-        \"size\": \"1280x720\",
-        \"num_frames\": 81
+        \"num_frames\": 81,
+        \"fps\": 16
     }")
 
 JOB_ID=$(echo "$RESPONSE" | jq -r '.id')
-
-if [ "$JOB_ID" == "null" ]; then
-    echo "Error submitting job: $RESPONSE"
-    exit 1
-fi
-
 echo "Job Submitted! ID: $JOB_ID"
-echo "Waiting for Blackwell to generate video..."
 
-# 2. Poll for Completion
 while true; do
     STATUS_REPLY=$(curl -s "$API_URL/$JOB_ID")
     STATUS=$(echo "$STATUS_REPLY" | jq -r '.status')
-
+    
     if [ "$STATUS" == "completed" ]; then
-        VIDEO_URL=$(echo "$STATUS_REPLY" | jq -r '.url')
-        echo -e "\n----------------"
-        echo "Success! Video URL: $VIDEO_URL"
+        # Fetch the internal path and notify user
+        FILE_PATH=$(echo "$STATUS_REPLY" | jq -r '.file_path')
+        echo -e "\nSuccess! Video generated at: $FILE_PATH"
+        echo "To download: kubectl cp <POD_NAME>:$FILE_PATH ./output.mp4"
         break
     elif [ "$STATUS" == "failed" ]; then
-        echo "Generation failed!"
-        echo "$STATUS_REPLY" | jq .
+        echo "Error: $(echo "$STATUS_REPLY" | jq -r '.error')"
         exit 1
     else
         echo -n "."
-        sleep 5
+        sleep 10
     fi
 done
