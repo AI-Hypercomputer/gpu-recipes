@@ -45,8 +45,7 @@ workload:
   # Added these to support Wan2.2 MoE and Blackwell architecture
   extraArgs: [
     "--tp", "4",
-    "--trust-remote-code",
-    "--text-encoder-cpu-offload" 
+    "--trust-remote-code", 
   ]
 
 network:
