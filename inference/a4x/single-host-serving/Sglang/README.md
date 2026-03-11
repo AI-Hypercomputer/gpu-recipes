@@ -245,11 +245,11 @@ Now, select a model to deploy. Each section below is self-contained for deployin
 > After running the recipe with `helm install`, it can take **up to 30 minutes** for the deployment to become fully available. This is because the GKE node must first pull the Docker image and then download the model weights from Hugging Face.
 
 <a name="serving-wan-model"></a>
-### 4.1. Serving Wan2.2
+### 4.1. Model Variants
 
 [Back to Top](#table-of-contents)
 
-This recipe serves the [Wan2.2-T2V-A14B-Diffusers model](https://huggingface.co/Wan-AI/Wan2.2-T2V-A14B-Diffusers) using SGLang framework on a single A4x node.
+This recipe serves the [Wan2.2-T2V-A14B-Diffusers model](https://huggingface.co/Wan-AI/Wan2.2-T2V-A14B-Diffusers) & [Wan2.2-I2V-A14B-Diffusers model](https://huggingface.co/Wan-AI/Wan2.2-I2V-A14B-Diffusers) using SGLang framework on a single A4x node.
 
 Upon launching the SGLang server, it performs the following steps:
 
@@ -310,7 +310,22 @@ Upon launching the SGLang server, it performs the following steps:
     }'
     ```
     
-2.  **Generate a Video via Utility Script:**
+    The I2V model requires a reference image. Add a second example for I2V interaction.
+    
+    ```bash
+    # Example for I2V (Image-to-Video)
+    kubectl exec -it deployment/$USER-serving-wan2-2-model -- \
+    curl http://localhost:8000/v1/videos \
+    -H "Content-Type: application/json" \
+    -d '{
+    "model": "Wan-AI/Wan2.2-I2V-A14B-Diffusers",
+    "prompt": "The character in the image starts walking toward the camera, cinematic lighting.",
+    "input_reference": "https://raw.githubusercontent.com/sgl-project/sglang/main/test/test_data/images/cat.png",
+    "num_frames": 81,
+    "fps": 16
+    }'
+    ```
+3.  **Generate a Video via Utility Script:**
 
     For a more automated experience, use the provided stream_video.sh script. First, forward the local port in one terminal:
 
@@ -329,24 +344,36 @@ Upon launching the SGLang server, it performs the following steps:
 
 1.  Run the [SGLang benchmarking tool](https://docs.sglang.ai/references/benchmark_and_profiling.html) directly inside the running deployment:
 
-    ```bash
-    kubectl exec -it deployment/$USER-serving-wan2.2-model -- /bin/sh -c \
-    'mkdir -p /gcs/benchmark_logs/sglang && sglang generate \
-    --model-path Wan-AI/Wan2.2-T2V-A14B-Diffusers \
-    --num-gpus 4 \
-    --tp-size 4 \
-    --num-frames 93 \
-    --dit-layerwise-offload false \
-    --text-encoder-cpu-offload false \
-    --vae-cpu-offload false \
-    --dit-cpu-offload false \
-    --pin-cpu-memory \
-    --prompt "Summer beach vacation style, a white cat wearing sunglasses sits on a surfboard. The fluffy-furred feline gazes directly at the camera with a relaxed expression. Blurred beach scenery forms the background featuring crystal-clear waters, distant green hills, and a blue sky dotted with white clouds. The cat assumes a naturally relaxed posture, as if savoring the sea breeze and warm sunlight. A close-up shot highlights the felines intricate details and the refreshing atmosphere of the seaside." \
-    --save-output'
-    ```
-
-    Benchmark results are displayed in the logs.
-
+     *Benchmark: Text-to-Video on 1 GPU*
+      ```bash
+      kubectl exec -it deployment/$USER-serving-wan2-2-model -- /bin/sh -c \
+      'sglang generate --model-path Wan-AI/Wan2.2-T2V-A14B-Diffusers \
+      --num-gpus 1 --tp-size 1 --num-frames 81 --save-output \
+      --prompt "Cyberpunk city street in the rain, neon lights reflecting on puddles."'
+      ```
+      *Benchmark: Text-to-Video on 4 GPU*
+      ```bash
+      kubectl exec -it deployment/$USER-serving-wan2-2-model -- /bin/sh -c \
+      'sglang generate --model-path Wan-AI/Wan2.2-T2V-A14B-Diffusers \
+      --num-gpus 4 --tp-size 4 --num-frames 93 --save-output \
+      --prompt "Cyberpunk city street in the rain, neon lights reflecting on puddles."'
+      ```
+      *Benchmark: Image-to-Video on 1 GPU*
+      ```bash
+      kubectl exec -it deployment/$USER-serving-wan2-2-model -- /bin/sh -c \
+      'sglang generate --model-path Wan-AI/Wan2.2-I2V-A14B-Diffusers \
+      --num-gpus 1 --tp-size 1 --num-frames 81 --save-output \
+      --image "https://raw.githubusercontent.com/sgl-project/sglang/main/test/test_data/images/cat.png" \
+      --prompt "The cat in the image blinks and looks at the camera."'
+      ```
+      *Benchmark: Image-to-Video on 4 GPU*
+      ```bash
+      kubectl exec -it deployment/$USER-serving-wan2-2-model -- /bin/sh -c \
+      'sglang generate --model-path Wan-AI/Wan2.2-I2V-A14B-Diffusers \
+      --num-gpus 4 --tp-size 4 --num-frames 93 --save-output \
+      --image "https://raw.githubusercontent.com/sgl-project/sglang/main/test/test_data/images/cat.png" \
+      --prompt "The cat in the image blinks and looks at the camera."'
+      ```
 
 <a name="monitoring"></a>
 ## 5. Monitoring and Troubleshooting
