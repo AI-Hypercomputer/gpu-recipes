@@ -2,11 +2,16 @@
 # launch-workload.sh
 set -eux
 
-# 1. Hardware Environment Setup
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+# 1. Environment & Path Setup
 export HF_HOME=/ssd
+export CUDA_DEVICE_ORDER=PCI_BUS_ID
 
-# 2. NCCL Optimization for Blackwell NVLink
+# 2. Dynamic GPU Detection for TP
+# This ensures the same script works for both 1-chip and 4-chip deployments
+NUM_GPUS=$(nvidia-smi -L | wc -l)
+echo "Detected $NUM_GPUS GPUs. Setting TP to $NUM_GPUS."
+
+# 3. Optimized NCCL settings for Blackwell NVLink
 export NCCL_DEBUG=WARN
 export NCCL_IB_DISABLE=0
 export NCCL_NET_GDR_LEVEL=PIX
@@ -16,18 +21,17 @@ if [ -z "$MODEL_NAME" ]; then
   exit 1
 fi
 
-# 3. Dynamic IP Discovery for Distributed Init
-# We use the internal Pod IP for the head-worker handshake
+# 4. Dynamic IP Discovery for Distributed Init
 export MY_IP=$(hostname -I | awk '{print $1}')
 
-echo "Launching SGLang for Wan2.2 on 4x B200 GPUs (Blackwell)"
+echo "Launching SGLang for $MODEL_NAME on $NUM_GPUS GPUs"
 
-# 4. Start Server
-# No CPU offloading - keeping 14B model entirely in Blackwell VRAM
+# 5. Start Server
+# Removed CPU offloading to maximize Blackwell VRAM performance
 sglang serve \
   --model-path "$MODEL_NAME" \
   --host 0.0.0.0 \
   --port 8000 \
-  --tp 4 \
+  --tp "$NUM_GPUS" \
   --trust-remote-code \
   --dist-init-addr "$MY_IP:6000"
