@@ -1,39 +1,34 @@
-# Copyright 2025 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 #!/bin/bash
+
+# Copyright 2025 Google LLC
+# Licensed under the Apache License, Version 2.0
 
 set -eux # Exit immediately if a command exits with a non-zero status.
 
-echo "SGLang server arguments received:"
-echo "  $@"
-echo ""
-
-echo "Launching SGLang server"
+echo "SGLang server arguments received: $@"
 
 export HF_HOME=/ssd
 
-# MODEL_NAME should be passed as an environment variable from deployment
+# MODEL_NAME and CONFIG_FILE should be passed from the Helm deployment
 if [ -z "$MODEL_NAME" ]; then
   echo "Error: MODEL_NAME environment variable is not set."
   exit 1
 fi
-echo "Using MODEL_NAME: $MODEL_NAME"
 
-# Launch the server
+# Default to the path where Helm mounts the serving-args.yaml
+CONFIG_FILE=${CONFIG_FILE:-"/workload/configs/serving-args.yaml"}
+
+echo "--------------------------------------------------"
+echo "Launching SGLang Server for Blackwell (A4X)"
+echo "Model Path:  $MODEL_NAME"
+echo "Config File: $CONFIG_FILE"
+echo "--------------------------------------------------"
+
+# Launch the server using the corrected --model-path argument
+# and linking the external configuration file.
 python3 -m sglang.launch_server \
-  --model "$MODEL_NAME" \
+  --model-path "$MODEL_NAME" \
+  --config-file "$CONFIG_FILE" \
   "$@"
 
 echo "Server bringup is complete. SGLang server command finished."
