@@ -290,7 +290,7 @@ Upon launching the SGLang server, it performs the following steps:
   > This deployment process can take **up to 30 minutes** as it downloads the model weights from Hugging Face and then the server loads the model weights.
 
 <a name="interact-with-wan2.2"></a>
-#### 4.1.2. Interact Wan2.2 model
+#### 4.1.2. Interact with Wan2.2 model
 
 1.  **Make a Video Generation API request:**
 
