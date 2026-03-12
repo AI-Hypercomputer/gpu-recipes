@@ -265,7 +265,7 @@ Upon launching the SGLang server, it performs the following steps:
     ```bash
     cd $RECIPE_ROOT
     helm install -f values.yaml \
-    --set-file workload_launcher=$REPO_ROOT/src/launchers/sglang-launcher.sh \
+    --set-file workload_launcher=$REPO_ROOT/src/launchers/sglang-diffusers-launcher.sh \
     --set-file serving_config=$REPO_ROOT/src/frameworks/a4x/sglang-configs/wan2.2.yaml \
     --set queue=${KUEUE_NAME} \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
