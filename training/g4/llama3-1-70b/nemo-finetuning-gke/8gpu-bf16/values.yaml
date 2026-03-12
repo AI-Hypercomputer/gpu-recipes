@@ -1,0 +1,37 @@
+dwsSettings:
+  maxRunDurationSeconds: null
+network:
+  hostNetwork: true
+  ncclSettings:
+  - name: NCCL_DEBUG
+    value: WARN
+  subnetworks[]: null
+queue: null
+tasSettings:
+  topologyRequest:
+    kueue.x-k8s.io/podset-preferred-topology: kubernetes.io/hostname
+volumes:
+  gcsMounts:
+  - bucketName: null
+    mountPath: null
+  gcsVolumes: true
+  psVolumes: false
+workload:
+  arguments[]: null
+  configFile: llama3-1-70b-fine-tuning.py
+  configPath: /workload/configs/
+  defaultArguments[]: null
+  envs:
+  - name: ARTIFACT_DIR
+    value: null
+  - name: HF_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: hf-token
+        key: token
+  - name: GLOO_SOCKET_IFNAME
+    value: eth0
+  - name: NEMO_LAUNCH_SCRIPT
+    value: /workload/configs/llama3-1-70b-fine-tuning.py
+  gpus: 8
+  image: nvcr.io/nvidia/nemo:25.07
