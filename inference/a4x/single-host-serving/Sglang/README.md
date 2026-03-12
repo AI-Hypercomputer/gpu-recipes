@@ -17,7 +17,7 @@ This guide walks you through setting up the necessary cloud infrastructure, conf
   * [3.5. Create Hugging Face Kubernetes Secret](#setup-hf-secret)
   * [3.6. Build the SGLang Serving Image](#build-image)
 * [4. Run the Recipe](#run-the-recipe)
-  * [4.1. Model varients](#serving-wan2.2)
+  * [4.1. Model Variants](#serving-wan-model)
 * [5. Monitoring and Troubleshooting](#monitoring)
   * [5.1. Check Deployment Status](#check-status)
   * [5.2. View Logs](#view-logs)
