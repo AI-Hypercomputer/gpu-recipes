@@ -1,6 +1,6 @@
-# Single host inference benchmark of Wan2.2 with Sglang on a4x GKE Node Pool
+# Single host inference benchmark of Wan2.2 with Sglang on A4x GKE Node Pool
 
-This document outlines the steps to serve and benchmark Wan2.2 model using the [SGLang](https://github.com/sgl-project/sglang/tree/main) framework on a single [a4x GKE Node pool](https://cloud.google.com/kubernetes-engine).
+This document outlines the steps to serve and benchmark Wan2.2 model using the [SGLang](https://github.com/sgl-project/sglang/tree/main) framework on a single [A4x GKE Node pool](https://cloud.google.com/kubernetes-engine).
 
 This guide walks you through setting up the necessary cloud infrastructure, configuring your environment, and benchmarking a high-performance video generation model.
 
