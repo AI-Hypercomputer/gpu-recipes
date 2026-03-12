@@ -363,14 +363,16 @@ Upon launching the SGLang server, it performs the following steps:
     kubectl exec -it deployment/$USER-serving-wan2-2-model -- /bin/sh -c \
     'sglang generate --model-path Wan-AI/Wan2.2-I2V-A14B-Diffusers \
     --num-gpus 1 --tp-size 1 --num-frames 81 --save-output \
-    --prompt "Cyberpunk city street in the rain, neon lights reflecting on puddles."'
+    --image "https://raw.githubusercontent.com/sgl-project/sglang/main/test/test_data/images/cat.png" \
+    --prompt "The cat in the image blinks and looks at the camera."'
     ```
     *Benchmark: Image-to-Video on 4 GPU*
     ```bash
     kubectl exec -it deployment/$USER-serving-wan2-2-model -- /bin/sh -c \
     'sglang generate --model-path Wan-AI/Wan2.2-I2V-A14B-Diffusers \
     --num-gpus 4 --tp-size 4 --num-frames 93 --save-output \
-    --prompt "Cyberpunk city street in the rain, neon lights reflecting on puddles."'
+    --image "https://raw.githubusercontent.com/sgl-project/sglang/main/test/test_data/images/cat.png" \
+    --prompt "The cat in the image blinks and looks at the camera."'
     ```
 
     Benchmark results are displayed in the logs.
