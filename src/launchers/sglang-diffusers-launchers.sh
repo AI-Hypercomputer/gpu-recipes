@@ -28,12 +28,16 @@ if [ -z "$MODEL_NAME" ]; then
 fi
 export MY_IP=$(hostname -I | awk '{print $1}')
 
+NUM_GPUS=${NUM_GPUS:-$(nvidia-smi -L | wc -l)}
+TP_SIZE=${TP_SIZE:-$NUM_GPUS}
+
 echo "Launching SGLang for $MODEL_NAME on $NUM_GPUS GPUs"
 
 sglang serve \
   --model-path "$MODEL_NAME" \
   --host 0.0.0.0 \
   --port 8000 \
-  --tp "$NUM_GPUS" \
+  --num-gpus "$NUM_GPUS" \
+  --tp "$TP_SIZE" \
   --trust-remote-code \
   --dist-init-addr "$MY_IP:6000"

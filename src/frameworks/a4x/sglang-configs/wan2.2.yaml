@@ -1,11 +1,9 @@
 tp: 4
+num_gpus: 4
 trust-remote-code: true
-ulysses-degree: 2
-ring-degree: 2
 text-encoder-cpu-offload: false
 vae-cpu-offload: false
 dit-cpu-offload: false
 dit-layerwise-offload: false
 attention-backend: flashinfer
-mem-fraction-static: 0.9
 port: 8000
