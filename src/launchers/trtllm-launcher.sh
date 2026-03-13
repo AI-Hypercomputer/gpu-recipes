@@ -85,7 +85,7 @@ parse_serving_config() {
 
     for ((index = 0; index < ${#SERVING_CONFIG[@]}; )); do
         current_arg="${SERVING_CONFIG[$index]}"
-        next_arg="${SERVING_CONFIG[$((index + 1))]}"
+        next_arg=${SERVING_CONFIG[$((index + 1))]:-}
 
         # Handle --key=value format
         if [[ "$current_arg" =~ ^--[^=]+=.+ ]]; then
@@ -180,6 +180,7 @@ run_benchmark() {
 
     if [[ $backend == "pytorch" ]]; then
         echo "Running throughput benchmark"
+        export NCCL_P2P_LEVEL=PHB
         trtllm-bench \
         --model $model_name \
         --model_path /ssd/${model_name} throughput \
