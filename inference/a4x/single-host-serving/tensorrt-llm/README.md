@@ -199,6 +199,10 @@ kubectl create secret generic hf-secret \
 
 This recipe supports the following models. You can easily swap between them by changing the environment variables in the next step.
 
+Running TRTLLM inference benchmarking on these models are only tested and validated on A4X GKE nodes with certain combination of TP, PP, EP, number of GPU chips, input & output sequence length, precision, etc.
+
+Example model configuration YAML files included in this repo only show a certain combination of parallelism hyperparameters and configs for benchmarking purposes. Input and output length in `gpu-recipes/inference/a4x/single-host-serving/tensorrt-llm/values.yaml` need to be adjusted according to the model and its configs.
+
 | Model Name | Hugging Face ID | Configuration File | Release Name Suffix |
 | :--- | :--- | :--- | :--- |
 | **DeepSeek-R1 671B** | `nvidia/DeepSeek-R1-NVFP4-v2` | `deepseek-r1-nvfp4.yaml` | `deepseek-r1` |
