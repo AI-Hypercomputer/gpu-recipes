@@ -22,7 +22,6 @@ service:
     http: 8000
 
 workload:
-
   model:
     name: 
   gpus: 4 
