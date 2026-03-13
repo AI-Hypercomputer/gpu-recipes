@@ -15,7 +15,6 @@ This guide walks you through setting up the necessary cloud infrastructure, conf
   * [3.3. Connect to your GKE Cluster](#connect-cluster)
   * [3.4. Get Hugging Face Token](#get-hf-token)
   * [3.5. Create Hugging Face Kubernetes Secret](#setup-hf-secret)
-  * [3.6. Build the SGLang Serving Image](#build-image)
 * [4. Run the Recipe](#run-the-recipe)
   * [4.1. Model varients](#serving-wan-model)
 * [5. Monitoring and Troubleshooting](#monitoring)
@@ -200,33 +199,7 @@ kubectl create secret generic hf-secret \
 --dry-run=client -o yaml | kubectl apply -f -
 ```
 
-<a name="build-image"></a>
-### 3.6. Build the SGLang Serving Image
 
-This step uses Cloud Build to create a custom Docker image with SGLang and push it to your Artifact Registry repository.
-
-> [!NOTE]
-> This build process can take **up to 30 minutes** as it compiles and installs several dependencies.
-
-```bash
-cd $REPO_ROOT/src/docker/sglang
-gcloud builds submit --region=${REGION} \
-    --config cloudbuild.yml \
-    --substitutions _ARTIFACT_REGISTRY=$ARTIFACT_REGISTRY,_SGLANG_IMAGE=$SGLANG_IMAGE,_SGLANG_VERSION=$SGLANG_VERSION \
-    --timeout "2h" \
-    --machine-type=e2-highcpu-32 \
-    --disk-size=1000
-```
-
-Optionally, you can monitor the build progress by streaming its logs. Replace `<BUILD_ID>` with the ID from the previous command's output.
-
-```bash
-BUILD_ID=<BUILD_ID>
-gcloud builds log $BUILD_ID --stream --region=$REGION
-```
-
-> [!WARNING]
-> You may see `pip's dependency resolver` warnings in the build logs. These are generally safe to ignore as long as the Cloud Build job completes successfully.
 
 **You have now completed the environment setup!** You are ready to deploy a model.
 
@@ -265,7 +238,7 @@ Upon launching the SGLang server, it performs the following steps:
     ```bash
     cd $RECIPE_ROOT
     helm install -f values.yaml \
-    --set-file workload_launcher=$REPO_ROOT/src/launchers/sglang--diffuser-launcher.sh \
+    --set-file workload_launcher=$REPO_ROOT/src/launchers/sglang-diffusion-launcher.sh \
     --set-file serving_config=$REPO_ROOT/src/frameworks/a4x/sglang-configs/wan2.2.yaml \
     --set queue=${KUEUE_NAME} \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
@@ -320,7 +293,7 @@ Upon launching the SGLang server, it performs the following steps:
     -d '{
     "model": "Wan-AI/Wan2.2-I2V-A14B-Diffusers",
     "prompt": "The character in the image starts walking toward the camera, cinematic lighting.",
-    "input_reference": "https://raw.githubusercontent.com/sgl-project/sglang/main/test/test_data/images/cat.png",
+    "input_reference": "assets/sampleImage.png",
     "num_frames": 81,
     "fps": 16
     }'
@@ -347,6 +320,8 @@ Upon launching the SGLang server, it performs the following steps:
     *Benchmark: Text-to-Video on 1 GPU*
     ```bash
     kubectl exec -it deployment/$USER-serving-wan2-2-model -- /bin/sh -c \
+    'set -e 
+    source /usr/local/gib/scripts/set_nccl_env.sh 
     'sglang generate --model-path Wan-AI/Wan2.2-T2V-A14B-Diffusers \
     --num-gpus 1 --tp-size 1 --num-frames 81 --save-output \
     --prompt "Cyberpunk city street in the rain, neon lights reflecting on puddles."'
@@ -354,29 +329,31 @@ Upon launching the SGLang server, it performs the following steps:
     *Benchmark: Text-to-Video on 4 GPU*
     ```bash
     kubectl exec -it deployment/$USER-serving-wan2-2-model -- /bin/sh -c \
+    'set -e 
+    source /usr/local/gib/scripts/set_nccl_env.sh 
     'sglang generate --model-path Wan-AI/Wan2.2-T2V-A14B-Diffusers \
     --num-gpus 4 --tp-size 4 --num-frames 93 --save-output \
     --prompt "Cyberpunk city street in the rain, neon lights reflecting on puddles."'
     ```
-    *Download reference image for I2V model benchmarking*
-    ```bash
-    kubectl exec -it deployment/$USER-serving-wan2-2-model -- \
-    curl -o /tmp/cat.png https://raw.githubusercontent.com/sgl-project/sglang/main/test/test_data/images/cat.png
-    ```
+
     *Benchmark: Image-to-Video on 1 GPU*
     ```bash
     kubectl exec -it deployment/$USER-serving-wan2-2-model -- /bin/sh -c \
+    'set -e 
+    source /usr/local/gib/scripts/set_nccl_env.sh 
     'sglang generate --model-path Wan-AI/Wan2.2-I2V-A14B-Diffusers \
     --num-gpus 1 --tp-size 1 --num-frames 81 --save-output \
-    --image "/tmp/cat.png" \
+    --image "assets/sampleImage" \
     --prompt "The cat in the image blinks and looks at the camera."'
     ```
     *Benchmark: Image-to-Video on 4 GPU*
     ```bash
     kubectl exec -it deployment/$USER-serving-wan2-2-model -- /bin/sh -c \
+    'set -e 
+    source /usr/local/gib/scripts/set_nccl_env.sh 
     'sglang generate --model-path Wan-AI/Wan2.2-I2V-A14B-Diffusers \
     --num-gpus 4 --tp-size 4 --num-frames 93 --save-output \
-    --image "/tmp/cat.png" \
+    --image "assets/sampleImage" \
     --prompt "The cat in the image blinks and looks at the camera."'
     ```
 

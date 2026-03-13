@@ -1,4 +1,4 @@
-tp: 4
+tp-size: 4
 num_gpus: 4
 trust-remote-code: true
 text-encoder-cpu-offload: false

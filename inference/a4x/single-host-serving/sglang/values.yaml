@@ -1,5 +1,8 @@
-# values.yaml
+
 queue: <YOUR_KUEUE_NAME>
+
+dwsSettings:
+  maxRunDurationSeconds: 
 
 huggingface:
   secretName: hf-secret
@@ -19,11 +22,11 @@ service:
     http: 8000
 
 workload:
-  # Supported: "Wan-AI/Wan2.2-T2V-A14B-Diffusers" or "Wan-AI/Wan2.2-I2V-A14B-Diffusers"
+
   model:
-    name: "Wan-AI/Wan2.2-T2V-A14B-Diffusers"
+    name: 
   gpus: 4 
-  image: "lmsysorg/sglang:latest"
+  image: 
   framework: "sglang"
   configFile: serving-args.yaml
   configPath: /workload/configs
@@ -36,20 +39,14 @@ workload:
       value: "/workload/configs/serving-args.yaml"
     - name: HF_HOME
       value: "/ssd"
-  # extraArgs left empty as launch-workload.sh now handles TP dynamically
-  extraArgs: []
+    - name: LD_LIBRARY_PATH
+      value: "/usr/local/nvidia/lib64:/usr/local/lib/"
+  
 
 network:
-  subnetworks:
-    - default
-    - gvnic-1
-    - rdma-0
-    - rdma-1
-    - rdma-2
-    - rdma-3
+  subnetworks[]:
+  gibVersion:   gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib-arm64:v1.0.7
+  ncclSettings:
+    - name: NCCL_DEBUG
+      value: "WARN"
 
-tolerations:
-  - key: "kubernetes.io/arch"
-    operator: "Equal"
-    value: "arm64"
-    effect: "NoSchedule"
