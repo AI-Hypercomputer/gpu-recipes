@@ -5,5 +5,4 @@ text-encoder-cpu-offload: false
 vae-cpu-offload: false
 dit-cpu-offload: false
 dit-layerwise-offload: false
-attention-backend: flashinfer
 port: 8000

@@ -325,7 +325,7 @@ Upon launching the SGLang server, it performs the following steps:
     "fps": 16
     }'
     ```    
-2.  ****Generate a Video via Utility Script:**
+2.  **Generate a Video via Utility Script:**
 
     For a more automated experience, use the provided stream_video.sh script. First, forward the local port in one terminal:
 
@@ -358,12 +358,17 @@ Upon launching the SGLang server, it performs the following steps:
     --num-gpus 4 --tp-size 4 --num-frames 93 --save-output \
     --prompt "Cyberpunk city street in the rain, neon lights reflecting on puddles."'
     ```
+    *Download reference image*
+    ```bash
+    kubectl exec -it deployment/$USER-serving-wan2-2-model -- \
+    curl -o /tmp/cat.png https://raw.githubusercontent.com/sgl-project/sglang/main/test/test_data/images/cat.png
+    ```
     *Benchmark: Image-to-Video on 1 GPU*
     ```bash
     kubectl exec -it deployment/$USER-serving-wan2-2-model -- /bin/sh -c \
     'sglang generate --model-path Wan-AI/Wan2.2-I2V-A14B-Diffusers \
     --num-gpus 1 --tp-size 1 --num-frames 81 --save-output \
-    --image "https://raw.githubusercontent.com/sgl-project/sglang/main/test/test_data/images/cat.png" \
+    --image "/tmp/cat.png" \
     --prompt "The cat in the image blinks and looks at the camera."'
     ```
     *Benchmark: Image-to-Video on 4 GPU*
@@ -371,7 +376,7 @@ Upon launching the SGLang server, it performs the following steps:
     kubectl exec -it deployment/$USER-serving-wan2-2-model -- /bin/sh -c \
     'sglang generate --model-path Wan-AI/Wan2.2-I2V-A14B-Diffusers \
     --num-gpus 4 --tp-size 4 --num-frames 93 --save-output \
-    --image "https://raw.githubusercontent.com/sgl-project/sglang/main/test/test_data/images/cat.png" \
+    --image "/tmp/cat.png" \
     --prompt "The cat in the image blinks and looks at the camera."'
     ```
 
