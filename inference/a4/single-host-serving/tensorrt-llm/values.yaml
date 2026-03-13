@@ -49,15 +49,19 @@ workload:
       value: "/workload/launcher/launch-workload.sh"
     - name: SERVER_ARGS_FILE
       value: "/workload/configs/serving-args.yaml"
+    - name: HF_HOME
+      value: "/ssd"
+    - name: LD_LIBRARY_PATH
+      value: "/usr/local/nvidia/lib64:/usr/local/lib/"
   benchmarks:
     experiments:
       - isl: 1024
-        osl: 1024
+        osl: 4096
         num_requests: 1000
 
 network:
   subnetworks[]:
-  gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib-arm64:v1.0.7
+  gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:v1.0.5
   ncclSettings:
     - name: NCCL_DEBUG
       value: "VERSION"
