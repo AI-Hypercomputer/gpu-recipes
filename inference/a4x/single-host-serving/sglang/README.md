@@ -358,7 +358,7 @@ Upon launching the SGLang server, it performs the following steps:
     --num-gpus 4 --tp-size 4 --num-frames 93 --save-output \
     --prompt "Cyberpunk city street in the rain, neon lights reflecting on puddles."'
     ```
-    *Download reference image*
+    *Download reference image for I2V model benchmarking*
     ```bash
     kubectl exec -it deployment/$USER-serving-wan2-2-model -- \
     curl -o /tmp/cat.png https://raw.githubusercontent.com/sgl-project/sglang/main/test/test_data/images/cat.png
