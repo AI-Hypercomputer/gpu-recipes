@@ -37,7 +37,7 @@ service:
 workload:
   model:
     name:
-  gpus: 4
+  gpus: 8
   image:
   framework:
   configFile: serving-args.yaml
