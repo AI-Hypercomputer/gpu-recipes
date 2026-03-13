@@ -106,10 +106,9 @@ flowchart TD
 * **helm:** A package manager for Kubernetes to define, install, and upgrade applications. It's used here to configure and deploy the Kubernetes Deployment.
 * **Deployment:** Manages the lifecycle of your model server pod, ensuring it stays running.
 * **Service:** Provides a stable network endpoint (a DNS name and IP address) to access your model server.
-* **Pod:** The smallest deployable unit in Kubernetes. The SGLang container runs inside this pod on a GPU-enabled node.
-* **Cloud Build:** A service to run build jobs on Google Cloud to build the SGLang container image.
-* **Artifact Registry:** A single place to manage container images.
 * **Cloud Storage:** A Cloud Storage bucket to store benchmark logs and other artifacts.
+* **Pod:** The smallest deployable unit in Kubernetes. The SGLang container runs inside this pod on a GPU-enabled node.
+
 
 <a name="environment-setup"></a>
 ## 3. Environment Setup (One-Time)
