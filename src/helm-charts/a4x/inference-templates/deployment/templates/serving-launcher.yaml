@@ -278,5 +278,7 @@ spec:
           resources:
             requests:
               nvidia.com/gpu: {{ $gpusPerNode }}
+              memory: "800Gi"
             limits:
               nvidia.com/gpu: {{ $gpusPerNode }}
+              memory: "1000Gi"
