@@ -157,10 +157,9 @@ Replace the following values:
 | `CLUSTER_REGION` | The GCP region where your GKE cluster is located. | `us-central1` |
 | `CLUSTER_NAME` | The name of your GKE cluster. | `a4x-gke-cluster` |
 | `KUEUE_NAME` | The name of the Kueue local queue. The default queue created by the cluster toolkit is `a4x`. Verify the name in your cluster. | `a4x` |
-| `ARTIFACT_REGISTRY` | Full path to your Artifact Registry repository. | `us-central1-docker.pkg.dev/gcp-project-12345/my-repo` |
 | `GCS_BUCKET` | Name of your GCS bucket (do not include `gs://`). | `my-benchmark-logs-bucket` |
-| `SGLANG_IMAGE` | The name for the Docker image to be built. | `lmsysorg/sglang:latest` |
-| `SGLANG_VERSION` | The tag/version for the Docker image. | `blackwell` |
+| `SGLANG_IMAGE` | The name for the Docker image to be built. | `lmsysorg/sglang` |
+| `SGLANG_VERSION` | The tag/version for the Docker image. | `latest` |
 
 
 <a name="connect-cluster"></a>
@@ -271,7 +270,7 @@ Upon launching the SGLang server, it performs the following steps:
 
     ```bash
     kubectl exec -it deployment/$USER-serving-wan2-2-model -- \
-    curl http://localhost:8000/v1/videos \
+    curl -s http://localhost:8000/v1/videos \
     -H "Content-Type: application/json" \
     -d '{
     "model":"Wan-AI/Wan2.2-T2V-A14B-Diffusers",
@@ -280,7 +279,7 @@ Upon launching the SGLang server, it performs the following steps:
     "fps": 16,
     "size": "1280x720",
     "seed": 1024
-    }'
+    }' | jq '.'
     ```
 2.  **Example for I2V (Image-to-Video)**
 
@@ -288,7 +287,7 @@ Upon launching the SGLang server, it performs the following steps:
 
     ```bash
     kubectl exec -it deployment/$USER-serving-wan2-2-model -- \
-    curl http://localhost:8000/v1/videos \
+    curl -s http://localhost:8000/v1/videos \
     -H "Content-Type: application/json" \
     -d '{
     "model": "Wan-AI/Wan2.2-I2V-A14B-Diffusers",
@@ -296,7 +295,7 @@ Upon launching the SGLang server, it performs the following steps:
     "input_reference": "assets/sampleImage.png",
     "num_frames": 81,
     "fps": 16
-    }'
+    }' | jq '.'
     ```    
 2.  **Generate a Video via Utility Script:**
 
