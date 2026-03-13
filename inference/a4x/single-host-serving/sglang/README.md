@@ -321,14 +321,14 @@ Upon launching the SGLang server, it performs the following steps:
     kubectl exec -it deployment/$USER-serving-wan2-2-model -- /bin/sh -c \
     'sglang generate --model-path Wan-AI/Wan2.2-T2V-A14B-Diffusers \
     --num-gpus 1 --tp-size 1 --num-frames 81 --save-output \
-    --prompt "Cyberpunk city street in the rain, neon lights reflecting on puddles."
+    --prompt "Cyberpunk city street in the rain, neon lights reflecting on puddles."'
     ```
     *Benchmark: Text-to-Video on 4 GPU*
     ```bash
     kubectl exec -it deployment/$USER-serving-wan2-2-model -- /bin/sh -c \
     'sglang generate --model-path Wan-AI/Wan2.2-T2V-A14B-Diffusers \
     --num-gpus 4 --tp-size 4 --num-frames 93 --save-output \
-    --prompt "Cyberpunk city street in the rain, neon lights reflecting on puddles."
+    --prompt "Cyberpunk city street in the rain, neon lights reflecting on puddles."'
     ```
 
     *Benchmark: Image-to-Video on 1 GPU*
@@ -337,7 +337,7 @@ Upon launching the SGLang server, it performs the following steps:
     'sglang generate --model-path Wan-AI/Wan2.2-I2V-A14B-Diffusers \
     --num-gpus 1 --tp-size 1 --num-frames 81 --save-output \
     --image "assets/sampleImage" \
-    --prompt "The cat in the image blinks and looks at the camera."
+    --prompt "The cat in the image blinks and looks at the camera."'
     ```
     *Benchmark: Image-to-Video on 4 GPU*
     ```bash
@@ -345,7 +345,7 @@ Upon launching the SGLang server, it performs the following steps:
     'sglang generate --model-path Wan-AI/Wan2.2-I2V-A14B-Diffusers \
     --num-gpus 4 --tp-size 4 --num-frames 93 --save-output \
     --image "assets/sampleImage" \
-    --prompt "The cat in the image blinks and looks at the camera."
+    --prompt "The cat in the image blinks and looks at the camera."'
     ```
 
     Benchmark results are displayed in the logs.
