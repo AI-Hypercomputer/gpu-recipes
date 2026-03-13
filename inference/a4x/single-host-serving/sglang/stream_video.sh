@@ -37,7 +37,7 @@ fi
 
 echo "Job Submitted! ID: $JOB_ID"
 
-# --- NEW: Polling Loop ---
+
 echo -n "Rendering Video..."
 while true; do
     # Check status inside the pod

@@ -134,14 +134,12 @@ This is the most critical step. These variables are used in subsequent commands 
 
 ```bash
 export PROJECT_ID=<PROJECT_ID>
-export REGION=<REGION_for_cloud_build>
 export CLUSTER_REGION=<REGION_of_your_cluster>
 export CLUSTER_NAME=<YOUR_GKE_CLUSTER_NAME>
 export KUEUE_NAME=<YOUR_KUEUE_NAME>
-export ARTIFACT_REGISTRY=<your-artifact-registry-repo-full-path>
 export GCS_BUCKET=<your-gcs-bucket-for-logs>
-export SGLANG_IMAGE=sglang
-export SGLANG_VERSION=blackwell
+export SGLANG_IMAGE=lmsysorg/sglang
+export SGLANG_VERSION=latest
 
 # Set the project for gcloud commands
 gcloud config set project $PROJECT_ID
@@ -152,7 +150,6 @@ Replace the following values:
 | Variable              | Description                                                                                             | Example                                                 |
 | --------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
 | `PROJECT_ID` | Your Google Cloud Project ID. | `gcp-project-12345` |
-| `REGION` | The GCP region to run the Cloud Build job. | `us-central1` |
 | `CLUSTER_REGION` | The GCP region where your GKE cluster is located. | `us-central1` |
 | `CLUSTER_NAME` | The name of your GKE cluster. | `a4x-gke-cluster` |
 | `KUEUE_NAME` | The name of the Kueue local queue. The default queue created by the cluster toolkit is `a4x`. Verify the name in your cluster. | `a4x` |
