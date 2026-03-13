@@ -1,5 +1,5 @@
 tp-size: 4
-num_gpus: 4
+num-gpus: 4
 trust-remote-code: true
 text-encoder-cpu-offload: false
 vae-cpu-offload: false

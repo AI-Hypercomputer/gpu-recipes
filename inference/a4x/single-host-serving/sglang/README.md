@@ -243,7 +243,7 @@ Upon launching the SGLang server, it performs the following steps:
     --set queue=${KUEUE_NAME} \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     --set workload.model.name=Wan-AI/Wan2.2-T2V-A14B-Diffusers \
-    --set workload.image=${ARTIFACT_REGISTRY}/${SGLANG_IMAGE}:${SGLANG_VERSION} \
+    --set workload.image=${SGLANG_IMAGE}:${SGLANG_VERSION} \
     --set workload.framework=sglang \
     $USER-serving-wan2-2-model \
     $REPO_ROOT/src/helm-charts/a4x/inference-templates/deployment
