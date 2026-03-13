@@ -1,14 +1,25 @@
 #!/bin/bash
-# stream_video.sh - Utility to poll and download generated video
 
 [ $# -eq 0 ] && { echo "Usage: $0 \"Your prompt\""; exit 1; }
 
 PROMPT="$1"
-API_URL="http://localhost:8000/v1/videos"
 
+POD_NAME=$(kubectl get pods --no-headers -o custom-columns=":metadata.name" | grep "serving-wan2-2-model" | head -n 1)
+
+if [ -z "$POD_NAME" ]; then
+    POD_NAME=$MY_POD
+fi
+
+if [ -z "$POD_NAME" ]; then
+    echo "Error: Could not find a running Wan2.2 pod."
+    echo "Please ensure your deployment is active or run: export MY_POD=your-pod-name"
+    exit 1
+fi
+
+echo "Using Pod: $POD_NAME"
 echo "Submitting Video Job..."
 
-RESPONSE=$(curl -s -X POST "$API_URL" \
+RESPONSE=$(kubectl exec "$POD_NAME" -- curl -s -X POST "http://localhost:8000/v1/videos" \
     -H "Content-Type: application/json" \
     -d "{
         \"model\": \"Wan-AI/Wan2.2-T2V-A14B-Diffusers\",
@@ -18,23 +29,38 @@ RESPONSE=$(curl -s -X POST "$API_URL" \
     }")
 
 JOB_ID=$(echo "$RESPONSE" | jq -r '.id')
+
+if [ "$JOB_ID" == "null" ] || [ -z "$JOB_ID" ]; then
+    echo "Error: Failed to get Job ID. Response: $RESPONSE"
+    exit 1
+fi
+
 echo "Job Submitted! ID: $JOB_ID"
 
+# --- NEW: Polling Loop ---
+echo -n "Rendering Video..."
 while true; do
-    STATUS_REPLY=$(curl -s "$API_URL/$JOB_ID")
+    # Check status inside the pod
+    STATUS_REPLY=$(kubectl exec "$POD_NAME" -- curl -s "http://localhost:8000/v1/videos/$JOB_ID")
     STATUS=$(echo "$STATUS_REPLY" | jq -r '.status')
-    
+    PROGRESS=$(echo "$STATUS_REPLY" | jq -r '.progress')
+
     if [ "$STATUS" == "completed" ]; then
-        # Fetch the internal path and notify user
         FILE_PATH=$(echo "$STATUS_REPLY" | jq -r '.file_path')
         echo -e "\nSuccess! Video generated at: $FILE_PATH"
-        echo "To download: kubectl cp <POD_NAME>:$FILE_PATH ./output.mp4"
+        echo "To download run: kubectl cp $POD_NAME:$FILE_PATH ./output.mp4"
         break
     elif [ "$STATUS" == "failed" ]; then
-        echo "Error: $(echo "$STATUS_REPLY" | jq -r '.error')"
+        ERROR_MSG=$(echo "$STATUS_REPLY" | jq -r '.error')
+        echo -e "\nError during generation: $ERROR_MSG"
         exit 1
     else
-        echo -n "."
+        # Print progress percentage if available, otherwise dots
+        if [ "$PROGRESS" != "null" ] && [ "$PROGRESS" != "0" ]; then
+            echo -ne "\rRendering Video... $PROGRESS%"
+        else
+            echo -n "."
+        fi
         sleep 10
     fi
 done

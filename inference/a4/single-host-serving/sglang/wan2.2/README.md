@@ -334,7 +334,7 @@ Upon launching the SGLang server, it performs the following steps:
     source /usr/local/gib/scripts/set_nccl_env.sh 
     sglang generate --model-path Wan-AI/Wan2.2-I2V-A14B-Diffusers \
     --num-gpus 1 --tp-size 1 --num-frames 81 --save-output \
-    --image "https://raw.githubusercontent.com/sgl-project/sglang/main/test/test_data/images/cat.png" \
+    --image "assets/sampleImage.png" \
     --prompt "The cat in the image blinks and looks at the camera."'
     ```
     *Benchmark: Image-to-Video on 4 GPU*
@@ -344,7 +344,7 @@ Upon launching the SGLang server, it performs the following steps:
     source /usr/local/gib/scripts/set_nccl_env.sh 
     sglang generate --model-path Wan-AI/Wan2.2-I2V-A14B-Diffusers \
     --num-gpus 4 --tp-size 4 --num-frames 93 --save-output \
-    --image "https://raw.githubusercontent.com/sgl-project/sglang/main/test/test_data/images/cat.png" \
+    --image "assets/sampleImage.png" \
     --prompt "The cat in the image blinks and looks at the camera."'
     ```
 
