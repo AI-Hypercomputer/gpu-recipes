@@ -1,0 +1,48 @@
+queue: 
+
+dwsSettings:
+  maxRunDurationSeconds: 
+
+huggingface:
+  secretName: hf-secret
+  secretData:
+    token: "hf_api_token"
+
+volumes:
+  gcsVolumes: true
+  ssdMountPath: "/ssd"
+  gcsMounts:
+    - bucketName: 
+      mountPath: "/gcs"
+
+service:
+  type: ClusterIP
+  ports:
+    http: 8000
+
+workload:
+  model:
+    name: 
+  gpus: 8 
+  image: 
+  framework: 
+  configFile: serving-args.yaml
+  configPath: /workload/configs
+  envs:
+    - name: HF_HUB_ENABLE_HF_TRANSFER
+      value: "1"
+    - name: LAUNCHER_SCRIPT
+      value: "/workload/launcher/launch-workload.sh"
+    - name: SERVER_ARGS_FILE
+      value: "/workload/configs/serving-args.yaml"
+    - name: HF_HOME
+      value: "/ssd"
+    - name: LD_LIBRARY_PATH
+      value: "/usr/local/nvidia/lib64:/usr/local/lib/"
+
+network:
+  subnetworks[]:
+  gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:v1.0.5
+  ncclSettings:
+    - name: NCCL_DEBUG
+      value: "WARN"
