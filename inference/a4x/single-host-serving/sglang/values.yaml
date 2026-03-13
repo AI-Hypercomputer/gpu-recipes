@@ -1,5 +1,4 @@
-
-queue: <YOUR_KUEUE_NAME>
+queue: 
 
 dwsSettings:
   maxRunDurationSeconds: 
@@ -13,7 +12,7 @@ volumes:
   gcsVolumes: true
   ssdMountPath: "/ssd"
   gcsMounts:
-    - bucketName: <YOUR_GCS_BUCKET_NAME>
+    - bucketName: 
       mountPath: "/gcs"
 
 service:
@@ -24,9 +23,9 @@ service:
 workload:
   model:
     name: 
-  gpus: 4 
+  gpus: 8 
   image: 
-  framework: "sglang"
+  framework: 
   configFile: serving-args.yaml
   configPath: /workload/configs
   envs:
@@ -40,7 +39,6 @@ workload:
       value: "/ssd"
     - name: LD_LIBRARY_PATH
       value: "/usr/local/nvidia/lib64:/usr/local/lib/"
-  
 
 network:
   subnetworks[]:
@@ -48,4 +46,3 @@ network:
   ncclSettings:
     - name: NCCL_DEBUG
       value: "WARN"
-
