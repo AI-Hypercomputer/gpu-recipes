@@ -50,7 +50,7 @@ data:
           --kv_cache_free_gpu_mem_fraction 0.95 > $output_file
 
         cat $output_file
-        gsutil cp $output_file /gcs/benchmark_logs/
+        gcloud storage cp $output_file /gcs/benchmark_logs/
 
         rm -rf $engine_dir
         rm -f $dataset_file
