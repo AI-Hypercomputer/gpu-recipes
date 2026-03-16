@@ -13,7 +13,7 @@ Make sure you have the following prerequisites:
 *   You have a project with a GPU quota. See [Request a quota increase](https://cloud.google.com/docs/quota/view-request#requesting_higher_quota).
 *   [Enable required APIs](https://console.cloud.google.com/flows/enableapi?apiid=compute.googleapis.com).
 
-The following commands set up environment variables and create a GCE instance. The `MACHINE_TYPE` is set to `g4-standard-384` for a single GPU VM. The boot disk is set to 200GB to accommodate the models and dependencies.
+The following commands set up environment variables and create a GCE instance. The `MACHINE_TYPE` is set to `g4-standard-384` for 8 GPU VM. The boot disk is set to 200GB to accommodate the models and dependencies.
 
 ```bash
 export VM_NAME="${USER}-g4-trtllm-qwen3-235b"
