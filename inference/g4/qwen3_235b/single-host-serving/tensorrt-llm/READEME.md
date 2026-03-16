@@ -97,7 +97,7 @@ huggingface-cli download Qwen/Qwen3-235B --local-dir /scratch/models/Qwen3-235B
 
 ```
 
-# Quantize the model using FP8
+#### Quantize the model using FP8
 ```bash
 git clone https://github.com/NVIDIA/TensorRT-Model-Optimizer.git
 
