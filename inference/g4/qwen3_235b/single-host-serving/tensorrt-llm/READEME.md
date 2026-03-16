@@ -1,6 +1,6 @@
 # Single host inference benchmark of Qwen3-235B with TensorRT-LLM on G4
 
-This recipe shows how to serve and benchmark the Qwen235B model using [NVIDIA TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) on a single GCP VM with G4 GPUs. For more information on G4 machine types, see the [GCP documentation](https://cloud.google.com/compute/docs/accelerator-optimized-machines#g4-machine-types).
+This recipe shows how to serve and benchmark the Qwen3-235B model using [NVIDIA TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) on a single GCP VM with G4 GPUs. For more information on G4 machine types, see the [GCP documentation](https://cloud.google.com/compute/docs/accelerator-optimized-machines#g4-machine-types).
 
 ## Before you begin
 
@@ -13,13 +13,13 @@ Make sure you have the following prerequisites:
 *   You have a project with a GPU quota. See [Request a quota increase](https://cloud.google.com/docs/quota/view-request#requesting_higher_quota).
 *   [Enable required APIs](https://console.cloud.google.com/flows/enableapi?apiid=compute.googleapis.com).
 
-The following commands set up environment variables and create a GCE instance. The `MACHINE_TYPE` is set to `g4-standard-384` for 8 GPU VM. The boot disk is set to 200GB to accommodate the models and dependencies.
+The following commands set up environment variables and create a GCE instance. The `MACHINE_TYPE` is set to `g4-standard-192` for 4 GPU VM. The boot disk is set to 200GB to accommodate the models and dependencies.
 
 ```bash
 export VM_NAME="${USER}-g4-trtllm-qwen3-235b"
 export PROJECT_ID="your-project-id"
 export ZONE="your-zone"
-export MACHINE_TYPE="g4-standard-384"
+export MACHINE_TYPE="g4-standard-192"
 export IMAGE_PROJECT="ubuntu-os-accelerator-images"
 export IMAGE_FAMILY="ubuntu-accelerator-2404-amd64-with-nvidia-570"
 
@@ -82,10 +82,6 @@ make -C docker release_build
 mkdir -p /scratch/cache
 make -C docker release_run DOCKER_RUN_ARGS="-v /scratch:/scratch -v /scratch/cache:/root/.cache --ipc=host"
 ```
-
-Now you are inside the container.
-
-### 4. Download and Quantize the Model
 
 ```bash
 # Inside the container
