@@ -58,6 +58,8 @@ echo "Launching Torch distributed on the node rank $JOB_COMPLETION_INDEX out of 
 
 pip install git+https://github.com/NVIDIA/dllogger#egg=dllogger
 
+export HF_TOKEN=<Repalce with your HF TOKEN>
+
 # Export the nemo2 config to yaml.
 python ${NEMO_LAUNCH_SCRIPT} --factory "recipe()" \
 trainer.num_nodes="$NNODES" \
