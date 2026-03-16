@@ -1,0 +1,8 @@
+tp-size: 4
+num-gpus: 4
+trust-remote-code: true
+text-encoder-cpu-offload: false
+vae-cpu-offload: false
+dit-cpu-offload: false
+dit-layerwise-offload: false
+port: 8000

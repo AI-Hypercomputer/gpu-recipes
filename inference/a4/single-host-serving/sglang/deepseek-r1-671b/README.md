@@ -126,7 +126,7 @@ First, you'll configure your local environment. These steps are required once be
 git clone https://github.com/ai-hypercomputer/gpu-recipes.git
 cd gpu-recipes
 export REPO_ROOT=$(pwd)
-export RECIPE_ROOT=$REPO_ROOT/inference/a4/single-host-serving/sglang
+export RECIPE_ROOT=$REPO_ROOT/inference/a4/single-host-serving/sglang/deepseek-r1-671b
 ```
 
 <a name="configure-vars"></a>
