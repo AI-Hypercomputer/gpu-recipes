@@ -82,6 +82,7 @@ make -C docker release_build
 mkdir -p /scratch/cache
 make -C docker release_run DOCKER_RUN_ARGS="-v /scratch:/scratch -v /scratch/cache:/root/.cache --ipc=host"
 ```
+### 4. Download the Model
 
 ```bash
 # Inside the container
@@ -93,7 +94,7 @@ huggingface-cli download Qwen/Qwen3-235B --local-dir /scratch/models/Qwen3-235B
 
 ```
 
-#### Quantize the model using FP8
+### 5. Quantize the model using FP8
 ```bash
 git clone https://github.com/NVIDIA/TensorRT-Model-Optimizer.git
 
