@@ -4,15 +4,11 @@
 
 PROMPT="$1"
 
-POD_NAME=$(kubectl get pods --no-headers -o custom-columns=":metadata.name" | grep "serving-wan2-2-model" | head -n 1)
-
-if [ -z "$POD_NAME" ]; then
-    POD_NAME=$MY_POD
-fi
+POD_NAME=$(kubectl get pods --no-headers -o custom-columns=":metadata.name" | grep "${USER}-serving-wan2-2-model" | head -n 1)
 
 if [ -z "$POD_NAME" ]; then
     echo "Error: Could not find a running Wan2.2 pod."
-    echo "Please ensure your deployment is active or run: export MY_POD=your-pod-name"
+    echo "Please ensure your deployment is active."
     exit 1
 fi
 
@@ -37,7 +33,7 @@ fi
 
 echo "Job Submitted! ID: $JOB_ID"
 
-
+# --- NEW: Polling Loop ---
 echo -n "Rendering Video..."
 while true; do
     # Check status inside the pod
