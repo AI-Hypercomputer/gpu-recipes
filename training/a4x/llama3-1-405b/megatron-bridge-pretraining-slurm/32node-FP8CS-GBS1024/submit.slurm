@@ -1,107 +1,101 @@
-<!-- mdformat global-off -->
-# Pretrain Llama 3.1 405B workloads on A4X Slurm Cluster with Nvidia Megatron-Bridge
+#!/bin/bash
+#SBATCH --exclusive
+#SBATCH --job-name=llama31-405b-pretrain
+#SBATCH --nodes=32
+#SBATCH --ntasks-per-node=4
+#SBATCH --mem=0
+#SBATCH --segment=16
+#SBATCH --output=logs/%x_%u_%j.out
+#SBATCH --time=24:00:00
+#SBATCH --open-mode=append
 
-This recipe outlines the steps for running a Llama 3.1 405B pretraining workload on [Google Cloud A4X Slurm clusters](https://docs.cloud.google.com/ai-hypercomputer/docs/create/create-slurm-cluster) by using [NVIDIA Megatron-Bridge](https://github.com/NVIDIA-NeMo/Megatron-Bridge).
+set -e
 
-## Orchestration and deployment tools
+# SET UP MASTER ADDRESS
+nodes=( $( scontrol show hostnames ${SLURM_JOB_NODELIST} ) )
+head_node=${nodes[0]}
+export MASTER_ADDR=${head_node}
+export MASTER_PORT=6002
+export NNODES=${SLURM_JOB_NUM_NODES}
+echo "Master Node: ${MASTER_ADDR}"
 
-For this recipe, the following setup is used:
+# EXPORT ENV VARS
+export PYTHONUNBUFFERED=1
+export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True"
 
-- Orchestration - [Slurm Workload Manager](https://slurm.schedmd.com/)
-- Deployment - [Cluster Toolkit](https://cloud.google.com/cluster-toolkit/docs/overview)
+# MPI AND NETWORK
+export PMIX_MCA_gds="^ds12"
+export GLOO_SOCKET_IFNAME=enp0s3
 
-## Test environment
+# PATHS - Modify these if your setup differs
+if [[ ! -d "${BASE_DIR}" ]]; then
+    echo "Error: BASE_DIR ${BASE_DIR} not found. Please ensure it exists."
+    exit 1
+fi
+CONTAINER="${BASE_DIR}/sqsh/nvidia+nemo+25.09.sqsh"
+REPO_DIR="${BASE_DIR}/Megatron-Bridge"
+RUN_SCRIPT="${REPO_DIR}/scripts/performance/run_script.py"
+CONFIG_FILE="${REPO_DIR}/scripts/performance/configs/llama31/llama31_405b_llm_pretrain.yaml"
 
-This recipe has been optimized for and tested with the following configuration:
+TOTAL_GPUS=$(( ${SLURM_JOB_NUM_NODES} * 4 ))
 
-- A4X Slurm Cluster (32 nodes, 128 GPUs)
-- Machine Type: `a4x-highgpu-4g`
-- Lustre Filesystem
+# CACHE SETUP
+CACHE_ROOT="${BASE_DIR}/cache/triton_cache"
+INDUCTOR_ROOT="${BASE_DIR}/cache/torchinductor_cache"
+JOB_CACHE_DIR="${CACHE_ROOT}/${SLURM_JOBID}"
+JOB_INDUCTOR_DIR="${INDUCTOR_ROOT}/${SLURM_JOBID}"
 
-Please follow the instructions in the [Cluster Toolkit A4X Example README](https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/examples/machine-learning/a4x-highgpu-4g/README.md) to provision an A4X High Slurm cluster.
+# EXECUTION
+echo "Submitting training job on ${SLURM_JOB_NUM_NODES} nodes (${TOTAL_GPUS} GPUs)..."
 
-## Docker container image
+# Note: --container-mounts assumes paths exist on the host
+srun \
+  --container-image "${CONTAINER}" \
+  --container-mounts "${BASE_DIR},/usr/local/gib:/usr/local/gib,${LOCAL_SSD_DIR}" \
+  --container-workdir "${BASE_DIR}" \
+  --no-container-mount-home \
+  --container-writable \
+  --gres=gpu:4 \
+  -l \
+  --segment 16 \
+  --mpi=pmix \
+  bash -c "
+    # Ensure clean slate inside container
+    unset NCCL_SOCKET_IFNAME
+    unset NCCL_IB_DISABLE
+    unset NCCL_GPUDIRECT_TCPX_FORCE_ACK
 
-This recipe uses the following container images:
+    # Distributed Ranks
+    export WORLD_SIZE=\${SLURM_NTASKS}
+    export RANK=\${SLURM_PROCID}
+    export LOCAL_RANK=\${SLURM_LOCALID}
+    export NODE_RANK=\${SLURM_NODEID}
 
-- `nvcr.io/nvidia/nemo:25.09`
-
-## Run the recipe
-
-From your cluster login node, complete the following steps:
-
-### Configure environment settings
-
-#### Setup Enroot for Megatron
-
-We recommend setting this up on Lustre.
-
-```bash
- # Here, /home is a lustre filesystem
-export BASE_DIR=/home/${USER}
-export LOCAL_SSD_DIR=/mnt/localssd
-cd ${BASE_DIR}
-
-# Configure Enroot
-export ENROOT_CONFIG_PATH=${HOME}/.config/enroot
-mkdir -p ${ENROOT_CONFIG_PATH}
-
-# Authenticate with Google Cloud Docker registry
-gcloud auth configure-docker us-docker.pkg.dev
-
-# Import the NVIDIA NeMo container
-mkdir -p ${BASE_DIR}/sqsh
-enroot import --output ${BASE_DIR}/sqsh/nvidia+nemo+25.09.sqsh -- docker://nvcr.io#nvidia/nemo:25.09
-```
-
-### Get the recipe
-
-Clone the Megatron-Bridge repository:
-
-```bash
-git clone https://github.com/NVIDIA-NeMo/Megatron-Bridge.git
-cd Megatron-Bridge
-git checkout minor_cfg_updates_2509
-cd ${BASE_DIR}
-```
-
-### Configure and submit a pretraining job
-
-#### Using 32 nodes (128 GPUs) FP8 precision
-
-The `submit.slurm` script is provided to run the training job. Ensure you are in your `${BASE_DIR}` and copy/create the `submit.slurm` script there.
-
-Create a logs directory to store the job output:
-
-```bash
-mkdir -p ${BASE_DIR}/logs
-```
-
-To execute the job with the default settings, run the following command:
-
-```bash
-sbatch ${BASE_DIR}/submit.slurm
-```
+    export TRITON_CACHE_DIR=${JOB_CACHE_DIR}/node_\${SLURM_NODEID}
+    export TORCHINDUCTOR_CACHE_DIR=${JOB_INDUCTOR_DIR}/node_\${SLURM_NODEID}
+    mkdir -p \${TRITON_CACHE_DIR} \${TORCHINDUCTOR_CACHE_DIR}
 
 
-### Monitor the job
+    export LD_LIBRARY_PATH=/usr/local/gib/lib64:\${LD_LIBRARY_PATH}
 
-To check the status of jobs in your queue, run the following command:
+    # Source environment scripts
+    if [ -f /usr/local/gib/scripts/set_nccl_env.sh ]; then
+        source /usr/local/gib/scripts/set_nccl_env.sh
+    fi
 
-```bash
-squeue
-```
+    echo \"print \$(hostname) executing rank \${SLURM_PROCID} (\${SLURM_JOBID}/\${SLURM_TASK_PID}) \${location}\"
 
-To view the output logs, use `tail` on the output file generated by Slurm (replace `<JOB_ID>` with your actual job ID):
-
-```bash
-tail -f logs/<JOB_NAME>_<USER>_<JOB_ID>.out
-```
-
-### Cancel the job
-
-To cancel a running job:
-
-```bash
-scancel <JOB_ID>
-```
+    # PYTHON EXECUTION
+    numactl --cpunodebind=\$((\${SLURM_LOCALID}/2)) --membind=\$((\${SLURM_LOCALID}/2)) \
+    python ${RUN_SCRIPT} \
+    --config_file ${CONFIG_FILE} \
+    --model_name llama31 \
+    --model_size 405b \
+    --compute_dtype fp8 \
+    --fp8_recipe cs \
+    --gpu gb200 \
+    -a dummy -p dummy \
+    -ng ${TOTAL_GPUS} \
+    train.manual_gc=true \
+    train.manual_gc_interval=100
+  "
