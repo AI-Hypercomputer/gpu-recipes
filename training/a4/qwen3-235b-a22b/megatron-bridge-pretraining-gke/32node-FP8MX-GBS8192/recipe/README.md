@@ -1,16 +1,19 @@
 <!-- mdformat global-off -->
+# Pretrain qwen3-235b-a22b-fp8mx-gbs8192-gpus256 workloads on a4 GKE Node pools with Megatron-Bridge
 
 This recipe outlines the steps for running a qwen3-235b-a22b pretraining
 workload on [a4 GKE Node pools](https://cloud.google.com/kubernetes-engine) by using the
 [NVIDIA Megatron-Bridge framework](https://github.com/NVIDIA-NeMo/Megatron-Bridge).
 
 ## Orchestration and deployment tools
+
 For this recipe, the following setup is used:
 
 - Orchestration - [Google Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine)
 - Pretraining job configuration and deployment - A Helm chart is used to configure and deploy the Kubernetes Jobset resource which manages the execution of the [Megatron-Bridge pretraining workload](https://github.com/NVIDIA-NeMo/Megatron-Bridge).
 
 ## Test environment
+
 This recipe has been optimized for and tested with the following configuration:
 
 - GKE cluster: Please follow Cluster Toolkit [instructions](https://github.com/GoogleCloudPlatform/cluster-toolkit/tree/main/examples/gke-a4x) to create your a4x GKE cluster.
@@ -18,18 +21,22 @@ This recipe has been optimized for and tested with the following configuration:
 - GPU Architecture: NVIDIA Blackwell.
 
 ## Training dataset
+
 This recipe uses a mock pretraining dataset provided by [Megatron Bridge Framework Datasets utils](https://github.com/NVIDIA-NeMo/Megatron-Bridge/blob/main/scripts/performance/utils/datasets.py)
 
 ## Docker container image
+
 This recipe uses the following docker images:
 
 - `nvcr.io/nvidia/nemo:26.02`
 - `us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib-arm64:v1.1.1`
 
 ## Run the recipe
+
 From your client workstation, complete the following steps:
 
 ### Configure environment settings
+
 Set the environment variables to match your environment:
 
 ```bash
@@ -57,11 +64,13 @@ gcloud config set project $PROJECT_ID
 ```
 
 ### Get cluster credentials
+
 ```bash
 gcloud container clusters get-credentials $CLUSTER_NAME --region $CLUSTER_REGION
 ```
 
 ### Get the recipe
+
 Clone the `gpu-recipes` repository and set a reference to the recipe folder.
 
 ```
@@ -73,6 +82,7 @@ cd $RECIPE_ROOT
 ```
 
 ### Configure and submit a pretraining job
+
 #### Using 32 nodes (256 gpus) fp8mx precision
 
 To execute the job with the default settings, run the following command from your client:
@@ -114,6 +124,7 @@ helm install $WORKLOAD_NAME . -f values.yaml \
     ```
 
 ### Monitor the job
+
 To check the status of pods in your job, run the following command:
 
 ```
@@ -137,6 +148,7 @@ This process runs on the pod whose name begins with
 For example: `$USER-qwen3-235b-32node-fp8mx-gbs8192-workload-0-0-s9zrv`.
 
 ### Uninstall the Helm release
+
 You can delete the job and other resources created by the Helm chart. To
 uninstall Helm, run the following command from your client:
 
