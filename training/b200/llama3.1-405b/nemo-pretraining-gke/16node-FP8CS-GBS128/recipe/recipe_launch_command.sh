@@ -1,0 +1,1 @@
+helm install phz-ubench-76ly . -f values.yaml --set-file workload_launcher=launcher.sh --set-file workload_config=/tmp/ubench_recipe/phz-ubench-76ly/custom_setup_experiment.py --set workload.image=nvcr.io/nvidia/nemo:26.02 --set volumes.gcsMounts[0].bucketName=ubench-logs --set volumes.gcsMounts[0].mountPath=/job-logs --set workload.envs[0].value=/job-logs/phz-ubench-76ly
