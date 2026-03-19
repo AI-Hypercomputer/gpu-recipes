@@ -7,7 +7,7 @@ EOF
 }
 
 parse_args() {
-  while [ "$1" != "" ]; do
+  while [[ "$1" != "" ]]; do
     case $(grep -o "=" <<< "$1" | wc -l) in
         1  )
         config_overrides+=("$1")
@@ -25,15 +25,15 @@ parse_args() {
 config_overrides=()
 parse_args "$@"
 
-if [ -z "${config_overrides}" ]; then
+if [[ -z "${config_overrides[*]}" ]]; then
   echo "No NeMo config overrides specified"
 else
   echo "NeMo config overrides:"
   echo "  ${config_overrides}"
 fi
 
-export LD_LIBRARY_PATH="$NCCL_PLUGIN_PATH:/usr/local/nvidia/lib64"
-ldconfig $LD_LIBRARY_PATH
+export LD_LIBRARY_PATH="/usr/local/cuda/compat/lib:$NCCL_PLUGIN_PATH:$LD_LIBRARY_PATH"
+ldconfig "$LD_LIBRARY_PATH"
 echo "Added $LD_LIBRARY_PATH to ldconfig:"
 ldconfig -p | grep libcuda | sed 's/^/  /'
 echo ""
@@ -47,7 +47,7 @@ echo "Logging to ${explicit_log_dir}"
 
 if [[ -n "${TOKENIZER_PATH}" ]]; then
   echo "Getting tokenizer files"
-  cp ${TOKENIZER_PATH}/* .
+  cp "${TOKENIZER_PATH}"/* .
   echo ""
 fi
 
@@ -56,14 +56,22 @@ echo "Launching Torch distributed on the node rank $JOB_COMPLETION_INDEX out of 
 pip install git+https://github.com/NVIDIA/dllogger#egg=dllogger
 
 # Create the nsys directory.
-mkdir -p ${explicit_log_dir}/nsys
+mkdir -p "${explicit_log_dir}/nsys"
 
-if [[ "$JOB_COMPLETION_INDEX" == "0" ]]; then
-  echo "--- DEBUG libnccl-env.so ---"
-  ls -la /usr/local/gib/lib/libnccl-env.so || echo "libnccl-env.so not found"
-  ls -lh /usr/local/gib/lib
-  echo "----------------------------"
+# Collect diagnostics to a single line
+kv="\"kernel_version\": \"$(uname --kernel-release)\""
+if command -v nvidia-smi &> /dev/null; then
+  cuda_v=$(nvidia-smi -q -x | grep -Po '(?<=<cuda_version>).*(?=</cuda_version>)' || true)
+  driver_v=$(nvidia-smi -q -x | grep -Po '(?<=<driver_version>).*(?=</driver_version>)' || true)
+  vbios_v=$(nvidia-smi -q -x | grep -Po '(?<=<vbios_version>).*(?=</vbios_version>)' | head -n1 || true)
+  kv="${kv}, \"cuda_version\": \"${cuda_v}\""
+  kv="${kv}, \"driver_version\": \"${driver_v}\""
+  kv="${kv}, \"vbios_version\": \"${vbios_v}\""
 fi
+echo "VERSION_DIAGNOSTICS: {${kv}}"
+
+
+export HF_TOKEN=YOUR_HF_TOKEN
 
 cd /opt
 rm -rf Megatron-Bridge
@@ -71,17 +79,13 @@ git clone https://github.com/NVIDIA-NeMo/Megatron-Bridge.git
 cd Megatron-Bridge
 git checkout f7a9428f301fa17ac374d5e7166a63b0aa4771af
 git submodule update --init --recursive
-sed -i -e '/return config/i \    config.dist.distributed_timeout_minutes = 30' scripts/performance/run_recipe.py
+sed -i -e '/pretrain(config=recipe/i \    recipe.dist.distributed_timeout_minutes = 60' scripts/performance/run_script.py
 ls
 
 cp $CUSTOM_SETUP_EXPERIMENT_SCRIPT_PATH scripts/performance/
 
 worker_command=$(cat <<- EOM
   if [ "\$RANK" -eq "0" ]; then
-    echo "--- LOCATING MEGATRON LIBRARIES ---" ;
-    python -c "import megatron.core; print('megatron.core:', megatron.core.__file__)" || echo "megatron.core not found" ;
-    python -c "import megatron.bridge; print('megatron.bridge:', megatron.bridge.__file__)" || echo "megatron.bridge not found" ;
-    echo "-----------------------------------" ;
     echo "Worker 0 is stalling for a few seconds.." ;
     sleep 3 ;
     echo "The detected environment within worker rank 0 is:" ;
@@ -89,9 +93,8 @@ worker_command=$(cat <<- EOM
   fi ;
 
   cd /opt/Megatron-Bridge ;
-  export PYTHONPATH="/opt/Megatron-Bridge:/opt/Megatron-Bridge/3rdparty/Megatron-LM:\$PYTHONPATH" ;
 
-  exec numactl \
+  numactl \
     --cpunodebind=\$((LOCAL_RANK/4)) \
     --membind=\$((LOCAL_RANK/4))           nsys profile \
     -t nvtx,cuda \
@@ -100,7 +103,7 @@ worker_command=$(cat <<- EOM
     --capture-range=cudaProfilerApi \
     --capture-range-end=stop \
     --kill none \
-    -o /${explicit_log_dir}/$JOB_IDENTIFIER/rank-\$RANK \
+    -o "/${explicit_log_dir}/$JOB_IDENTIFIER/rank-\$RANK" \
     --force-overwrite true \
     --session-new "nsys-\$RANDOM-\$RANK" \
   nice -10 \
@@ -110,16 +113,19 @@ worker_command=$(cat <<- EOM
     --model_recipe_name deepseek_v3 \
     --gpus_per_node 8 \
     --num_gpus 256 \
+    --compute_dtype bf16 \
+    --seq_length 4096 \
     --global_batch_size 2048 \
     --micro_batch_size 1 \
-    --seq_length 4096 \
     --tensor_model_parallel_size 1 \
     --pipeline_model_parallel_size 16 \
+    --expert_model_parallel_size 8 \
+    --expert_tensor_parallel_size 1 \
     --context_parallel_size 1 \
     --virtual_pipeline_model_parallel_size None \
-    --expert_model_parallel_size 8 \
-    --compute_dtype bf16 \
-    --max_steps 30 dist.distributed_timeout_minutes=30
+    --recompute_modules mla_up_proj \
+    --moe_a2a_overlap False \
+    --max_steps 30
 
 EOM
 )
@@ -138,10 +144,10 @@ torchrun \
 
 
 if [[ "$JOB_COMPLETION_INDEX" == "0" ]]; then
-  mkdir -p ${ARTIFACT_DIR}
-  cp -r ${explicit_log_dir}/* ${ARTIFACT_DIR}/
-  env > ${ARTIFACT_DIR}/environ.txt
-  ls ${ARTIFACT_DIR}
+  mkdir -p "${ARTIFACT_DIR}"
+  cp -r "${explicit_log_dir}"/* "${ARTIFACT_DIR}/"
+  env > "${ARTIFACT_DIR}/environ.txt"
+  ls "${ARTIFACT_DIR}"
 fi
 echo "Training completed"
 echo "Pod on $(hostname --fqdn) is exiting"
