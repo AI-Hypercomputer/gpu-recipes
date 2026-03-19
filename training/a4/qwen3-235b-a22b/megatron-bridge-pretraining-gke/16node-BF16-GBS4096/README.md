@@ -29,7 +29,7 @@ This recipe uses a mock pretraining dataset provided by [Megatron Bridge Framewo
 This recipe uses the following docker images:
 
 - `nvcr.io/nvidia/nemo:26.02`
-- `us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:v1.1.1`
+- `us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib-arm64:v1.1.1`
 
 ## Run the recipe
 
