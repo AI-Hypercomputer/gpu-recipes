@@ -1,0 +1,1 @@
+helm install vishwasreddy-ubench-d5hr . -f values.yaml --set-file workload_launcher=launcher.sh --set-file workload_config=llama3-1-8b-bf16-seq4096-gbs256-gpus8.py --set workload.image=nvcr.io/nvidia/nemo:25.11 --set volumes.gcsMounts[0].bucketName=ubench-logs --set volumes.gcsMounts[0].mountPath=/job-logs --set workload.envs[0].value=/job-logs/vishwasreddy-ubench-d5hr
