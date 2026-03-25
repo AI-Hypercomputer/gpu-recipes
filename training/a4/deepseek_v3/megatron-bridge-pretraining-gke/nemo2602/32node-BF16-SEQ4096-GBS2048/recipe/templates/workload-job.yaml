@@ -62,7 +62,7 @@ spec:
               gke-parallelstore/memory-limit: "0"
               {{- end }}
               {{- if and $root.Values.queue $root.Values.tasSettings.topologyRequest }}
-              kueue.x-k8s.io/podset-preferred-topology: {{ .Values.tasSettings.topologyRequest | default "kubernetes.io/hostname" }}
+              {{- toYaml .Values.tasSettings.topologyRequest | nindent 14 }}
               {{- end }}
               {{- if and $root.Values.queue $root.Values.dwsSettings.maxRunDurationSeconds }}
               provreq.kueue.x-k8s.io/maxRunDurationSeconds: "{{ $root.Values.dwsSettings.maxRunDurationSeconds }}"
@@ -245,7 +245,7 @@ spec:
                 value: "{{ $gpusPerNode }}"
 
               - name: NCCL_PLUGIN_PATH
-                value: /usr/local/gib/lib64
+                value: /usr/local/gib/lib64:/usr/local/nvidia/lib64
 
               {{ if $root.Values.network.gibVersion }}
               - name: NCCL_INIT_SCRIPT
