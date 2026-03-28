@@ -206,7 +206,7 @@ To download the model from HuggingFace, please follow the steps below:
 1.  Follow these [instructions](https://docs.cloud.google.com/managed-lustre/docs/connect-from-compute-engine) to create a compute
     engine and mount your Lustre instance on it.
 3.  Access the mount point on the compute engine and create the model folder.
-4.  Under the mount point,
+4.  Under the model folder,
     [download](https://huggingface.co/docs/hub/en/models-downloading) the model
     using the `hf` command:
 
