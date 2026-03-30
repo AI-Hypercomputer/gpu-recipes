@@ -120,6 +120,11 @@ parse_serving_config() {
     ep_size=${SERVING_CONFIG_DICT["ep_size"]:=1}
     backend=${SERVING_CONFIG_DICT["backend"]:="tensorrt"}
     kv_cache_free_gpu_mem_fraction=${SERVING_CONFIG_DICT["kv_cache_free_gpu_mem_fraction"]:=0.95}
+    modality=${SERVING_CONFIG_DICT["modality"]:=""}
+    streaming=${SERVING_CONFIG_DICT["streaming"]:="false"}
+    max_input_len=${SERVING_CONFIG_DICT["max_input_len"]:=""}
+    max_batch_size=${SERVING_CONFIG_DICT["max_batch_size"]:=""}
+    custom_dataset=${SERVING_CONFIG_DICT["dataset"]:=""}
 }
 
 print_configuration() {
@@ -158,26 +163,34 @@ run_benchmark() {
     local backend=$8
     local kv_cache_free_gpu_mem_fraction=$9
 
-    echo "Running benchmark for $model_name with ISL=$isl, OSL=$osl, TP=$tp_size, PP=$pp_size, EP=$ep_size, backend=$7"
+    echo "Running benchmark for $model_name with ISL=$isl, OSL=$osl, TP=$tp_size, PP=$pp_size, EP=$ep_size, backend=$backend"
 
-    dataset_file="/ssd/token-norm-dist_${model_name##*/}_${isl}_${osl}_tp${tp_size}.json" # Add $psl
-    output_file="/ssd/output_${model_name##*/}_isl${isl}_osl${osl}_tp${tp_size}.txt" # Add $psl
+    vl_args=""
+    if [ -n "$modality" ]; then vl_args="$vl_args --modality $modality"; fi
+    if [ "$streaming" == "true" ]; then vl_args="$vl_args --streaming"; fi
+    if [ -n "$max_input_len" ]; then vl_args="$vl_args --max_input_len $max_input_len"; fi
+    if [ -n "$max_batch_size" ]; then vl_args="$vl_args --max_batch_size $max_batch_size"; fi
+
+    dataset_file=$custom_dataset
+    if [ -z "$dataset_file" ]; then
+        dataset_file="/ssd/token-norm-dist_${model_name##*/}_${isl}_${osl}_tp${tp_size}.json"
+        echo "Preparing dataset"
+        python3 $TRTLLM_DIR/benchmarks/cpp/prepare_dataset.py \
+            --tokenizer=$model_name \
+            --stdout token-norm-dist \
+            --num-requests=$num_requests \
+            --input-mean=$isl \
+            --output-mean=$osl \
+            --input-stdev=0 \
+            --output-stdev=0 >$dataset_file
+    fi 
+
+    output_file="/ssd/output_${model_name##*/}_isl${isl}_osl${osl}_tp${tp_size}.txt"
     extra_args_file="/tmp/extra_llm_api_args.yaml"
     extra_args=""
     if [ -f "$extra_args_file" ]; then
         extra_args="--extra_llm_api_options $extra_args_file"
     fi
-
-    echo "Preparing dataset"
-    python3 $TRTLLM_DIR/benchmarks/cpp/prepare_dataset.py \
-        --tokenizer=$model_name \
-        --stdout token-norm-dist \
-        --num-requests=$num_requests \
-        --input-mean=$isl \
-        --output-mean=$osl \
-        --input-stdev=0 \
-        --output-stdev=0 >$dataset_file
-        # --prefix-mean=$psl \
     
     export TOKENIZERS_PARALLELISM=false
     echo "enable_cuda_graph: false" > /tmp/extra_llm_api_args.yaml
@@ -193,7 +206,8 @@ run_benchmark() {
         --pp $pp_size \
         --ep $ep_size \
         --backend "pytorch" \
-        --kv_cache_free_gpu_mem_fraction $kv_cache_free_gpu_mem_fraction $extra_args >$output_file
+        --kv_cache_free_gpu_mem_fraction $kv_cache_free_gpu_mem_fraction \
+        $extra_args $vl_args > $output_file
     else
         echo "Building engine"
         trtllm-bench \
