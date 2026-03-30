@@ -160,8 +160,8 @@ run_benchmark() {
 
     echo "Running benchmark for $model_name with ISL=$isl, OSL=$osl, TP=$tp_size, PP=$pp_size, EP=$ep_size, backend=$7"
 
-    dataset_file="/ssd/token-norm-dist_${model_name##*/}_${isl}_${osl}_tp${tp_size}.json"
-    output_file="/ssd/output_${model_name##*/}_isl${isl}_osl${osl}_tp${tp_size}.txt"
+    dataset_file="/ssd/token-norm-dist_${model_name##*/}_${isl}_${osl}_tp${tp_size}.json" # Add $psl
+    output_file="/ssd/output_${model_name##*/}_isl${isl}_osl${osl}_tp${tp_size}.txt" # Add $psl
     extra_args_file="/tmp/extra_llm_api_args.yaml"
     extra_args=""
     if [ -f "$extra_args_file" ]; then
@@ -177,6 +177,10 @@ run_benchmark() {
         --output-mean=$osl \
         --input-stdev=0 \
         --output-stdev=0 >$dataset_file
+        # --prefix-mean=$psl \
+    
+    export TOKENIZERS_PARALLELISM=false
+    echo "enable_cuda_graph: false" > /tmp/extra_llm_api_args.yaml
 
     if [[ $backend == "pytorch" ]]; then
         echo "Running throughput benchmark"

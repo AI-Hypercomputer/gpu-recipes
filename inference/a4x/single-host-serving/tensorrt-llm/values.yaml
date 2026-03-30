@@ -51,8 +51,8 @@ workload:
       value: "/workload/configs/serving-args.yaml"
   benchmarks:
     experiments:
-      - isl: 1024
-        osl: 1024
+      - isl: 2048
+        osl: 2048
         num_requests: 1000
 
 network:
