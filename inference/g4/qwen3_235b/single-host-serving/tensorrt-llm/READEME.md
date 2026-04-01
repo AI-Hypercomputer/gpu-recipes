@@ -109,10 +109,21 @@ python examples/llm_ptq/hf_ptq.py \
     --trust_remote_code
 
 ```
-#### 5.1 Optional.
-We can also use a pre-quantized model: https://huggingface.co/nvidia/Qwen3-235B-A22B-FP8
+### 5.1 Use a Pre-quantized Model (Optional)
+
+if you already have access to a quantized model, you can skip the quantization process in Step 5 and download the weights directly from Hugging Face. For example, you can use the [https://huggingface.co/nvidia/Qwen3-235B-A22B-FP8]
+
 
 ## Run Benchmarks
+
+G4 instances enhance multi-GPU workload performance by using direct GPU [peer-to-peer](https://cloud.google.com/blog/products/compute/g4-vms-p2p-fabric-boosts-multi-gpu-workloads/) communication. This capability allows GPUs that attach to the same G4 instance to exchange data directly over the PCIe bus, bypassing the need to transfer data through the CPU's main memory.
+
+
+```
+To configure NCCL, before you run your workloads, set the NCCL_P2P_LEVEL on your G4 instance by:
+export NCCL_P2P_LEVEL=PHB
+```
+
 
 Create a script to run the benchmarks with different configurations.
 
