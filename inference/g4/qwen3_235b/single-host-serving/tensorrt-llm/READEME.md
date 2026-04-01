@@ -109,6 +109,9 @@ python examples/llm_ptq/hf_ptq.py \
     --trust_remote_code
 
 ```
+#### 5.1 Optional.
+We can also use a pre-quantized model: https://huggingface.co/nvidia/Qwen3-235B-A22B-FP8
+
 ## Run Benchmarks
 
 Create a script to run the benchmarks with different configurations.
@@ -134,7 +137,7 @@ run_benchmark() {
   dataset_file="/scratch/token-norm-dist_${model_name##*/}_${isl}_${osl}.json"
 
   python benchmarks/cpp/prepare_dataset.py --tokenizer=$model_name --stdout token-norm-dist --num-requests=$num_requests --input-mean=$isl --output-mean=$osl --input-stdev=0 --output-stdev=0 > $dataset_file
-
+  export NCCL_P2P_LEVEL=PHB # https://docs.cloud.google.com/compute/docs/accelerator-optimized-machines#g4-gpu-p2p
   # Save throughput output to a file
   trtllm-bench --model $model_name --model_path ${model_name} throughput --concurrency 128 --dataset $dataset_file --tp $tp_size --pp $pp_size --ep $ep_size --backend pytorch > "/scratch/output_${model_name##*/}_isl${isl}_osl${osl}_tp${tp_size}_pp${pp_size}_ep${ep_size}_throughput.txt"
 
