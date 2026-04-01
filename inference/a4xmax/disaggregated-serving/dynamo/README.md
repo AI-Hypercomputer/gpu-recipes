@@ -185,7 +185,7 @@ gcloud storage buckets add-iam-policy-binding ${GCS_BUCKET} \
 
 Downloading model files into the gcs bucket and set your gcs bucket name in values.yaml file.
 
-<a name="build-dynamo-image"></a>
+<a name="configure-dynamo-image"></a>
 ### 2.7. Configure Dynamo Image
 
 Instead of building the Dynamo container image manually, we will use the official pre-built SGLang runtime release artifact.
