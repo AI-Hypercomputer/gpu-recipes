@@ -111,19 +111,12 @@ python examples/llm_ptq/hf_ptq.py \
 ```
 ### 5.1 Use a Pre-quantized Model (Optional)
 
-if you already have access to a quantized model, you can skip the quantization process in Step 5 and download the weights directly from Hugging Face. For example, you can use the [https://huggingface.co/nvidia/Qwen3-235B-A22B-FP8]
+if you already have access to a quantized model, you can skip the quantization process in Step 5 and download the weights directly from Hugging Face. For example, you can use the [Qwen3-235B-A22B-FP8](https://huggingface.co/nvidia/Qwen3-235B-A22B-FP8)
 
 
 ## Run Benchmarks
 
 G4 instances enhance multi-GPU workload performance by using direct GPU [peer-to-peer](https://cloud.google.com/blog/products/compute/g4-vms-p2p-fabric-boosts-multi-gpu-workloads/) communication. This capability allows GPUs that attach to the same G4 instance to exchange data directly over the PCIe bus, bypassing the need to transfer data through the CPU's main memory.
-
-
-```
-To configure NCCL, before you run your workloads, set the NCCL_P2P_LEVEL on your G4 instance by:
-export NCCL_P2P_LEVEL=PHB
-```
-
 
 Create a script to run the benchmarks with different configurations.
 
@@ -132,6 +125,8 @@ Create a script to run the benchmarks with different configurations.
 
 cat << 'EOF' > /scratch/run_benchmark.sh
 #!/bin/bash
+#To configure NCCL, before you run your workloads, set the NCCL_P2P_LEVEL on your G4 instance by
+export NCCL_P2P_LEVEL=PHB
 
 # Function to run benchmarks
 run_benchmark() {
@@ -148,7 +143,6 @@ run_benchmark() {
   dataset_file="/scratch/token-norm-dist_${model_name##*/}_${isl}_${osl}.json"
 
   python benchmarks/cpp/prepare_dataset.py --tokenizer=$model_name --stdout token-norm-dist --num-requests=$num_requests --input-mean=$isl --output-mean=$osl --input-stdev=0 --output-stdev=0 > $dataset_file
-  export NCCL_P2P_LEVEL=PHB # https://docs.cloud.google.com/compute/docs/accelerator-optimized-machines#g4-gpu-p2p
   # Save throughput output to a file
   trtllm-bench --model $model_name --model_path ${model_name} throughput --concurrency 128 --dataset $dataset_file --tp $tp_size --pp $pp_size --ep $ep_size --backend pytorch > "/scratch/output_${model_name##*/}_isl${isl}_osl${osl}_tp${tp_size}_pp${pp_size}_ep${ep_size}_throughput.txt"
 
