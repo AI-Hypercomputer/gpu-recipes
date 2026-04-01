@@ -111,7 +111,7 @@ python examples/llm_ptq/hf_ptq.py \
 ```
 ### 5.1 Use a Pre-quantized Model (Optional)
 
-if you already have access to a quantized model, you can skip the quantization process in Step 5 and download the weights directly from Hugging Face. For example, you can use the [Qwen3-235B-A22B-FP8](https://huggingface.co/nvidia/Qwen3-235B-A22B-FP8)
+If you already have access to a quantized model, you can skip the quantization process in Step 5 and download the weights directly from Hugging Face. For example, you can use the [Qwen3-235B-A22B-FP8](https://huggingface.co/nvidia/Qwen3-235B-A22B-FP8).
 
 
 ## Run Benchmarks
