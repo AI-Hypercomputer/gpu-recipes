@@ -153,7 +153,7 @@ def _download_dataset_locally(input_dir: str):
             # If PARQUET_ID is empty, download all parquets in the directory
             source_for_gsutil = os.path.join(remote_path_item, "*.parquet")
 
-        gsutil_command = ["gsutil", "-m", "cp", "-r", source_for_gsutil, local_path_dir]
+        gsutil_command = ["gcloud", "storage", "cp", "--recursive", source_for_gsutil, local_path_dir]
 
         logger.info(
             f"[DATALOADER] Downloading dataset. Command: {' '.join(gsutil_command)}"
@@ -164,9 +164,9 @@ def _download_dataset_locally(input_dir: str):
             )
             logger.info(f"[DATALOADER] Successfully downloaded to {local_path_dir}.")
             if result.stdout:
-                logger.info(f"[DATALOADER] gsutil stdout: {result.stdout}")
+                logger.info(f"[DATALOADER] gcloud stdout: {result.stdout}")
             if result.stderr:  # gsutil often prints status to stderr even on success
-                logger.info(f"[DATALOADER] gsutil stderr: {result.stderr}")
+                logger.info(f"[DATALOADER] gcloud stderr: {result.stderr}")
         except subprocess.CalledProcessError as e:
             logger.error(
                 f"[Fatal][DATALOADER] Failed to download from {source_for_gsutil} to {local_path_dir}. "
