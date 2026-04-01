@@ -122,14 +122,9 @@ helm repo add nvidia https://helm.ngc.nvidia.com/nvidia \
 helm repo update
 ```
 
-Fetch the Dynamo Helm charts:
-```bash
-helm install dynamo-platform https://helm.ngc.nvidia.com/nvidia/ai-dynamo/charts/dynamo-platform-${RELEASE_VERSION}.tgz
-```
-
 Install the Dynamo Platform with Grove & Kai scheduler enabled:
 ```bash
-helm install dynamo-platform dynamo-platform-${RELEASE_VERSION}.tgz \
+helm install https://helm.ngc.nvidia.com/nvidia/ai-dynamo/charts/dynamo-platform-${RELEASE_VERSION}.tgz \
   --namespace ${NAMESPACE} -f orchestrator-values.yaml --no-hooks --timeout 10m
 ```
 
@@ -138,7 +133,7 @@ Verify the installation:
 kubectl get pods -n ${NAMESPACE}
 ```
 
-Before moving forward, verify that all platform pods have successfully transitioned to the `Running` state. The expected output should look similar to this, with every pod fully `Ready` and `Running`:
+Before moving forward, verify that all platform Pods have successfully transitioned to the `Running` state. The expected output should look similar to this, with every pod fully `Ready` and `Running`:
 ```bash
 $ kubectl get pods
 NAME                                                              READY   STATUS    RESTARTS       AGE
