@@ -1,9 +1,9 @@
 <!-- mdformat global-off -->
-# Pretrain wan21-14b workloads on a4x-max GKE Node pools with Nvidia Megatron-Bridge Framework
+# Pretrain wan21-14b workloads on a4x-max GKE Node pools with NVIDIA DFM & Megatron-Bridge
 
 This recipe outlines the steps for running a wan21-14b pretraining
 workload on [a4x-max GKE Node pools](https://cloud.google.com/kubernetes-engine) by using the
-[Megatron-Bridge framework](https://github.com/NVIDIA-NeMo/Megatron-Bridge).
+[NeMo DFM (Diffusion Foundation Models)](https://github.com/NVIDIA-NeMo/DFM) and [Megatron-Bridge framework](https://github.com/NVIDIA-NeMo/Megatron-Bridge).
 
 ## Orchestration and deployment tools
 
@@ -12,7 +12,7 @@ For this recipe, the following setup is used:
 - Orchestration - [Google Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine)
 - Pretraining job configuration and deployment - A Helm chart is used to
   configure and deploy the [Kubernetes Jobset](https://kubernetes.io/blog/2025/03/23/introducing-jobset) resource which manages the execution of the
-  [Megatron-Bridge pretraining workload](https://github.com/NVIDIA-NeMo/Megatron-Bridge).
+  DFM pretraining workload.
 
 ## Test environment
 
