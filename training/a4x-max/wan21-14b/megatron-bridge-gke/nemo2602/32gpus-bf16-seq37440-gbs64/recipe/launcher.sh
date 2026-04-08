@@ -136,8 +136,8 @@ worker_command=$(cat <<- EOM
     --mock \
     --config-file examples/megatron/recipes/wan/conf/gb300_perf_pretrain_mock.yaml \
     checkpoint.save_interval=0 \
-    train.global_batch_size=128 \
-    dataset.global_batch_size=128 \
+    train.global_batch_size=64 \
+    dataset.global_batch_size=64 \
     train.train_iters=30
 
 EOM
@@ -148,7 +148,7 @@ chmod 777 worker_command.sh
 
 torchrun \
 --nproc-per-node="4" \
---nnodes="16" \
+--nnodes="8" \
 --node_rank="${JOB_COMPLETION_INDEX}" \
 --rdzv_id="${JOB_IDENTIFIER}" \
 --master_addr="${MASTER_ADDR}" \
