@@ -1,1 +1,0 @@
-helm install ninggu-ubench-7xhh . -f values.yaml --set-file workload_launcher=launcher.sh --set workload.image=nvcr.io/nvidia/nemo:26.02 --set volumes.gcsMounts[0].bucketName=ubench-logs --set volumes.gcsMounts[0].mountPath=/job-logs --set workload.envs[0].value=/job-logs/ninggu-ubench-7xhh --set queue=tas-lq
