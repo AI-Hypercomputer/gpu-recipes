@@ -213,8 +213,10 @@ spec:
             - name: workload
               image: "{{ $root.Values.workload.image }}"
               imagePullPolicy: Always
+              {{- if or $root.Values.network.hostNetwork $root.Values.workload.privileged }}
               securityContext:
-                privileged: {{ $root.Values.workload.privileged | default false }}
+                privileged: true
+              {{- end }}
 
               env:
               - name: JOB_IDENTIFIER
