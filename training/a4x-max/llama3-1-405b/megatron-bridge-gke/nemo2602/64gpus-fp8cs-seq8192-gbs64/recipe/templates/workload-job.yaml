@@ -194,25 +194,6 @@ spec:
                 path: /mnt/stateful_partition/kube-ephemeral-ssd
             {{- end }}
 
-            initContainers:
-            #{{ if $root.Values.network.gibVersion }}
-            #- name: nccl-plugin-installer
-              #image: {{ $root.Values.network.gibVersion }}
-              #imagePullPolicy: Always
-              #args:
-              #- |
-                #set -ex
-                #/scripts/container_entry.sh install --install-nccl
-                #cp -R /var/lib/gib/lib64/. /target/usr/local/gib/lib64
-                #cp -R /var/lib/gib/. /target/usr/local/gib
-              #command:
-              #- /bin/sh
-              #- -c
-              #volumeMounts:
-              #- mountPath: /target/usr/local/gib
-                #name: gib
-            #{{ end}}
-
             resourceClaims:
             - name: compute-domain-channel
               resourceClaimTemplateName: "{{ .Release.Name }}-{{ $jobSuffix }}"
@@ -296,7 +277,6 @@ spec:
                   source ${NCCL_INIT_SCRIPT}
                 fi
 
-                # Mansoor: Setup networking for A4X-MAX
                 # Install DOCA-OFED
                 apt update -y
                 apt install -y curl
@@ -326,26 +306,8 @@ spec:
                 export NCCL_DEBUG_SUBSYS="INIT,ENV,NET,GRAPH"
                 export NCCL_DEBUG=WARN
                 export NCCL_SOCKET_IFNAME="eth0"
-                export GLOO_SOCKET_IFNAME=eth0
+                export GLOO_SOCKET_IFNAME="eth0"
                 export NCCL_NVLS_ENABLE=0
-                #export export UB_SKIPMC=1
-                #export OMP_NUM_THREADS=8
-                #fi
-                # Mansoor: Copied from slurm output.
-                export PYTHONUNBUFFERED=1
-                export SLURM_UNBUFFEREDIO=1
-                export TORCHX_MAX_RETRIES=0
-                export TORCH_NCCL_AVOID_RECORD_STREAMS=1
-                export TRANSFORMERS_OFFLINE=0
-                export TOKENIZERS_PARALLELISM=False
-                export NCCL_NVLS_ENABLE=0
-                export NVTE_NORM_FWD_USE_CUDNN=1
-                export NVTE_NORM_BWD_USE_CUDNN=1
-                export TORCH_NCCL_HIGH_PRIORITY=1
-                export HF_HUB_OFFLINE=0
-                export CUDA_DEVICE_MAX_CONNECTIONS=32
-                export NVTE_FWD_LAYERNORM_SM_MARGIN=16
-                export NVTE_BWD_LAYERNORM_SM_MARGIN=16
                 export HF_TOKEN="{{ .Values.workload.hfToken }}"
 
                 echo "Launching workload with the following arguments:"
