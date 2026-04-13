@@ -213,10 +213,9 @@ spec:
             - name: workload
               image: "{{ $root.Values.workload.image }}"
               imagePullPolicy: Always
-              {{- if $root.Values.network.hostNetwork }}
               securityContext:
-                privileged: true
-              {{- end }}
+                privileged: {{ $root.Values.workload.privileged | default false }}
+
               env:
               - name: JOB_IDENTIFIER
                 value: "{{ .Release.Name }}-{{ $timestamp }}"

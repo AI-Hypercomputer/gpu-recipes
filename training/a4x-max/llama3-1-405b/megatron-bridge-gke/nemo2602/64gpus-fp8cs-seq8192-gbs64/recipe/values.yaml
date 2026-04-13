@@ -25,9 +25,8 @@ workload:
     - name: CUSTOM_SETUP_EXPERIMENT_SCRIPT_PATH
       value: /workload/configs/custom_setup_experiment.py
 network:
-  hostNetwork: true 
+  hostNetwork: false
   subnetworks[]: null
-  gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-gib-a4x-max-arm64:v1.1.1
   ncclSettings:
     - name: NCCL_DEBUG
       value: WARN
