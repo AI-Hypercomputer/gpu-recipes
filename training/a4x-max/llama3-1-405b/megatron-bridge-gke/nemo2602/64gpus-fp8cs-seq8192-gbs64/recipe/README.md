@@ -99,7 +99,8 @@ helm install $WORKLOAD_NAME . -f values.yaml \
 --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
 --set volumes.gcsMounts[0].mountPath=/job-logs \
 --set workload.envs[0].value=/job-logs/$WORKLOAD_NAME \
---set queue=${KUEUE_NAME}
+--set queue=${KUEUE_NAME} \
+--set workload.hfToken=$HF_TOKEN
 ```
 
 **Examples**

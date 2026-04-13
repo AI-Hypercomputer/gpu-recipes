@@ -346,6 +346,7 @@ spec:
                 export CUDA_DEVICE_MAX_CONNECTIONS=32
                 export NVTE_FWD_LAYERNORM_SM_MARGIN=16
                 export NVTE_BWD_LAYERNORM_SM_MARGIN=16
+                export HF_TOKEN="{{ .Values.workload.hfToken }}"
 
                 echo "Launching workload with the following arguments:"
                 {{- range $root.Values.workload.defaultArguments }}
