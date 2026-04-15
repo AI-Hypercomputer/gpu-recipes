@@ -1,35 +1,37 @@
 <!-- mdformat global-off -->
-# Pretrain deepseek_v3-bf16-gbs2048-gpus256 workloads on a3ultra GKE Node pools with Megatron-Bridge
+# Pretrain deepseek-v3 workloads on a3ultra GKE Node pools with Nvidia Megatron-Bridge Framework
 
-This recipe outlines the steps for running a deepseek_v3 pretraining
+This recipe outlines the steps for running a deepseek-v3 pretraining
 workload on [a3ultra GKE Node pools](https://cloud.google.com/kubernetes-engine) by using the
-[NVIDIA Megatron-Bridge framework](https://github.com/NVIDIA-NeMo/Megatron-Bridge).
+[Megatron-Bridge pretraining workload](https://github.com/NVIDIA-NeMo/Megatron-Bridge).
 
 ## Orchestration and deployment tools
 
 For this recipe, the following setup is used:
 
 - Orchestration - [Google Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine)
-- Pretraining job configuration and deployment - A Helm chart is used to configure and deploy the Kubernetes Jobset resource which manages the execution of the [Megatron-Bridge pretraining workload](https://github.com/NVIDIA-NeMo/Megatron-Bridge).
+- Pretraining job configuration and deployment - A Helm chart is used to
+  configure and deploy the [Kubernetes Jobset](https://kubernetes.io/blog/2025/03/23/introducing-jobset) resource which manages the execution of the
+  [Megatron-Bridge pretraining workload](https://github.com/NVIDIA-NeMo/Megatron-Bridge).
 
 ## Test environment
 
 This recipe has been optimized for and tested with the following configuration:
 
-- GKE cluster: Please follow Cluster Toolkit [instructions](https://github.com/GoogleCloudPlatform/cluster-toolkit/tree/main/examples/gke-a3ultra) to create your a3ultra GKE cluster.
-- Node Configuration: 32 nodes (8 GPUs per node, 256 GPUs total).
-- GPU Architecture: NVIDIA Hopper (H200).
+- GKE cluster
+Please follow Cluster Toolkit [instructions](https://github.com/GoogleCloudPlatform/cluster-toolkit/)
+to create your a3ultra GKE cluster.
 
 ## Training dataset
 
-This recipe uses a mock pretraining dataset provided by [Megatron Bridge Framework Datasets utils](https://github.com/NVIDIA-NeMo/Megatron-Bridge/blob/main/scripts/performance/utils/datasets.py)
+This recipe uses a mock pretraining dataset provided by the Megatron-Bridge framework.
 
 ## Docker container image
 
 This recipe uses the following docker images:
 
 - `nvcr.io/nvidia/nemo:26.02`
-- `us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:v1.1.0`
+- `unknown`
 
 ## Run the recipe
 
@@ -39,33 +41,29 @@ From your client workstation, complete the following steps:
 
 Set the environment variables to match your environment:
 
-```bash
-export PROJECT_ID=<PROJECT_ID>
-export CLUSTER_REGION=<CLUSTER_REGION>
-export CLUSTER_NAME=<CLUSTER_NAME>
-export GCS_BUCKET=<GCS_BUCKET> # Note: path should not be prefixed with gs://
-export KUEUE_NAME=<KUEUE_NAME>
-```
+ ```bash
+ export PROJECT_ID=<PROJECT_ID>
+ export CLUSTER_REGION=<CLUSTER_REGION>
+ export CLUSTER_NAME=<CLUSTER_NAME>
+ export GCS_BUCKET=<GCS_BUCKET> # Note: path should not be prefixed with gs://
+ export KUEUE_NAME=<KUEUE_NAME>
+ export HF_TOKEN=<YOUR_HF_TOKEN>
+ ```
 
 Replace the following values:
 
-- `<PROJECT_ID>`: your Google Cloud project ID.
-- `<CLUSTER_REGION>`: the region where your cluster is located.
-- `<CLUSTER_NAME>`: the name of your GKE cluster.
-- `<GCS_BUCKET>`: the name of your Cloud Storage bucket. Don't include the gs:// prefix.
-- `<KUEUE_NAME>`: the name of the Kueue local queue. The default queue created by the cluster toolkit is a3ultra.
+ - `<PROJECT_ID>`: your Google Cloud project ID.
+ - `<CLUSTER_REGION>`: the region where your cluster is located.
+ - `<CLUSTER_NAME>`: the name of your GKE cluster.
+ - `<GCS_BUCKET>`: the name of your Cloud Storage bucket. Don't include the `gs://` prefix.
+ - `<KUEUE_NAME>`: the name of the Kueue local queue. The default queue created by the cluster toolkit is `a3ultra`. Make sure to verify the name of the local queue in your cluster.
+ - `<YOUR_HF_TOKEN>`: Your HuggingFace token.
 
 Set the default project:
 
-```bash
-gcloud config set project $PROJECT_ID
-```
-
-### Get cluster credentials
-
-```bash
-gcloud container clusters get-credentials $CLUSTER_NAME --region $CLUSTER_REGION
-```
+ ```bash
+ gcloud config set project $PROJECT_ID
+ ```
 
 ### Get the recipe
 
@@ -79,18 +77,23 @@ export RECIPE_ROOT=$REPO_ROOT/training/a3ultra/deepseek_v3/megatron-bridge-gke/n
 cd $RECIPE_ROOT
 ```
 
+### Get cluster credentials
+
+```
+gcloud container clusters get-credentials $CLUSTER_NAME --region $CLUSTER_REGION
+```
+
 ### Configure and submit a pretraining job
 
-#### Using 32 nodes (256 gpus) bf16 precision
-
-To execute the job with the default settings, run the following command from your client:
+#### Using 32 node (256 gpus) bf16 precision
+To execute the job with the default settings, run the following command from
+your client:
 
 ```bash
 cd $RECIPE_ROOT
-export WORKLOAD_NAME=$USER-deepseek-v3-32node-bf16-seq4096-gbs2048
+export WORKLOAD_NAME=$USER-a3ultra-deepseek-v3-32node
 helm install $WORKLOAD_NAME . -f values.yaml \
 --set-file workload_launcher=launcher.sh \
---set-file workload_config=custom_setup_experiment.py \
 --set workload.image=nvcr.io/nvidia/nemo:26.02 \
 --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
 --set volumes.gcsMounts[0].mountPath=/job-logs \
@@ -105,10 +108,9 @@ helm install $WORKLOAD_NAME . -f values.yaml \
 
     ```bash
     cd $RECIPE_ROOT
-    export WORKLOAD_NAME=$USER-deepseek-v3-32node-bf16-seq4096-gbs2048
+    export WORKLOAD_NAME=$USER-a3ultra-deepseek-v3-32node
     helm install $WORKLOAD_NAME . -f values.yaml \
     --set-file workload_launcher=launcher.sh \
-    --set-file workload_config=custom_setup_experiment.py \
     --set workload.image=nvcr.io/nvidia/nemo:26.02 \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     --set volumes.gcsMounts[0].mountPath=/job-logs \
@@ -122,12 +124,12 @@ helm install $WORKLOAD_NAME . -f values.yaml \
 To check the status of pods in your job, run the following command:
 
 ```
-kubectl get pods | grep $USER-deepseek-v3-32node-bf16-seq4096-gbs2048
+kubectl get pods | grep $USER-a3ultra-deepseek-v3-32node
 ```
 
 Replace the following:
 
-- JOB_NAME_PREFIX - your job name prefix. For example $USER-deepseek-v3-32node-bf16-seq4096-gbs2048.
+- JOB_NAME_PREFIX - your job name prefix. For example $USER-a3ultra-deepseek-v3-32node.
 
 To get the logs for one of the pods, run the following command:
 
@@ -139,7 +141,7 @@ Information about the training job's progress, including crucial details such as
 loss, step count, and step time, is generated by the rank 0 process.
 This process runs on the pod whose name begins with
 `JOB_NAME_PREFIX-workload-0-0`.
-For example: `$USER-deepseek-v3-32node-bf16-seq4096-gbs2048-workload-0-0-s9zrv`.
+For example: `$USER-a3ultra-deepseek-v3-32node-workload-0-0-s9zrv`.
 
 ### Uninstall the Helm release
 
@@ -147,5 +149,5 @@ You can delete the job and other resources created by the Helm chart. To
 uninstall Helm, run the following command from your client:
 
 ```bash
-helm uninstall $USER-deepseek-v3-32node-bf16-seq4096-gbs2048
+helm uninstall $USER-a3ultra-deepseek-v3-32node
 ```
