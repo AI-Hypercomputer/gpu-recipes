@@ -1,0 +1,33 @@
+queue: null
+dwsSettings:
+  maxRunDurationSeconds: null
+tasSettings:
+  topologyRequest:
+    kueue.x-k8s.io/podset-preferred-topology: kubernetes.io/hostname
+volumes:
+  gcsVolumes: true
+  psVolumes: false
+  gcsMounts:
+    - bucketName: null
+      mountPath: null
+workload:
+  gpus: 256
+  image: nvcr.io/nvidia/nemo:26.02
+  defaultArguments[]: null
+  arguments[]: null
+  configFile: custom_setup_experiment.py
+  configPath: /workload/configs/
+  envs:
+    - name: ARTIFACT_DIR
+      value: null
+    - name: GLOO_SOCKET_IFNAME
+      value: eth0
+    - name: CUSTOM_SETUP_EXPERIMENT_SCRIPT_PATH
+      value: /workload/configs/custom_setup_experiment.py
+network:
+  hostNetwork: true
+  subnetworks[]: null
+  gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:v1.1.0
+  ncclSettings:
+    - name: NCCL_DEBUG
+      value: WARN
