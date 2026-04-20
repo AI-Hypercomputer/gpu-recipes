@@ -50,10 +50,10 @@ workload:
       - isl: 128
         osl: 128
         num_requests: 1000
+  gcsSidecarImage: us.gcr.io/gke-release/gcr.io/gcs-fuse-csi-driver-sidecar-mounter:v1.22.4-gke.2
 
 network:
   gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib-arm64:v1.0.7
   ncclSettings:
     - name: NCCL_DEBUG
       value: "VERSION"
-

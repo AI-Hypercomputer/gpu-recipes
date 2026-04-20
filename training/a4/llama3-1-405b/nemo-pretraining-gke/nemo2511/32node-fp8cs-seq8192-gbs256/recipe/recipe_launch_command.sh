@@ -1,1 +1,0 @@
-helm install joeywan-ubench-4un3 . -f values.yaml --set-file workload_launcher=launcher.sh --set-file workload_config=llama3-1-405b-seq8192-gbs256-mbs1-gpus256.py --set workload.image=nvcr.io/nvidia/nemo:25.07 --set volumes.gcsMounts[0].bucketName=ubench-logs --set volumes.gcsMounts[0].mountPath=/job-logs --set workload.envs[0].value=/job-logs/joeywan-ubench-4un3

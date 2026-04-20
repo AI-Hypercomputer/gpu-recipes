@@ -7,21 +7,21 @@ This guide walks you through setting up the necessary cloud infrastructure, conf
 <a name="table-of-contents"></a>
 ## Table of Contents
 
-* [1. Test Environment](#test-environment)
-* [2. High-Level Architecture](#architecture)
-* [3. Environment Setup (One-Time)](#environment-setup)
-  * [3.1. Clone the Repository](#clone-repo)
-  * [3.2. Configure Environment Variables](#configure-vars)
-  * [3.3. Connect to your GKE Cluster](#connect-cluster)
-  * [3.4. Upload the Model Checkpoints](#upload-the-model-checkpoints)
-  * [3.5. Create Persistent Volumes and Persistent Volume Claims](#create-persistent-volumes-and-persistent-volume-claims)
-  * [3.6. Grant Storage Permissions to Kubernetes Service Account](#grant-storage-permission-to-kubernetes-service-account)
-* [4. Run the Recipe](#run-the-recipe)
-  * [4.1. Inference benchmark for DeepSeek-R1 671B](#serving-deepseek-r1-671b)
-* [5. Monitoring and Troubleshooting](#monitoring)
-  * [5.1. Check Deployment Status](#check-status)
-  * [5.2. View Logs](#view-logs)
-* [6. Cleanup](#cleanup)
+- [1. Test Environment](#1-test-environment)
+- [2. High-Level Flow](#2-high-level-flow)
+- [3. Environment Setup (One-Time)](#3-environment-setup-one-time)
+  - [3.1. Clone the Repository](#31-clone-the-repository)
+  - [3.2. Configure Environment Variables](#32-configure-environment-variables)
+  - [3.3. Connect to your GKE Cluster](#33-connect-to-your-gke-cluster)
+  - [3.4 Upload the Model Checkpoints](#34-upload-the-model-checkpoints)
+  - [3.5 Create Persistent Volumes and Persistent Volume Claims](#35-create-persistent-volumes-and-persistent-volume-claims)
+  - [3.6 Grant Storage Permission to Kubernetes Service Account](#36-grant-storage-permission-to-kubernetes-service-account)
+- [4. Run the recipe](#4-run-the-recipe)
+  - [4.1. Inference benchmark for DeepSeek-R1 671B Model](#41-inference-benchmark-for-deepseek-r1-671b-model)
+- [5. Monitoring and Troubleshooting](#5-monitoring-and-troubleshooting)
+  - [5.1. Check Deployment Status](#51-check-deployment-status)
+  - [5.2. View Logs](#52-view-logs)
+- [6. Cleanup](#6-cleanup)
 
 <a name="test-environment"></a>
 ## 1. Test Environment
@@ -40,7 +40,7 @@ This recipe has been optimized for and tested with the following configuration:
     * A [regional standard cluster](https://cloud.google.com/kubernetes-engine/docs/concepts/configuration-overview) version: `1.33.4-gke.1036000` or later.
     * A GPU node pool with 1 [a4x-highgpu-4g](https://cloud.google.com/compute/docs/gpus) machine.
     * [Workload Identity Federation for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity) enabled.
-    * [Cloud Storage FUSE CSI driver for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/cloud-storage-fuse-csi-driver) enabled.
+    * [Cloud Storage FUSE CSI driver for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/cloud-storage-fuse-csi-driver) enabled. In this recipe, we will use GCSFuse CSI version `v1.22.4-gke.2`.
     * [DCGM metrics](https://cloud.google.com/kubernetes-engine/docs/how-to/dcgm-metrics) enabled.
     * [Kueue](https://kueue.sigs.k8s.io/docs/reference/kueue.v1beta1/) and [JobSet](https://jobset.sigs.k8s.io/docs/overview/) APIs installed.
     * Kueue configured to support [Topology Aware Scheduling](https://kueue.sigs.k8s.io/docs/concepts/topology_aware_scheduling/).
@@ -169,7 +169,7 @@ To download the model from HuggingFace, please follow the steps below:
 1.  [Mount the bucket](https://docs.cloud.google.com/storage/docs/cloud-storage-fuse/mount-bucket)
 to your local system.
 1.  Access into the mount point and create the model folder.
-2.  Under the mount point,
+2.  Under the model folder,
     [download](https://huggingface.co/docs/hub/en/models-downloading) the model
     using the `hf` command:
 
@@ -183,8 +183,8 @@ to your local system.
 The inference deployment accesses GCS buckets for serving model through
 [the Cloud Storage FUSE CSI driver](https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/cloud-storage-fuse-csi-driver)
 configured using Kubernetes Persistent Volumes (PV) and Persistent Volume
-Claims (PVC). You must generate PVs and PVCs for serving modelbucket using the
-[gcs-fuse helper Helm chart](../../../../src/helm-charts/storage/gcs-fuse).
+Claims (PVC). You must generate PVs and PVCs for serving model bucket using the
+[GCSFuse helper Helm chart](../../../../src/helm-charts/storage/gcs-fuse).
 The chart configures the FUSE driver settings following the best practices
 for optimizing access to buckets for serving model.
 

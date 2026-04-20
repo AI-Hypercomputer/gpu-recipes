@@ -1,0 +1,34 @@
+queue: null
+dwsSettings:
+  maxRunDurationSeconds: null
+tasSettings:
+  topologyRequest:
+    kueue.x-k8s.io/podset-required-topology: cloud.google.com/gce-topology-block
+    kueue.x-k8s.io/podset-slice-required-topology: cloud.google.com/gce-topology-subblock
+    kueue.x-k8s.io/podset-slice-size: '8'
+volumes:
+  gcsVolumes: false
+  psVolumes: false
+  gcsMounts:
+    - bucketName: null
+      mountPath: null
+workload:
+  gpus: 32
+  image: nvcr.io/nvidia/nemo:26.02
+  privileged: true
+  hfToken: null
+  defaultArguments[]: null
+  arguments[]: null
+  configFile: null
+  configPath: null
+  envs:
+    - name: ARTIFACT_DIR
+      value: null
+    - name: GLOO_SOCKET_IFNAME
+      value: eth0
+network:
+  hostNetwork: false
+  subnetworks[]: null
+  ncclSettings:
+    - name: NCCL_DEBUG
+      value: WARN
