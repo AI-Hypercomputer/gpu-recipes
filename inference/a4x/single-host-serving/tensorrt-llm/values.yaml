@@ -51,8 +51,8 @@ workload:
       value: "/workload/configs/serving-args.yaml"
   benchmarks:
     experiments:
-      - isl: 2048
-        osl: 2048
+      - isl: 1024 # Input sequence length
+        osl: 4096 # Output sequence length
         num_requests: 1000
 
 network:

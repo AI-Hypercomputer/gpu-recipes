@@ -1,4 +1,9 @@
 tp_size: 1
 pp_size: 1
 backend: pytorch
-kv_cache_free_gpu_mem_fraction: 0.90
+modality: image # For multimodal VL models
+streaming: true # For multimodal VL models
+max_input_len: 8192 # For multimodal VL models
+max_batch_size: 2 # For multimodal VL models
+kv_cache_free_gpu_mem_fraction: 0.95
+dataset: /gcs/datasets/Qwen2.5-VL-7B-Instruct/Qwen_Qwen2.5-VL-7B-Instruct/inlen1024_outlen110_prefixlen0_MM_imgnum5.5_imgsize736x480.jsonl

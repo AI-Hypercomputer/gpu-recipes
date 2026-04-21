@@ -141,6 +141,10 @@ print_configuration() {
     echo "pipeline parallel size:  $pp_size"
     echo "expert parallel size:    $ep_size"
     echo "backend:                 $backend"
+    echo "modality:                $modality"
+    echo "streaming:               $streaming"
+    echo "max input length:        $max_input_len"
+    echo "max batch size:          $max_batch_size"
     echo "kv_cache_free_gpu_mem_fraction: $kv_cache_free_gpu_mem_fraction"
     echo "--------------------------------"
 }
@@ -172,6 +176,7 @@ run_benchmark() {
     if [ -n "$max_batch_size" ]; then vl_args="$vl_args --max_batch_size $max_batch_size"; fi
 
     dataset_file=$custom_dataset
+    # If custom_dataset is not set, generate a textual dataset with tokens sampled in normal distribution
     if [ -z "$dataset_file" ]; then
         dataset_file="/ssd/token-norm-dist_${model_name##*/}_${isl}_${osl}_tp${tp_size}.json"
         echo "Preparing dataset"
@@ -191,7 +196,7 @@ run_benchmark() {
     if [ -f "$extra_args_file" ]; then
         extra_args="--extra_llm_api_options $extra_args_file"
     fi
-    
+
     export TOKENIZERS_PARALLELISM=false
     echo "enable_cuda_graph: false" > /tmp/extra_llm_api_args.yaml
 
@@ -202,6 +207,7 @@ run_benchmark() {
         --model $model_name \
         --model_path /ssd/${model_name} throughput \
         --dataset $dataset_file \
+        --num_requests $num_requests \
         --tp $tp_size \
         --pp $pp_size \
         --ep $ep_size \
