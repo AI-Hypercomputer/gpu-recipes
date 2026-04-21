@@ -82,6 +82,28 @@ Models             | GPU Machine Type                                           
 | ---------------- | ---------------- | --------- | ------------------- | ------------ | ------------------ |
 | **DeepSeek R1 671B**     | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)    | vLLM  | Inference   | GKE          | [Link](./inference/a4/single-host-serving/vllm/README.md)
 | **DeepSeek R1 671B**     | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)    | SGLang  | Inference   | GKE          | [Link](./inference/a4/single-host-serving/sglang/README.md)
+| **DeepSeek R1 671B**     | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)    | TensorRT-LLM   | Inference   | GKE          | [Link](./inference/a4/single-host-serving/tensorrt-llm/README.md)
+| **Llama 3.1 405B**     | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)    | TensorRT-LLM   | Inference   | GKE          | [Link](./inference/a4/single-host-serving/tensorrt-llm/README.md)
+| **Qwen 2.5 VL 7B**     | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)    | TensorRT-LLM   | Inference   | GKE          | [Link](./inference/a4/single-host-serving/tensorrt-llm/README.md)
+| **Qwen 3 235B A22B**     | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)    | TensorRT-LLM   | Inference   | GKE          | [Link](./inference/a4/single-host-serving/tensorrt-llm/README.md)
+| **Qwen 3 32B**     | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)    | TensorRT-LLM   | Inference   | GKE          | [Link](./inference/a4/single-host-serving/tensorrt-llm/README.md)
+
+### Inference benchmarks A4X
+
+| Models           | GPU Machine Type | Framework | Workload Type       | Orchestrator | Link to the recipe |
+| ---------------- | ---------------- | --------- | ------------------- | ------------ | ------------------ |
+| **DeepSeek R1 671B**     | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)    | vLLM  | Inference   | GKE          | [Link](./inference/a4x/single-host-serving/vllm/README.md)
+| **Wan2.2 T2V A14B Diffusers**     | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)    | SGLang  | Inference   | GKE          | [Link](./inference/a4x/single-host-serving/sglang/README.md)
+| **Wan2.2 I2V A14B Diffusers**     | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)    | SGLang  | Inference   | GKE          | [Link](./inference/a4x/single-host-serving/sglang/README.md)
+| **DeepSeek R1 671B**     | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)    | TensorRT-LLM   | Inference   | GKE          | [Link](./inference/a4x/single-host-serving/tensorrt-llm/README.md) <br> <br> [Link for Using Google Cloud Storage (GCS) as Storage Option]((./inference/a4x/single-host-serving/tensorrt-llm-gcs/README.md)) <br> <br> [Link for Using Lustre as Storage Option]((./inference/a4x/single-host-serving/tensorrt-llm-lustre/README.md))
+| **Llama 3.1 405B**      | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)    | TensorRT-LLM   | Inference   | GKE          | [Link](./inference/a4x/single-host-serving/tensorrt-llm/README.md)
+| **Llama 3.1 70B**      | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)    | TensorRT-LLM   | Inference   | GKE          | [Link](./inference/a4x/single-host-serving/tensorrt-llm/README.md)
+| **Llama 3.1 8B**      | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)    | TensorRT-LLM   | Inference   | GKE          | [Link](./inference/a4x/single-host-serving/tensorrt-llm/README.md)
+| **Qwen 2.5 VL 7B**      | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)    | TensorRT-LLM   | Inference   | GKE          | [Link](./inference/a4x/single-host-serving/tensorrt-llm/README.md)
+| **Qwen 3 235B A22B**      | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)    | TensorRT-LLM   | Inference   | GKE          | [Link](./inference/a4x/single-host-serving/tensorrt-llm/README.md)
+| **Qwen 3 32B**      | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)    | TensorRT-LLM   | Inference   | GKE          | [Link](./inference/a4x/single-host-serving/tensorrt-llm/README.md)
+| **Qwen 3 4B**      | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)    | TensorRT-LLM   | Inference   | GKE          | [Link](./inference/a4x/single-host-serving/tensorrt-llm/README.md)
+
 
 ### Inference benchmarks G4
 

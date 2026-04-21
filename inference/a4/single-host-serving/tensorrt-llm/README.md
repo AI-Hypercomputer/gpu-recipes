@@ -205,12 +205,17 @@ Example model configuration YAML files included in this repo only show a certain
 
 | Model Name | Hugging Face ID | Configuration File | Release Name Suffix |
 | :--- | :--- | :--- | :--- |
-| **DeepSeek-R1 671B** | `nvidia/DeepSeek-R1-NVFP4-v2` | `deepseek-r1-nvfp4.yaml` | `deepseek-r1` |
-| **Qwen 3 235B A22B FP4** |  `nvidia/Qwen3-235B-A22B-NVFP4` | `qwen3-235b-a22b-nvfp4.yaml` | `qwen3-235b-a22b` |
+| **DeepSeek R1 671B** | `nvidia/DeepSeek-R1-NVFP4-v2` | `deepseek-r1-nvfp4.yaml` | `deepseek-r1` |
+| **Llama 3.1 405B (FP8)** | `meta-llama/Llama-3.1-405B-Instruct-FP8` | `llama-3.1-405b.yaml` | `llama-3-1-405b` |
+| **Llama 3.1 405B (NVFP4)** | `nvidia/Llama-3.1-405B-Instruct-NVFP4` | `llama-3.1-405b.yaml` | `llama-3-1-405b` |
+| **Qwen 2.5 VL 7B (FP8)** |  `Qwen/Qwen2.5-VL-7B-Instruct` | `qwen2-5-vl-7b-fp8.yaml` | `qwen2-5-vl-7b` |
+| **Qwen 2.5 VL 7B (NVFP4)** |  `nvidia/Qwen2.5-VL-7B-Instruct-NVFP4` | `qwen2-5-vl-7b-nvfp4.yaml` | `qwen2-5-vl-7b` |
+| **Qwen 3 235B A22B (FP8)** |  `Qwen/Qwen3-235B-A22B-FP8` | `qwen3-235b-a22b-fp8.yaml` | `qwen3-235b-a22b` |
+| **Qwen 3 235B A22B (NVFP4)** |  `nvidia/Qwen3-235B-A22B-NVFP4` | `qwen3-235b-a22b-nvfp4.yaml` | `qwen3-235b-a22b` |
 | **Qwen 3 32B** | `Qwen/Qwen3-32B` | `qwen3-32b.yaml` | `qwen3-32b` |
 
 > [!TIP]
-> **DeepSeek-R1 671B** uses Nvidia's pre-quantized FP4 checkpoint. For more information, see the [Hugging Face model card](https://huggingface.co/nvidia/DeepSeek-R1-NVFP4-v2).
+> **DeepSeek R1 671B** uses Nvidia's pre-quantized FP4 checkpoint. For more information, see the [Hugging Face model card](https://huggingface.co/nvidia/DeepSeek-R1-NVFP4-v2).
 
 > [!TIP]
 > You can use the [NVIDIA Model Optimizer](https://github.com/NVIDIA/Model-Optimizer/tree/main/examples/llm_ptq) to quantize these models to FP8 or NVFP4 for improved performance.
@@ -225,7 +230,7 @@ The recipe uses [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/mai
 1.  **Configure model-specific variables.** Choose a model from the [table above](#supported-models) and set the variables:
 
     ```bash
-    # Example for DeepSeek-R1 NVFP4
+    # Example for DeepSeek R1 NVFP4
     export HF_MODEL_ID="nvidia/DeepSeek-R1-NVFP4-v2"
     export CONFIG_FILE="deepseek-r1-nvfp4.yaml"
     export RELEASE_NAME="$USER-serving-deepseek-r1"
@@ -269,7 +274,7 @@ After the model is deployed via Helm as described in the sections [above](#run-t
 Check the status of your deployment. Replace the name if you deployed a different model.
 
 ```bash
-# Example for DeepSeek-R1 671B
+# Example for DeepSeek R1 671B
 kubectl get deployment/$USER-serving-deepseek-r1
 ```
 
