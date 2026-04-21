@@ -37,7 +37,7 @@ service:
 workload:
   model:
     name:
-  gpus: 4
+  gpus: 4 # Adjustable
   image:
   framework:
   configFile: serving-args.yaml
@@ -51,9 +51,9 @@ workload:
       value: "/workload/configs/serving-args.yaml"
   benchmarks:
     experiments:
-      - isl: 1024 # Input sequence length
-        osl: 4096 # Output sequence length
-        num_requests: 1000
+      - isl: 1024 # Input sequence length, adjustable
+        osl: 4096 # Output sequence length, adjustable
+        num_requests: 1000 # Adjustable
 
 network:
   subnetworks[]:
