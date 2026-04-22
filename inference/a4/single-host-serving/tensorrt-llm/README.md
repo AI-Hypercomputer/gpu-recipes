@@ -1,6 +1,6 @@
-# Single Host Model Serving with NVIDIA TensorRT-LLM (TRT-LLM) on A4x GKE Node Pool
+# Single Host Model Serving with NVIDIA TensorRT-LLM (TRT-LLM) on A4 GKE Node Pool
 
-This document outlines the steps to serve and benchmark various Large Language Models (LLMs) using the [NVIDIA TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) framework on a single [A4x GKE Node pool](https://cloud.google.com/kubernetes-engine).
+This document outlines the steps to serve and benchmark various Large Language Models (LLMs) using the [NVIDIA TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) framework on a single [A4 GKE Node pool](https://cloud.google.com/kubernetes-engine).
 
 This guide walks you through setting up the necessary cloud infrastructure, configuring your environment, and deploying a high-performance LLM for inference.
 
@@ -37,7 +37,7 @@ This recipe has been optimized for and tested with the following configuration:
 
 * **GKE Cluster**:
     * A [regional standard cluster](https://cloud.google.com/kubernetes-engine/docs/concepts/configuration-overview) version: `1.33.4-gke.1036000` or later.
-    * A GPU node pool with 1 [a4x-highgpu-4g](https://docs.cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) machine.
+    * A GPU node pool with 1 [a4-highgpu-8g](https://docs.cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms) machine.
     * [Workload Identity Federation for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity) enabled.
     * [Cloud Storage FUSE CSI driver for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/cloud-storage-fuse-csi-driver) enabled.
     * [DCGM metrics](https://cloud.google.com/kubernetes-engine/docs/how-to/dcgm-metrics) enabled.
@@ -70,7 +70,7 @@ flowchart TD
  subgraph huggingface["Hugging Face Hub"]
     I["Model Weights"]
   end
- subgraph gke["GKE Cluster (A4x)"]
+ subgraph gke["GKE Cluster (A4)"]
     C["Deployment"]
     D["Pod"]
     E["TensorRT-LLM container"]
@@ -141,11 +141,11 @@ Replace the following values:
 | --------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
 | `PROJECT_ID` | Your Google Cloud Project ID. | `gcp-project-12345` |
 | `CLUSTER_REGION` | The GCP region where your GKE cluster is located. | `us-central1` |
-| `CLUSTER_NAME` | The name of your GKE cluster. | `a4x-cluster` |
-| `KUEUE_NAME` | The name of the Kueue local queue. The default queue created by the cluster toolkit is `a4x`. Verify the name in your cluster. | `a4x` |
+| `CLUSTER_NAME` | The name of your GKE cluster. | `a4-cluster` |
+| `KUEUE_NAME` | The name of the Kueue local queue. The default queue created by the cluster toolkit is `a4`. Verify the name in your cluster. | `a4` |
 | `ARTIFACT_REGISTRY` | Full path to your Artifact Registry repository. | `us-central1-docker.pkg.dev/gcp-project-12345/my-repo` |
 | `GCS_BUCKET` | Name of your GCS bucket (do not include `gs://`). | `my-benchmark-logs-bucket` |
-| `TRTLLM_VERSION` | The tag/version for the Docker image. Other verions can be found at https://catalog.ngc.nvidia.com/orgs/nvidia/teams/tensorrt-llm/containers/release | `1.2.0rc2` |
+| `TRTLLM_VERSION` | The tag/version for the Docker image. Other verions can be found at https://catalog.ngc.nvidia.com/orgs/nvidia/teams/tensorrt-llm/containers/release | `1.3.0rc5` |
 
 
 <a name="connect-cluster"></a>
@@ -199,23 +199,20 @@ kubectl create secret generic hf-secret \
 
 This recipe supports the following models. You can easily swap between them by changing the environment variables in the next step.
 
-Running TRTLLM inference benchmarking on these models are only tested and validated on A4X GKE nodes with certain combination of TP, PP, EP, number of GPU chips, input & output sequence length, precision, etc.
+Running TRTLLM inference benchmarking on these models are only tested and validated on A4 GKE nodes with certain combination of TP, PP, EP, number of GPU chips, input & output sequence length, precision, etc.
 
-Example model configuration YAML files included in this repo only show a certain combination of parallelism hyperparameters and configs for benchmarking purposes. Input and output length in `gpu-recipes/inference/a4x/single-host-serving/tensorrt-llm/values.yaml` need to be adjusted according to the model and its configs.
+Example model configuration YAML files included in this repo only show a certain combination of parallelism hyperparameters and configs for benchmarking purposes. Input and output length in `gpu-recipes/inference/a4/single-host-serving/tensorrt-llm/values.yaml` need to be adjusted according to the model and its configs.
 
 | Model Name | Hugging Face ID | Configuration File | Release Name Suffix |
 | :--- | :--- | :--- | :--- |
 | **DeepSeek R1 671B** | `nvidia/DeepSeek-R1-NVFP4-v2` | `deepseek-r1-nvfp4.yaml` | `deepseek-r1` |
 | **Llama 3.1 405B (FP8)** | `meta-llama/Llama-3.1-405B-Instruct-FP8` | `llama-3.1-405b.yaml` | `llama-3-1-405b` |
 | **Llama 3.1 405B (NVFP4)** | `nvidia/Llama-3.1-405B-Instruct-NVFP4` | `llama-3.1-405b.yaml` | `llama-3-1-405b` |
-| **Llama 3.1 70B** | `meta-llama/Llama-3.1-70B-Instruct` | `llama-3.1-70b.yaml` | `llama-3-1-70b` |
-| **Llama 3.1 8B** | `meta-llama/Llama-3.1-8B-Instruct` | `llama-3.1-8b.yaml` | `llama-3-1-8b` |
 | **Qwen 2.5 VL 7B (FP8)** |  `Qwen/Qwen2.5-VL-7B-Instruct` | `qwen2-5-vl-7b-fp8.yaml` | `qwen2-5-vl-7b` |
 | **Qwen 2.5 VL 7B (NVFP4)** |  `nvidia/Qwen2.5-VL-7B-Instruct-NVFP4` | `qwen2-5-vl-7b-nvfp4.yaml` | `qwen2-5-vl-7b` |
 | **Qwen 3 235B A22B (FP8)** |  `Qwen/Qwen3-235B-A22B-FP8` | `qwen3-235b-a22b-fp8.yaml` | `qwen3-235b-a22b` |
 | **Qwen 3 235B A22B (NVFP4)** |  `nvidia/Qwen3-235B-A22B-NVFP4` | `qwen3-235b-a22b-nvfp4.yaml` | `qwen3-235b-a22b` |
 | **Qwen 3 32B** | `Qwen/Qwen3-32B` | `qwen3-32b.yaml` | `qwen3-32b` |
-| **Qwen 3 4B** | `Qwen/Qwen3-4B` | `qwen3-4b.yaml` | `qwen3-4b` |
 
 > [!TIP]
 > **DeepSeek R1 671B** uses Nvidia's pre-quantized FP4 checkpoint. For more information, see the [Hugging Face model card](https://huggingface.co/nvidia/DeepSeek-R1-NVFP4-v2).
@@ -298,36 +295,42 @@ kubectl logs -f deployment/$USER-serving-deepseek-r1
 You should see logs indicating preparing the model, and then running the throughput benchmark test, similar to this:
 
 ```bash
-Running benchmark for nvidia/DeepSeek-R1-NVFP4-v2 with ISL=128, OSL=128, TP=4, EP=4, PP=1
+Running benchmark for nvidia/DeepSeek-R1-NVFP4-v2 with ISL=1024, OSL=4096, TP=4, EP=4, PP=1
 
 ===========================================================
 = PYTORCH BACKEND
 ===========================================================
 Model:			nvidia/DeepSeek-R1-NVFP4-v2
 Model Path:		/ssd/nvidia/DeepSeek-R1-NVFP4-v2
+Revision:		N/A
 TensorRT LLM Version:	1.2
 Dtype:			bfloat16
 KV Cache Dtype:		FP8
 Quantization:		NVFP4
 
 ===========================================================
+= MACHINE DETAILS 
+===========================================================
+NVIDIA B200, memory 178.35 GB, 4.00 GHz
+
+===========================================================
 = REQUEST DETAILS 
 ===========================================================
 Number of requests:             1000
-Number of concurrent requests:  985.9849
-Average Input Length (tokens):  128.0000
-Average Output Length (tokens): 128.0000
+Number of concurrent requests:  752.9244
+Average Input Length (tokens):  1024.0000
+Average Output Length (tokens): 4096.0000
 ===========================================================
 = WORLD + RUNTIME INFORMATION 
 ===========================================================
 TP Size:                4
 PP Size:                1
 EP Size:                4
-Max Runtime Batch Size: 2304
-Max Runtime Tokens:     4608
+Max Runtime Batch Size: 128
+Max Runtime Tokens:     2048
 Scheduling Policy:      GUARANTEED_NO_EVICT
 KV Memory Percentage:   85.00%
-Issue Rate (req/sec):   8.3913E+13
+Issue Rate (req/sec):   8.6889E+13
 
 ===========================================================
 = PERFORMANCE OVERVIEW 
@@ -353,20 +356,20 @@ Per GPU Output Throughput (tps/gpu):              X.XX
 ===========================================================
 = DATASET DETAILS
 ===========================================================
-Dataset Path:         /ssd/token-norm-dist_DeepSeek-R1-NVFP4-v2_128_128_tp4.json
+Dataset Path:         /ssd/token-norm-dist_DeepSeek-R1-NVFP4-v2_1024_4096_tp4.json
 Number of Sequences:  1000
 
 -- Percentiles statistics ---------------------------------
 
         Input              Output           Seq. Length
 -----------------------------------------------------------
-MIN:   128.0000           128.0000           256.0000
-MAX:   128.0000           128.0000           256.0000
-AVG:   128.0000           128.0000           256.0000
-P50:   128.0000           128.0000           256.0000
-P90:   128.0000           128.0000           256.0000
-P95:   128.0000           128.0000           256.0000
-P99:   128.0000           128.0000           256.0000
+MIN:  1024.0000          4096.0000          5120.0000
+MAX:  1024.0000          4096.0000          5120.0000
+AVG:  1024.0000          4096.0000          5120.0000
+P50:  1024.0000          4096.0000          5120.0000
+P90:  1024.0000          4096.0000          5120.0000
+P95:  1024.0000          4096.0000          5120.0000
+P99:  1024.0000          4096.0000          5120.0000
 ===========================================================
 ```
 
