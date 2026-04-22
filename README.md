@@ -117,6 +117,8 @@ Models             | GPU Machine Type                                           
 | **Qwen3 32B**     | [G4 (NVIDIA RTX PRO 6000 Blackwell)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#g4-series)    | vLLM  | Inference   | GCE          | [Link](./inference/g4/single-host-serving/vllm/README.md)
 | **Llama3.1 70B** | [G4 (NVIDIA RTX PRO 6000 Blackwell)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#g4-series)    | TensorRT-LLM  | Inference   | GCE          | [Link](./inference/g4/llama3_1_70b/single-host-serving/tensorrt-llm/README.md)
 | **DeepSeek R1**  | [G4 (NVIDIA RTX PRO 6000 Blackwell)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#g4-series)    | TensorRT-LLM  | Inference   | GCE          | [Link](./inference/g4/deepseek_r1/single-host-serving/tensorrt-llm/README.md)
+| **Qwen3 235B**  | [G4 (NVIDIA RTX PRO 6000 Blackwell)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#g4-series)    | TensorRT-LLM  | Inference   | GCE          | [Link](./inference/g4/qwen3_235b/single-host-serving/tensorrt-llm/README.md)
+| **Wan2.2 14B**  | [G4 (NVIDIA RTX PRO 6000 Blackwell)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#g4-series)    | SGLang  | Inference   | GCE          | [Link](./inference/g4/wan2.2/sglang/README.md)
 
 ### Checkpointing benchmarks
 
