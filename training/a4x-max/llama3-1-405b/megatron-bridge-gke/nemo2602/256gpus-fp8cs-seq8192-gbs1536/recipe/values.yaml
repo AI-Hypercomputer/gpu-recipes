@@ -34,8 +34,3 @@ network:
   ncclSettings:
     - name: NCCL_DEBUG
       value: WARN
-# targetNodepools:
-#   - np-1
-#   - np-3
-#   - np-4
-#   - np-5
