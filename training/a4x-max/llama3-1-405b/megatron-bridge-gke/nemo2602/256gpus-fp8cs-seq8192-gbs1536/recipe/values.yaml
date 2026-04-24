@@ -7,7 +7,7 @@ tasSettings:
     kueue.x-k8s.io/podset-slice-required-topology: cloud.google.com/gce-topology-subblock
     kueue.x-k8s.io/podset-slice-size: '16'
 volumes:
-  gcsVolumes: false
+  gcsVolumes: true
   psVolumes: false
   gcsMounts:
     - bucketName: null
@@ -34,3 +34,8 @@ network:
   ncclSettings:
     - name: NCCL_DEBUG
       value: WARN
+# targetNodepools:
+#   - np-1
+#   - np-3
+#   - np-4
+#   - np-5
