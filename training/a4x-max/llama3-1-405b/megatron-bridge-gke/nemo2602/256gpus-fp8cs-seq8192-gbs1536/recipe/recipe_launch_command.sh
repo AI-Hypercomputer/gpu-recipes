@@ -1,1 +1,5 @@
-helm install ninggu-ubench-8yx5 . -f values.yaml --set-file workload_launcher=launcher.sh --set-file workload_config=/tmp/ubench_recipe/ninggu-ubench-8yx5/custom_setup_experiment.py --set workload.image=nvcr.io/nvidia/nemo:26.02 --set volumes.gcsMounts[0].bucketName=ubench-logs --set volumes.gcsMounts[0].mountPath=/job-logs --set workload.envs[0].value=/job-logs/ninggu-ubench-8yx5 --set queue=tas-lq
+helm install $USER-a4x-max-llama3-1-405b-256gpus . -f values.yaml \
+  --set-file workload_launcher=launcher.sh \
+  --set-file workload_config=custom_setup_experiment.py \
+  --set workload.image=nvcr.io/nvidia/nemo:26.02 \
+  --set queue=tas-lq

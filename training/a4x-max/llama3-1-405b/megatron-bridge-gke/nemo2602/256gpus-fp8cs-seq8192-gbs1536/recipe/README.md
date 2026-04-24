@@ -92,12 +92,15 @@ your client:
 cd $RECIPE_ROOT
 export WORKLOAD_NAME=$USER-a4x-max-llama3-1-405b-256gpus
 helm install $WORKLOAD_NAME . -f values.yaml \
+--set-file workload_config=custom_setup_experiment.py \
 --set-file workload_launcher=launcher.sh \
 --set workload.image=nvcr.io/nvidia/nemo:26.02 \
 --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
 --set volumes.gcsMounts[0].mountPath=/job-logs \
 --set workload.envs[0].value=/job-logs/$WORKLOAD_NAME \
---set queue=${KUEUE_NAME}
+--set queue=${KUEUE_NAME} \
+--set workload.hfToken=${HF_TOKEN}
+
 ```
 
 **Examples**
@@ -109,12 +112,14 @@ helm install $WORKLOAD_NAME . -f values.yaml \
     cd $RECIPE_ROOT
     export WORKLOAD_NAME=$USER-a4x-max-llama3-1-405b-256gpus
     helm install $WORKLOAD_NAME . -f values.yaml \
+    --set-file workload_config=custom_setup_experiment.py \
     --set-file workload_launcher=launcher.sh \
     --set workload.image=nvcr.io/nvidia/nemo:26.02 \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     --set volumes.gcsMounts[0].mountPath=/job-logs \
     --set workload.envs[0].value=/job-logs/$WORKLOAD_NAME \
     --set queue=${KUEUE_NAME} \
+    --set workload.hfToken=${HF_TOKEN} \
     --set workload.arguments[0]="trainer.max_steps=100"
     ```
 
