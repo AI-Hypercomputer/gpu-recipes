@@ -296,7 +296,7 @@ spec:
 
                 rm -rf /opt/rdma-core/build/lib/libibverbs* || true
                 export LD_LIBRARY_PATH="/usr/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu/libibverbs:/usr/lib/libibverbs:/usr/local/nccl-plugin/lib64:/usr/local/nvidia/lib64/:${LD_LIBRARY_PATH}"
-
+                export HF_TOKEN="{{ .Values.workload.hfToken }}"
                 echo "Launching workload with the following arguments:"
                 {{- range $root.Values.workload.defaultArguments }}
                 echo "  {{ . }}"
