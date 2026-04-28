@@ -1,18 +1,37 @@
-
-# Reproducible benchmark recipes for GPUs
+# Cloud GPU performance benchmark recipes
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-Welcome to the reproducible benchmark recipes repository for GPUs! This repository contains recipes for reproducing training and serving benchmarks for large machine learning models using GPUs on Google Cloud.
+The reproducible benchmark recipes repository for GPUs contains instructions 
+necessary to reproduce specific training and serving performance measurements, 
+which are part of a confidential benchmarking program. This repository focuses
+on helping users reliably achieve performance metrics, such as throughput, that
+demonstrate the combined hardware and software stack on GPUs.
 
-## Overview
+**Note:** The content in this repository is not designed as a set of general-purpose 
+code samples or tutorials for using Compute Engine-based products.
 
-1. **Identify your requirements:** Determine the model, GPU type, workload, framework, and orchestrator you are interested in.
-2. **Select a recipe:** Based on your requirements use the [Benchmark support matrix](#benchmarks-support-matrix) to find a recipe that meets your needs.
-3. Follow the recipe: each recipe will provide you with procedures to complete the following tasks:
-   * Prepare your environment
-   * Run the benchmark
-   * Analyze the benchmarks results. This includes not just the results but detailed logs for further analysis
+## Intended audience
+
+This content is for you if you are a customer or partner who needs to:
+
+- validate hardware performance with your suppliers.
+- inform purchasing decisions using the benchmarking data.
+- reproduce optimal performance scenarios before you customize workflows
+  for your own requirements.
+  
+## How to use these recipes
+
+To reproduce a benchmark, follow these steps:
+
+1. **Identify your requirements:** determine the model, GPU type, workload, framework,
+   and orchestrator you are interested in.
+2. **Select a recipe:** based on your requirements use the
+   [Benchmark support matrix](#benchmarks-support-matrix) to find a recipe that meets your needs.
+3. **Follow the recipe:** each recipe will provide you with procedures to complete the following tasks:
+   * prepare your environment.
+   * run the benchmark.
+   * analyze the benchmarks results. This includes not just the results but detailed logs for further analysis.
 
 ## Benchmarks support matrix
 
@@ -134,17 +153,50 @@ Models            | GPU Machine Type                                            
 **Llama-3.1-405B** | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) | NeMo      | Pre-training using  the Google Cloud Resiliency library  | GKE          | [Link](./training/a3ultra/llama3-1-405b/nemo-pretraining-gke-resiliency/README.md)
 **Mixtral-8x7B** | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) | NeMo      | Pre-training using  the Google Cloud Resiliency library  | GKE          | [Link](./training/a3ultra/mixtral-8x7b/nemo-pretraining-gke-resiliency/README.md)
 
-## Repository structure
+## Repository organization
 
-* **[training/](./training)**: Contains recipes to reproduce training benchmarks with GPUs.
-* **[inference/](./inference)**: Contains recipes to reproduce inference benchmarks with GPUs.
-* **[src/](./src)**: Contains shared dependencies required to run benchmarks, such as Docker and Helm charts.
-* **[docs/](./docs)**: Contains supporting documentation for the recipes, such as explanation of benchmark methodologies or configurations.
+- `./training`: use these recipes to reproduce training benchmarks with GPUs.
+- `./inference`: use these recipes to reproduce inference benchmarks with GPUs.
+- `./src`: shared dependencies required to run benchmarks, such as Docker
+  images and Helm charts.
+- `./docs`: supporting documentation for explanations of benchmark methodologies
+  or configurations.
+
+## Repository scope
+
+This repository provides the steps that you can use to reproduce a specific
+benchmark. The actual performance measurements or the complete, confidential
+benchmark report are not included.
+
+## Methodology
+
+Performance benchmarks measure the performance of various workloads on the 
+platform. These benchmarks are primarily used to validate performance with
+hardware suppliers and to provide you with data for purchasing decisions.
+
+### Maintenance policy
+
+Benchmark data is considered a point-in-time measurement and completed
+benchmarks are not repeated. As such, there is no intent to maintain or
+update the reproducibility steps provided in this repository.
+
+## Resources
+
+If you are looking for general guidance on how to get started using
+Compute products, refer to the official documentation and tutorials:
+
+- [Official Compute Engine tutorials and samples](https://docs.cloud.google.com/compute/docs/overview)
+- [Cloud TPU documentation](https://docs.cloud.google.com/tpu/docs)
+- [AI Hypercomputer documentation](https://docs.cloud.google.com/ai-hypercomputer/docs)
 
 ## Getting help
 
-If you have any questions or if you found any problems with this repository, please report through GitHub issues.
+If you have any questions or if you encounter any problems with this repository,
+report them through https://github.com/AI-Hypercomputer/tpu-recipes/issues.
 
-## Disclaimer
+## Contributor notes
 
-This is not an officially supported Google product. The code in this repository is for demonstrative purposes only.
+Note: This is not an officially supported Google product. This project is not
+eligible for the [Google Open Source Software Vulnerability Rewards
+Program](https://bughunters.google.com/open-source-security).
+
