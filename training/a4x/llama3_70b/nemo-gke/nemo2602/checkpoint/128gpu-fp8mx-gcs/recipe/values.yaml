@@ -1,0 +1,61 @@
+dwsSettings:
+  maxRunDurationSeconds: null
+network:
+  gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib-diagnostic-arm64:v1.1.0
+
+  hostNetwork: true
+  ncclSettings:
+  - name: NCCL_DEBUG
+    value: WARN
+  subnetworks[]: null
+queue: tas-lq
+tasSettings:
+  topologyRequest:
+    kueue.x-k8s.io/podset-slice-required-topology: "cloud.google.com/gce-topology-subblock"
+    kueue.x-k8s.io/podset-slice-size: "16"
+    kueue.x-k8s.io/podset-required-topology: "cloud.google.com/gce-topology-block"
+
+volumes:
+  gcsMounts:
+  - bucketName: "asq-a4x-storage-logging-0"
+    mountPath: "/job-logs"
+  gcsVolumes: true
+  psVolumes: false
+  pvcMounts:
+  - claimName: "asq-a4x-storage-ckpt-pvc"
+    mountPath: "/gcsckpt"
+  - claimName: "asq-a4x-storage-data-pvc"
+    mountPath: "/gcsdata"
+workload:
+  arguments[]: null
+  configFile: custom_setup_experiment.py
+  configPath: /workload/configs/
+  runScript: run_script.py
+  defaultArguments[]: null
+  envs:
+  - name: ARTIFACT_DIR
+    value: null
+  - name: GLOO_SOCKET_IFNAME
+    value: eth0
+  - name: CUSTOM_SETUP_EXPERIMENT_SCRIPT_PATH
+    value: /workload/configs/custom_setup_experiment.py
+  - name: CUSTOM_RUN_SCRIPT_PATH
+    value: /workload/configs/run_script.py
+  - name: HF_TOKEN
+    value: null
+  - name: DATASET_TYPE
+    value: null
+  - name: DATASET_PATHS
+    value: null
+  - name: INDEX_MAPPING_DIR
+    value: null
+  - name: CKPT_SAVE_DIR
+    value: null
+  - name: CKPT_SAVE_INTERVAL
+    value: null
+  - name: CKPT_LOAD_DIR
+    value: null
+  - name: CKPT_LOAD_STEP
+    value: null
+  gpus: 128
+  image: nvcr.io/nvidia/nemo:26.02.01

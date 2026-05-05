@@ -1,0 +1,53 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: lustre-sc
+provisioner: lustre.csi.storage.gke.io
+volumeBindingMode: Immediate
+reclaimPolicy: Delete
+parameters:
+  perUnitStorageThroughput: "1000"
+  network: projects/<PROJECT_ID>/global/networks/<NETWORK_NAME>
+allowedTopologies:
+- matchLabelExpressions:
+  - key: topology.gke.io/zone
+    values:
+    - <ZONE
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+ name: a4x-storage-lustre-pv
+ annotations:
+   pv.kubernetes.io/provisioned-by: lustre.csi.storage.gke.io
+spec:
+ storageClassName: lustre-sc
+ capacity:
+   storage: 4096Gi
+ accessModes:
+   - ReadWriteMany
+ persistentVolumeReclaimPolicy: Retain
+ volumeMode: Filesystem
+ claimRef:
+    namespace: default
+    name: a4x-storage-lustre-pvc
+ csi:
+   driver: lustre.csi.storage.gke.io
+   volumeHandle: projects/<PROJECT_ID>/locations/<CLUSTER_ZONE>/instances/<NAME>
+   volumeAttributes:
+     ip: <LUSTRE_IP>
+     filesystem: <FILESYSTEM>
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: a4x-storage-lustre-pvc
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 4096Gi
+  volumeName: a4x-storage-lustre-pv
+  storageClassName: lustre-sc
