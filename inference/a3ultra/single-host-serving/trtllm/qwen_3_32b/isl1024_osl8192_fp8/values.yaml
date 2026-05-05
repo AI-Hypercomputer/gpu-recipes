@@ -1,0 +1,31 @@
+queue: null
+dwsSettings:
+  maxRunDurationSeconds: null
+tasSettings:
+  topologyRequest:
+    kueue.x-k8s.io/podset-preferred-topology: kubernetes.io/hostname
+volumes:
+  gcsVolumes: true
+  psVolumes: false
+  gcsMounts:
+    - bucketName: null
+      mountPath: null
+workload:
+  gpus: 8
+  image: nvcr.io/nvidia/tensorrt-llm/release:1.3.0rc12
+  defaultArguments: []
+  arguments: []
+  configFile: null
+  configPath: null
+  envs:
+    - name: ARTIFACT_DIR
+      value: null
+    - name: GLOO_SOCKET_IFNAME
+      value: eth0
+network:
+  hostNetwork: true
+  subnetworks: []
+  gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:v1.1.1
+  ncclSettings:
+    - name: NCCL_DEBUG
+      value: WARN
