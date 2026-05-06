@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Release.Name }}-config"
+data:
+  serving-configuration: |-
+{{ .Values.serving_config | indent 4 }}

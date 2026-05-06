@@ -1,4 +1,4 @@
-# Copyright 2025 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,13 +13,14 @@
 # limitations under the License.
 
 apiVersion: v1
-kind: ConfigMap
+kind: Service
 metadata:
-  name: "{{ .Release.Name }}-config"
-data:
-  serving-configuration: |-
-{{- if .Values.serving_config  }}
-{{ .Values.serving_config | nindent 4 }}
-{{- else }}
-{{ "config: null" | nindent 4 }}
-{{- end }}
+  name: {{ .Release.Name }}-svc
+spec:
+  selector:
+    app: {{ .Release.Name }}-serving
+  ports:
+    - name: http
+      port: {{ .Values.service.ports.http | default 8000 }}
+      targetPort: {{ .Values.service.ports.http | default 8000 }}
+  type: {{ .Values.service.type | default "ClusterIP" }}

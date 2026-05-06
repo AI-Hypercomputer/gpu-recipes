@@ -1,4 +1,4 @@
-# Copyright 2025 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,27 +13,22 @@
 # limitations under the License.
 
 queue:
-
 dwsSettings:
   maxRunDurationSeconds:
-
 huggingface:
   secretName: hf-secret
   secretData:
     token: "hf_api_token"
-
 volumes:
   gcsVolumes: true
-  ssdMountPath: "/ssd"
+  ssdMountPath: "/scratch"
   gcsMounts:
     - bucketName:
       mountPath: "/gcs"
-
 service:
   type: ClusterIP
   ports:
     http: 8000
-
 workload:
   model:
     name:
@@ -43,19 +38,27 @@ workload:
   configFile: serving-args.yaml
   configPath: /workload/configs
   envs:
-    - name: HF_HUB_ENABLE_HF_TRANSFER
-      value: "1"
     - name: LAUNCHER_SCRIPT
       value: "/workload/launcher/launch-workload.sh"
+    - name: HF_HUB_ENABLE_HF_TRANSFER
+      value: "0"
     - name: SERVER_ARGS_FILE
       value: "/workload/configs/serving-args.yaml"
+    - name: NCCL_PROFILER_PLUGIN
+      value: "none"
+    - name: NCCL_TUNER_PLUGIN
+      value: "none"
+    - name: TRTLLM_DISABLE_AUTOTUNER
+      value: "1"
+    - name: TRTLLM_CUSTOM_ALLREDUCE
+      value: "0"
   benchmarks:
     experiments:
       - isl: 128
         osl: 128
         num_requests: 30000
-
 network:
+  hostNetwork: true
   subnetworks[]:
   gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:v1.1.1
   ncclSettings:
