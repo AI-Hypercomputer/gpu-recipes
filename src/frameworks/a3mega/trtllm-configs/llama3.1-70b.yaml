@@ -1,4 +1,4 @@
 tp_size: 8
 pp_size: 1
-#backend: "tensorrt"
-#kv_cache_free_gpu_mem_fraction: 0.85
+backend: "tensorrt"
+#kv_cache_free_gpu_mem_fraction: 0.95

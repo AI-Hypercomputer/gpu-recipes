@@ -118,7 +118,7 @@ parse_serving_config() {
     tp_size=${SERVING_CONFIG_DICT["tp_size"]:=8}
     pp_size=${SERVING_CONFIG_DICT["pp_size"]:=1}
     ep_size=${SERVING_CONFIG_DICT["ep_size"]:=1}
-    backend=${SERVING_CONFIG_DICT["backend"]:="tensorrt"}
+    backend="tensorrt"
     kv_cache_free_gpu_mem_fraction=${SERVING_CONFIG_DICT["kv_cache_free_gpu_mem_fraction"]:=0.95}
     modality=${SERVING_CONFIG_DICT["modality"]:=""}
     streaming=${SERVING_CONFIG_DICT["streaming"]:="false"}
@@ -205,7 +205,7 @@ run_benchmark() {
 
     if [[ $backend == "pytorch" ]]; then
         echo "Running throughput benchmark"
-        export NCCL_P2P_LEVEL=PHB
+        #export NCCL_P2P_LEVEL=PHB
         trtllm-bench \
         --model $model_name \
         --model_path /scratch/${model_name} throughput --tp $tp_size --pp $pp_size \
@@ -223,8 +223,10 @@ run_benchmark() {
             --model $model_name \
             --model_path /scratch/${model_name} \
             --workspace /scratch build \
+            \
             --tp_size $tp_size \
             --pp_size $pp_size \
+            \
             --quantization FP8 \
             --dataset $dataset_file
 
@@ -234,7 +236,7 @@ run_benchmark() {
         echo "Running throughput benchmark"
         trtllm-bench \
             --model $model_name \
-            --model_path /scratch/${model_name} throughput --tp $tp_size --pp $pp_size \
+            --model_path /scratch/${model_name} throughput --backend "tensorrt" --tp $tp_size --pp $pp_size \
             --dataset $dataset_file \
             --engine_dir $engine_dir \
             --kv_cache_free_gpu_mem_fraction $kv_cache_free_gpu_mem_fraction $extra_args $vl_args >$output_file

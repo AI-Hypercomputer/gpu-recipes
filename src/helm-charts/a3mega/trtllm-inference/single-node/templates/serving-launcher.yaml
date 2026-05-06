@@ -4,7 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#      http://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -47,26 +47,24 @@ spec:
         {{- if and $root.Values.queue $root.Values.dwsSettings.maxRunDurationSeconds }}
         provreq.kueue.x-k8s.io/maxRunDurationSeconds: "{{ $root.Values.dwsSettings.maxRunDurationSeconds }}"
         {{- end }}
-        # MANDATORY: Trigger NRI to inject device handles
-        nri.device-injector.google.com/inject: "all"
         {{- if not $root.Values.network.hostNetwork }}
         networking.gke.io/default-interface: "eth0"
-        networking.gke.io/interfaces: |
-        {{- if $root.Values.network.subnetworks }}
-          [
-            {{- range $i, $subnetwork := $root.Values.network.subnetworks }}
-            {"interfaceName":"eth{{ $i }}","network":"{{ $subnetwork }}"}{{ eq $i 9 | ternary "" ","}}
-            {{- end }}
-          ]
-        {{- else }}
-          [
-            {"interfaceName":"eth0","network":"default"},
-            {"interfaceName":"eth1","network":"gvnic-1"},
-            {{- range  $i := until 8 }}
-            {"interfaceName":"eth{{ add 2 $i }}","network":"pr-a3mega-gpunet-{{ $i }}"}{{ eq $i 7 | ternary "" ","}}
-            {{- end }}
-          ]
-        {{- end }}
+        # networking.gke.io/interfaces: |
+        # {{- if $root.Values.network.subnetworks }}
+        #   [
+        #     {{- range $i, $subnetwork := $root.Values.network.subnetworks }}
+        #     {"interfaceName":"eth{{ $i }}","network":"{{ $subnetwork }}"}{{ eq $i 5 | ternary "" ","}}
+        #     {{- end }}
+        #   ]
+        # {{- else }}
+        #   [
+        #     {"interfaceName":"eth0","network":"default"},
+        #     {"interfaceName":"eth1","network":"gvnic-1"},
+        #     {{- range  $i := until 4 }}
+        #     {"interfaceName":"eth{{ add 2 $i }}","network":"rdma-{{ $i }}"}{{ eq $i 3 | ternary "" ","}}
+        #     {{- end }}
+        #   ]
+        # {{- end }}
         {{- end }}
     spec:
       {{- if $root.Values.network.hostNetwork }}
@@ -93,19 +91,15 @@ spec:
         key: nvidia.com/gpu
       - operator: "Exists"
         key: cloud.google.com/impending-node-termination
+      - key: "kubernetes.io/arch"
+        operator: "Equal"
+        value: "arm64"
+        effect: "NoSchedule"
       volumes:
+        {{- if $root.Values.network.gibVersion }}
         - name: gib
           emptyDir: {}
-        # FIX: Mount Host Paths to allow the container to load kernel modules and see /dev
-        - name: dev-infiniband
-          hostPath:
-            path: /dev/infiniband
-        - name: tcpxo-run
-          hostPath:
-            path: /run/tcpxo
-        - name: host-bin-nvidia
-          hostPath:
-            path: /home/kubernetes/bin/nvidia
+        {{- end }}
         - name: serving-configuration
           configMap:
             name: "{{.Release.Name}}-config"
@@ -115,11 +109,11 @@ spec:
         - name: serving-launcher
           configMap:
             name: "{{.Release.Name}}-launcher"
-            defaultMode: 0555
+            defaultMode: 0700
         - name: shared-memory
           emptyDir:
             medium: "Memory"
-            sizeLimit: 512Gi
+            sizeLimit: 250Gi
         {{- range $gcs := $root.Values.volumes.gcsMounts }}
         - name: "{{ $gcs.bucketName }}"
           csi:
@@ -137,24 +131,23 @@ spec:
         {{- end }}
 
       initContainers:
+      {{- if $root.Values.network.gibVersion }}
       - name: nccl-plugin-installer
-        image: {{ $root.Values.network.gibVersion | default "us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:v1.1.1" }}
+        image: {{ $root.Values.network.gibVersion }}
         imagePullPolicy: Always
-        command:
-        - /bin/sh
-        - -c
         args:
         - |
           set -ex
-          mkdir -p /target/usr/local/gib/lib64
-          if [ -f "/scripts/container_entry.sh" ]; then
-            /scripts/container_entry.sh install --install-nccl
-          fi
-          cp -v -R /var/lib/gib/lib64/. /target/usr/local/gib/lib64
-          cp -v -R /var/lib/gib/. /target/usr/local/gib
+          /scripts/container_entry.sh install --install-nccl
+          cp -R /var/lib/gib/lib64/. /target/usr/local/gib/lib64
+          cp -R /var/lib/gib/. /target/usr/local/gib
+        command:
+        - /bin/sh
+        - -c
         volumeMounts:
         - mountPath: /target/usr/local/gib
           name: gib
+      {{- end }}
 
       containers:
         {{- if $root.Values.workload.gcsSidecarImage }}
@@ -166,37 +159,33 @@ spec:
         - name: serving
           image: "{{ $root.Values.workload.image }}"
           imagePullPolicy: Always
+          {{- if $root.Values.network.hostNetwork }}
           securityContext:
             privileged: true
+          {{- end }}
           env:
             - name: HF_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: "{{ $root.Values.huggingface.secretName }}"
                   key: "{{ $root.Values.huggingface.secretData.token }}"
+            # Pass NCCL settings to the container
             {{- if $root.Values.network.ncclSettings }}
             {{- toYaml .Values.network.ncclSettings | nindent 12 }}
             {{- end }}
             - name: NCCL_PLUGIN_PATH
               value: /usr/local/gib/lib64
             - name: LD_LIBRARY_PATH
-              value: "/usr/local/gib/lib64:/usr/local/nvidia/lib64:/usr/local/lib/python3.12/dist-packages/torch/lib:/usr/local/lib/python3.12/dist-packages/torch_tensorrt/lib:/usr/local/cuda/compat/lib:/usr/local/cuda/lib64:/usr/local/tensorrt/lib"
-            - name: NCCL_P2P_DISABLE
-              value: "1"
-            - name: NCCL_IB_DISABLE
-              value: "0"
-            - name: NCCL_NET_GDR_LEVEL
-              value: "PIX"
-            - name: NCCL_CROSS_NIC
-              value: "0"
+              value: /usr/local/gib/lib64:/usr/local/lib/python3.12/dist-packages/torch/lib:/usr/local/lib/python3.12/dist-packages/torch_tensorrt/lib:/usr/local/cuda/compat/lib:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64:/usr/local/tensorrt/lib
             {{- if $root.Values.network.gibVersion }}
             - name: NCCL_INIT_SCRIPT
               value: "/usr/local/gib/scripts/set_nccl_env.sh"
             {{- end }}
+            # Workload specific environment variables
             - name: MODEL_NAME
               value: "{{ $root.Values.workload.model.name }}"
             - name: MODEL_DOWNLOAD_DIR
-              value: "{{ $root.Values.volumes.ssdMountPath }}/{{ $root.Values.workload.model.name }}"
+              value: "/scratch/{{ $root.Values.workload.model.name }}"
             - name: TRTLLM_DIR
               value: "/app/tensorrt_llm"
             {{- if $root.Values.workload.envs }}
@@ -207,89 +196,17 @@ spec:
           command: ["/bin/bash", "-c"]
           args:
             - |
-              #!/bin/bash
-              set -ex
+              chmod +x /workload/launcher/launch-workload.sh
+              /workload/launcher/launch-workload.sh
 
-              # --- DEEP HARDWARE DISCOVERY & PCI BINDING FIX ---
-              echo "Attempting Deep Driver Initialization..."
-              
-              # 1. Manually find and load the driver from the GKE driver path on the host
-              # We use the mounted host-bin-nvidia volume (/host-nvidia)
-              find /host-nvidia -name "tcpxo.ko" -exec insmod {} \; || echo "Driver already loaded or not found."
-
-              # 2. Bind the 8 Fabric Controllers (Device 0084) to the tcpxo driver
-              for dev in $(lspci -d 1ae0:0084 | cut -d' ' -f1); do
-                PCI_ADDR="0000:$dev"
-                if [ -d "/sys/bus/pci/drivers/tcpxo" ]; then
-                  if [ ! -e "/sys/bus/pci/drivers/tcpxo/$PCI_ADDR" ]; then
-                    echo "Binding $PCI_ADDR to tcpxo driver..."
-                    echo "$PCI_ADDR" > /sys/bus/pci/drivers/tcpxo/bind || true
-                  else
-                    echo "$PCI_ADDR already bound."
-                  fi
-                else
-                  echo "CRITICAL: tcpxo driver directory not found in sysfs."
-                fi
-              done
-
-              echo "Verifying Hardware Handles (Goal: uverbs0-7):"
-              ls -l /dev/infiniband/ || echo "/dev/infiniband not found"
-              # --- END OF FIX ---
-
-              if [[ -n "${NCCL_INIT_SCRIPT}" ]]; then
-                echo "Running NCCL init script: ${NCCL_INIT_SCRIPT}"
-                source ${NCCL_INIT_SCRIPT}
-                env | grep NCCL
-                ldconfig
-              fi
-
-              if [ ! -f "$LAUNCHER_SCRIPT" ]; then
-                echo "Error: Launcher script $LAUNCHER_SCRIPT not found!"
-                exit 1
-              fi
-
-              ARGS=()
-              if [ -f "/workload/configs/serving-args.yaml" ]; then
-                echo "Loading server arguments from ConfigMap"
-                while IFS=': ' read -r key value || [ -n "$key" ]; do
-                  [[ -z "$key" || "$key" == \#* ]] && continue
-                  key=$(echo "$key" | xargs)
-                  value=$(echo "$value" | xargs)
-                  if [ -n "$key" ]; then
-                    if [[ "$value" == "true" ]]; then
-                      ARGS+=("--$key")
-                    elif [[ "$value" == "false" ]]; then
-                      ARGS+=("--$key" "false")
-                    elif [ -n "$value" ]; then
-                      ARGS+=("--$key" "$value")
-                    else
-                      ARGS+=("--$key")
-                    fi
-                  fi
-                done < "/workload/configs/serving-args.yaml"
-              fi
-
-              {{ if eq $root.Values.workload.framework "trtllm" }}
-              {{- range $root.Values.workload.benchmarks.experiments }}
-              echo "Running benchmark: $LAUNCHER_SCRIPT"
-              bash "$LAUNCHER_SCRIPT" --model_name "$MODEL_NAME" --isl {{ .isl }} --osl {{ .osl }} --num_requests {{ .num_requests }} -- "${ARGS[@]}"
-              {{- end }}
-              {{ else }}
-              bash "$LAUNCHER_SCRIPT" "${ARGS[@]}"
-              {{ end }}
 
           volumeMounts:
+            {{- if $root.Values.network.gibVersion }}
             - name: gib
               mountPath: /usr/local/gib
-            - name: dev-infiniband
-              mountPath: /dev/infiniband
-            - name: tcpxo-run
-              mountPath: /run/tcpxo
-            - name: host-bin-nvidia
-              mountPath: /host-nvidia
+            {{- end }}
             - name: serving-configuration
-              mountPath: /workload/configs/serving-args.yaml
-              subPath: {{ $root.Values.workload.configFile | default "serving-args" }}
+              mountPath: {{ $root.Values.workload.configPath | default "/workload/configs" }}
             - name: serving-launcher
               mountPath: /workload/launcher
             - name: shared-memory
