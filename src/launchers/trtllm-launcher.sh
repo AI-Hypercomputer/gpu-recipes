@@ -1,4 +1,4 @@
-# Copyright 2025 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -118,12 +118,13 @@ parse_serving_config() {
     tp_size=${SERVING_CONFIG_DICT["tp_size"]:=8}
     pp_size=${SERVING_CONFIG_DICT["pp_size"]:=1}
     ep_size=${SERVING_CONFIG_DICT["ep_size"]:=1}
-    backend=${SERVING_CONFIG_DICT["backend"]:="tensorrt"}
+    backend="tensorrt"
     kv_cache_free_gpu_mem_fraction=${SERVING_CONFIG_DICT["kv_cache_free_gpu_mem_fraction"]:=0.95}
     modality=${SERVING_CONFIG_DICT["modality"]:=""}
     streaming=${SERVING_CONFIG_DICT["streaming"]:="false"}
     max_input_len=${SERVING_CONFIG_DICT["max_input_len"]:=""}
     max_batch_size=${SERVING_CONFIG_DICT["max_batch_size"]:=""}
+    max_num_tokens=${SERVING_CONFIG_DICT["max_num_tokens"]:=""}
     custom_dataset=${SERVING_CONFIG_DICT["dataset"]:=""}
 }
 
@@ -145,6 +146,7 @@ print_configuration() {
     echo "streaming:               $streaming"
     echo "max input length:        $max_input_len"
     echo "max batch size:          $max_batch_size"
+    echo "max num tokens:          $max_num_tokens"
     echo "kv_cache_free_gpu_mem_fraction: $kv_cache_free_gpu_mem_fraction"
     echo "--------------------------------"
 }
@@ -174,11 +176,12 @@ run_benchmark() {
     if [ "$streaming" == "true" ]; then vl_args="$vl_args --streaming"; fi
     if [ -n "$max_input_len" ]; then vl_args="$vl_args --max_input_len $max_input_len"; fi
     if [ -n "$max_batch_size" ]; then vl_args="$vl_args --max_batch_size $max_batch_size"; fi
+    if [ -n "$max_num_tokens" ]; then vl_args="$vl_args --max_num_tokens $max_num_tokens"; fi
 
     dataset_file=$custom_dataset
     # If custom_dataset is not set, generate a textual dataset with tokens sampled in normal distribution
     if [ -z "$dataset_file" ]; then
-        dataset_file="/ssd/token-norm-dist_${model_name##*/}_${isl}_${osl}_tp${tp_size}.json"
+        dataset_file="/scratch/token-norm-dist_${model_name##*/}_${isl}_${osl}_tp${tp_size}.json"
         echo "Preparing dataset"
         python3 $TRTLLM_DIR/benchmarks/cpp/prepare_dataset.py \
             --tokenizer=$model_name \
@@ -190,7 +193,7 @@ run_benchmark() {
             --output-stdev=0 >$dataset_file
     fi 
 
-    output_file="/ssd/output_${model_name##*/}_isl${isl}_osl${osl}_tp${tp_size}.txt"
+    output_file="/scratch/output_${model_name##*/}_isl${isl}_osl${osl}_tp${tp_size}.txt"
     extra_args_file="/tmp/extra_llm_api_args.yaml"
     extra_args=""
     if [ -f "$extra_args_file" ]; then
@@ -202,10 +205,10 @@ run_benchmark() {
 
     if [[ $backend == "pytorch" ]]; then
         echo "Running throughput benchmark"
-        export NCCL_P2P_LEVEL=PHB
+        #export NCCL_P2P_LEVEL=PHB
         trtllm-bench \
         --model $model_name \
-        --model_path /ssd/${model_name} throughput \
+        --model_path /scratch/${model_name} throughput --tp $tp_size --pp $pp_size \
         --dataset $dataset_file \
         --num_requests $num_requests \
         --tp $tp_size \
@@ -218,23 +221,25 @@ run_benchmark() {
         echo "Building engine"
         trtllm-bench \
             --model $model_name \
-            --model_path /ssd/${model_name} \
-            --workspace /ssd build \
+            --model_path /scratch/${model_name} \
+            --workspace /scratch build \
+            \
             --tp_size $tp_size \
             --pp_size $pp_size \
+            \
             --quantization FP8 \
             --dataset $dataset_file
 
-        engine_dir="/ssd/${model_name}/tp_${tp_size}_pp_${pp_size}"
+        engine_dir="/scratch/${model_name}/tp_${tp_size}_pp_${pp_size}"
 
         # Save throughput output to a file
         echo "Running throughput benchmark"
         trtllm-bench \
             --model $model_name \
-            --model_path /ssd/${model_name} throughput \
+            --model_path /scratch/${model_name} throughput --backend "tensorrt" --tp $tp_size --pp $pp_size \
             --dataset $dataset_file \
             --engine_dir $engine_dir \
-            --kv_cache_free_gpu_mem_fraction $kv_cache_free_gpu_mem_fraction $extra_args >$output_file
+            --kv_cache_free_gpu_mem_fraction $kv_cache_free_gpu_mem_fraction $extra_args $vl_args >$output_file
     fi
 
     cat $output_file
@@ -262,8 +267,8 @@ main() {
 }
 
 # Set environment variables
-export HF_HOME=/ssd
-export LD_LIBRARY_PATH=/usr/local/lib/python3.12/dist-packages/torch/lib:/usr/local/lib/python3.12/dist-packages/torch_tensorrt/lib:/usr/local/cuda/compat/lib:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64:/usr/local/tensorrt/lib
+export HF_HOME=/scratch
+export LD_LIBRARY_PATH=/usr/local/gib/lib64:/usr/local/lib/python3.12/dist-packages/torch/lib:/usr/local/lib/python3.12/dist-packages/torch_tensorrt/lib:/usr/local/cuda/compat/lib:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64:/usr/local/tensorrt/lib
 
 # Run the main function
 main "$@"
