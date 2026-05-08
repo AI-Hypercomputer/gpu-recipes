@@ -4,7 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#      http://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -50,21 +50,21 @@ spec:
         {{- if not $root.Values.network.hostNetwork }}
         networking.gke.io/default-interface: "eth0"
         networking.gke.io/interfaces: |
-          {{- if $root.Values.network.subnetworks }}
-            [
-              {{- range $i, $subnetwork := $root.Values.network.subnetworks }}
-              {"interfaceName":"eth{{ $i }}","network":"{{ $subnetwork }}"}{{ eq $i 9 | ternary "" ","}}
-              {{- end }}
-            ]
-          {{- else }}
-            [
-              {"interfaceName":"eth0","network":"default"},
-              {"interfaceName":"eth1","network":"gvnic-1"},
-              {{- range  $i := until 8 }}
-              {"interfaceName":"eth{{ add 2 $i }}","network":"rdma-{{ $i }}"}{{ eq $i 7 | ternary "" ","}}
-              {{- end }}
-            ]
-          {{- end }}
+        {{- if $root.Values.network.subnetworks }}
+          [
+            {{- range $i, $subnetwork := $root.Values.network.subnetworks }}
+            {"interfaceName":"eth{{ $i }}","network":"{{ $subnetwork }}"}{{ eq $i 9 | ternary "" ","}}
+            {{- end }}
+          ]
+        {{- else }}
+          [
+            {"interfaceName":"eth0","network":"default"},
+            {"interfaceName":"eth1","network":"gvnic-1"},
+            {{- range  $i := until 8 }}
+            {"interfaceName":"eth{{ add 2 $i }}","network":"rdma-{{ $i }}"}{{ eq $i 7 | ternary "" ","}}
+            {{- end }}
+          ]
+        {{- end }}
         {{- end }}
     spec:
       {{- if $root.Values.network.hostNetwork }}
@@ -101,7 +101,7 @@ spec:
             name: "{{.Release.Name}}-config"
             items:
             - key: serving-configuration
-              path: "serving-args.yaml"
+              path: {{ $root.Values.workload.configFile | default "serving-args.yaml" }}
         - name: serving-launcher
           configMap:
             name: "{{.Release.Name}}-launcher"
@@ -171,7 +171,7 @@ spec:
             - name: NCCL_PLUGIN_PATH
               value: /usr/local/gib/lib64
             - name: LD_LIBRARY_PATH
-              value: /usr/local/gib/lib64:/usr/local/lib/python3.12/dist-packages/torch/lib:/usr/local/lib/python3.12/dist-packages/torch_tensorrt/lib:/usr/local/cuda/compat/lib:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64:/usr/local/tensorrt/lib
+              value: /usr/local/gib/lib64:/usr/local/nvidia/lib64
             {{- if $root.Values.network.gibVersion }}
             - name: NCCL_INIT_SCRIPT
               value: "/usr/local/gib/scripts/set_nccl_env.sh"
@@ -186,6 +186,15 @@ spec:
               value: "/workload/launcher/launch-workload.sh"
             - name: SERVER_ARGS_FILE
               value: "/workload/configs/serving-args.yaml"
+            - name: NCCL_PROFILER_PLUGIN
+              value: "none"
+            - name: NCCL_TUNER_PLUGIN
+              value: "none"
+            - name: TRTLLM_DISABLE_AUTOTUNER
+              value: "1"
+            - name: TRTLLM_CUSTOM_ALLREDUCE
+              value: "0"
+
 
             {{- if $root.Values.workload.envs }}
             {{- toYaml .Values.workload.envs | nindent 12 }}
@@ -196,66 +205,50 @@ spec:
           args:
             - |
               #!/bin/bash
-              set -eo pipefail
 
-              echo "=== INITIALIZING MASTER PROCESS ENVIRONMENT ==="
-
-              # 1. Manual Success Flags (Must be exported before benchmark starts)
-              export NCCL_TUNER_PLUGIN=none
-              export TRTLLM_DISABLE_AUTOTUNER=1
-              export TRTLLM_CUSTOM_ALLREDUCE=0
-              export NCCL_IB_GID_INDEX=3
-              export NCCL_IB_TC=136
-              export NCCL_NET_GDR_LEVEL=PIX
-              
-              # Stability Overrides
-              export NCCL_DEBUG=VERSION
-              export NCCL_IGNORE_DISABLED_P2P=1
-              export NCCL_IB_TIMEOUT=22
-              export TORCH_NCCL_BLOCKING_WAIT=1
-              export MALLOC_CONF="dirty_decay_ms:100,muzzy_decay_ms:100"
-
-              # 2. Network Initialization
               if [[ -n "${NCCL_INIT_SCRIPT}" ]]; then
+                echo "Running NCCL init script: ${NCCL_INIT_SCRIPT}"
                 source ${NCCL_INIT_SCRIPT}
+                env | grep NCCL
                 ldconfig
               fi
 
-              # 3. Parse ConfigMap Arguments
+              if [ ! -f "$LAUNCHER_SCRIPT" ]; then
+                echo "Error: Launcher script $LAUNCHER_SCRIPT not found!"
+                exit 1
+              fi
+
               ARGS=()
+
               if [ -f "$SERVER_ARGS_FILE" ]; then
+                echo "Loading server arguments from ConfigMap"
                 while IFS=': ' read -r key value || [ -n "$key" ]; do
                   [[ -z "$key" || "$key" == \#* ]] && continue
-                  key=$(echo "$key" | xargs); value=$(echo "$value" | xargs)
+                  key=$(echo "$key" | xargs)
+                  value=$(echo "$value" | xargs)
+
                   if [ -n "$key" ]; then
-                    if [[ "$value" == "true" ]]; then ARGS+=("--$key")
-                    elif [[ "$value" == "false" ]]; then ARGS+=("--$key" "false")
-                    elif [ -n "$value" ]; then ARGS+=("--$key" "$value")
-                    else ARGS+=("--$key"); fi
+                    if [[ "$value" == "true" ]]; then
+                     ARGS+=("--$key")
+                    elif [[ "$value" == "false" ]]; then
+                     ARGS+=("--$key" "false")
+                    elif [ -n "$value" ]; then
+                     ARGS+=("--$key" "$value")
+                    else
+                     ARGS+=("--$key")
+                    fi
                   fi
                 done < "$SERVER_ARGS_FILE"
               fi
 
-              # 4. Engine Stability Overrides (Passed via Bash to avoid YAML file breaks)
-              BASH_OVERRIDES=(
-                "--enable_cuda_graph" "false"
-                "--allreduce_strategy" "NCCL"
-                "--kv_cache_free_gpu_mem_fraction" "0.70"
-              )
-
-              # 5. Execution Loop
               {{ if eq $root.Values.workload.framework "trtllm" }}
               {{- range $root.Values.workload.benchmarks.experiments }}
-              echo "Launching benchmark: ISL={{ .isl }} OSL={{ .osl }} req={{ .num_requests }}"
-              bash "$LAUNCHER_SCRIPT" \
-                --model_name $MODEL_NAME \
-                --isl {{ .isl }} \
-                --osl {{ .osl }} \
-                --num_requests {{ .num_requests }} \
-                -- "${ARGS[@]}" "${BASH_OVERRIDES[@]}"
+              echo "Running: $LAUNCHER_SCRIPT --model_name $MODEL_NAME --isl {{ .isl }} --osl {{ .osl }} --num_requests {{ .num_requests }} -- ${ARGS[@]}"
+              exec "$LAUNCHER_SCRIPT" --model_name $MODEL_NAME --isl {{ .isl }} --osl {{ .osl }} --num_requests {{ .num_requests }} -- "${ARGS[@]}"
               {{- end }}
               {{ else }}
-              bash "$LAUNCHER_SCRIPT" "${ARGS[@]}"
+              echo "Running: $LAUNCHER_SCRIPT ${ARGS[@]}"
+              exec "$LAUNCHER_SCRIPT" "${ARGS[@]}"
               {{- end }}
 
           volumeMounts:
@@ -264,7 +257,7 @@ spec:
               mountPath: /usr/local/gib
             {{- end }}
             - name: serving-configuration
-              mountPath: /workload/configs
+              mountPath: {{ $root.Values.workload.configPath | default "/workload/configs" }}
             - name: serving-launcher
               mountPath: /workload/launcher
             - name: shared-memory
@@ -275,7 +268,7 @@ spec:
             {{- end }}
             {{- if $root.Values.volumes.ssdMountPath }}
             - name: local-ssd
-              mountPath: /ssd
+              mountPath: "{{ $root.Values.volumes.ssdMountPath }}"
             {{- end }}
 
           resources:
