@@ -13,22 +13,27 @@
 # limitations under the License.
 
 queue:
+
 dwsSettings:
   maxRunDurationSeconds:
+
 huggingface:
   secretName: hf-secret
   secretData:
     token: "hf_api_token"
+
 volumes:
   gcsVolumes: true
-  ssdMountPath: "/scratch"
+  ssdMountPath: "/ssd"
   gcsMounts:
     - bucketName:
       mountPath: "/gcs"
+
 service:
   type: ClusterIP
   ports:
     http: 8000
+
 workload:
   model:
     name:
@@ -44,19 +49,12 @@ workload:
       value: "0"
     - name: SERVER_ARGS_FILE
       value: "/workload/configs/serving-args.yaml"
-    - name: NCCL_PROFILER_PLUGIN
-      value: "none"
-    - name: NCCL_TUNER_PLUGIN
-      value: "none"
-    - name: TRTLLM_DISABLE_AUTOTUNER
-      value: "1"
-    - name: TRTLLM_CUSTOM_ALLREDUCE
-      value: "0"
   benchmarks:
     experiments:
       - isl: 128
         osl: 128
         num_requests: 30000
+
 network:
   hostNetwork: true
   subnetworks[]:
