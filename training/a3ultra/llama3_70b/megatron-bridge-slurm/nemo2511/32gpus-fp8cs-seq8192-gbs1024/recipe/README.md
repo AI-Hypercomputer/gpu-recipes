@@ -1,7 +1,7 @@
 <!-- mdformat global-off -->
-# Pretrain Llama 3 8B workloads on A3U Slurm Cluster with Nvidia Megatron-Bridge
+# Pretrain Llama 3 70B workloads on A3U Slurm Cluster with Nvidia Megatron-Bridge
 
-This recipe outlines the steps for running a Llama 3 8B pretraining workload on [Google Cloud A3U Slurm clusters](https://docs.cloud.google.com/ai-hypercomputer/docs/create/create-slurm-cluster) by using [NVIDIA Megatron-Bridge](https://github.com/NVIDIA-NeMo/Megatron-Bridge).
+This recipe outlines the steps for running a Llama 3 70B pretraining workload on [Google Cloud A3U Slurm clusters](https://docs.cloud.google.com/ai-hypercomputer/docs/create/create-slurm-cluster) by using [NVIDIA Megatron-Bridge](https://github.com/NVIDIA-NeMo/Megatron-Bridge).
 
 ## Orchestration and deployment tools
 
@@ -14,7 +14,7 @@ For this recipe, the following setup is used:
 
 This recipe has been optimized for and tested with the following configuration:
 
-- A3U Slurm Cluster (2 nodes, 16 GPUs)
+- A3U Slurm Cluster (4 nodes, 32 GPUs)
 - Machine Type: `a3-ultragpu-8g`
 - Lustre Filesystem
 
@@ -65,7 +65,7 @@ Clone the `gpu-recipes` repository and set a reference to the recipe folder.
 git clone https://github.com/ai-hypercomputer/gpu-recipes.git
 cd gpu-recipes
 export REPO_ROOT=`git rev-parse --show-toplevel`
-export RECIPE_ROOT=$REPO_ROOT/training/a3u/llama3-8b/megatron-bridge-pretraining-slurm/2node-FP8CS-GBS256/recipe
+export RECIPE_ROOT=$REPO_ROOT/training/a3ultra/llama3_70b/megatron-bridge-slurm/nemo2511/32gpus-fp8cs-seq8192-gbs1024/recipe
 cd $RECIPE_ROOT
 ```
 

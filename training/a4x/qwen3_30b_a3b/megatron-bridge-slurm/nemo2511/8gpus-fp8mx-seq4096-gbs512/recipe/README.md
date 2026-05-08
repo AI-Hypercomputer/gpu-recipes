@@ -65,7 +65,7 @@ Clone the `gpu-recipes` repository and set a reference to the recipe folder.
 git clone https://github.com/ai-hypercomputer/gpu-recipes.git
 cd gpu-recipes
 export REPO_ROOT=`git rev-parse --show-toplevel`
-export RECIPE_ROOT=$REPO_ROOT/training/a4x/qwen3_30b_a3b/megatron-bridge-slurm/nemo2511/8gpus-fp8mx-seq4096-gbs512/recipe/recipe
+export RECIPE_ROOT=$REPO_ROOT/training/a4x/qwen3_30b_a3b/megatron-bridge-slurm/nemo2511/8gpus-fp8mx-seq4096-gbs512/recipe
 cd $RECIPE_ROOT
 ```
 

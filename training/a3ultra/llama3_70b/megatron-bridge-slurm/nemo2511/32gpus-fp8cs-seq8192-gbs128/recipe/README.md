@@ -1,7 +1,7 @@
 <!-- mdformat global-off -->
-# Pretrain Qwen 3 235B workloads on A4 Slurm Cluster with Nvidia Megatron-Bridge
+# Pretrain Llama 3 70B workloads on A3U Slurm Cluster with Nvidia Megatron-Bridge
 
-This recipe outlines the steps for running a Qwen 3 235B pretraining workload on [Google Cloud A4 Slurm clusters](https://docs.cloud.google.com/ai-hypercomputer/docs/create/create-slurm-cluster) by using [NVIDIA Megatron-Bridge](https://github.com/NVIDIA-NeMo/Megatron-Bridge).
+This recipe outlines the steps for running a Llama 3 70B pretraining workload on [Google Cloud A3U Slurm clusters](https://docs.cloud.google.com/ai-hypercomputer/docs/create/create-slurm-cluster) by using [NVIDIA Megatron-Bridge](https://github.com/NVIDIA-NeMo/Megatron-Bridge).
 
 ## Orchestration and deployment tools
 
@@ -14,12 +14,13 @@ For this recipe, the following setup is used:
 
 This recipe has been optimized for and tested with the following configuration:
 
-- A4 Slurm Cluster (16 nodes, 128 GPUs)
-- Machine Type: `a4-highgpu-8g`
+- A3U Slurm Cluster (4 nodes, 32 GPUs)
+- Machine Type: `a3-ultragpu-8g`
 - Lustre Filesystem
 
-Please follow the instructions in the [Cluster Toolkit A4 Example README](https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/examples/machine-learning/a4-highgpu-8g) to provision an A4 Slurm cluster.
+Please follow the instructions in the [Cluster Toolkit A3U Example README](https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/examples/machine-learning/a3-ultragpu-8g) to provision an A3 ultra Slurm cluster.
 
+Version of the blueprint to create the slurm cluster is `v1.82.0`
 
 ## Docker container image
 
@@ -64,11 +65,12 @@ Clone the `gpu-recipes` repository and set a reference to the recipe folder.
 git clone https://github.com/ai-hypercomputer/gpu-recipes.git
 cd gpu-recipes
 export REPO_ROOT=`git rev-parse --show-toplevel`
-export RECIPE_ROOT=$REPO_ROOT/training/a4/qwen3_235b_a22b/megatron-bridge-slurm/nemo2511/128gpus-bf16-seq4096-gbs4096/recipe/recipe
+export RECIPE_ROOT=$REPO_ROOT/training/a3ultra/llama3_70b/megatron-bridge-slurm/nemo2511/32gpus-fp8cs-seq8192-gbs128/recipe
 cd $RECIPE_ROOT
 ```
 
 ### Submit a pretraining job
+
 
 ```
 # set your HF_TOKEN inside launch_script.sh
