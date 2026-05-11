@@ -1,9 +1,9 @@
 <!-- mdformat global-off -->
-# Pretrain llama3-8b workloads on a4 GKE Node pools with Nvidia Megatron-Bridge Framework
+# Pretrain llama3-1-70b workloads on g4_standard_384 GKE Node pools with Nvidia NeMo Framework
 
-This recipe outlines the steps for running a llama3-8b pretraining
-workload on [a4 GKE Node pools](https://cloud.google.com/kubernetes-engine) by using the
-[Megatron-Bridge pretraining workload](https://github.com/NVIDIA-NeMo/Megatron-Bridge).
+This recipe outlines the steps for running a llama3-1-70b pretraining
+workload on [g4_standard_384 GKE Node pools](https://cloud.google.com/kubernetes-engine) by using the
+[NVIDIA NeMo framework](https://github.com/NVIDIA/nemo).
 
 ## Orchestration and deployment tools
 
@@ -12,26 +12,29 @@ For this recipe, the following setup is used:
 - Orchestration - [Google Kubernetes Engine (GKE)](https://cloud.google.com/kubernetes-engine)
 - Pretraining job configuration and deployment - A Helm chart is used to
   configure and deploy the [Kubernetes Jobset](https://kubernetes.io/blog/2025/03/23/introducing-jobset) resource which manages the execution of the
-  [Megatron-Bridge pretraining workload](https://github.com/NVIDIA-NeMo/Megatron-Bridge).
+  [NeMo pretraining workload](https://github.com/NVIDIA/nemo).
 
 ## Test environment
 
 This recipe has been optimized for and tested with the following configuration:
 
 - GKE cluster
-Please follow Cluster Toolkit [instructions](https://github.com/GoogleCloudPlatform/cluster-toolkit/tree/main/examples/gke-a4)
-to create your a4 GKE cluster.
+Please follow Cluster Toolkit [instructions](https://github.com/GoogleCloudPlatform/cluster-toolkit/)
+to create your g4_standard_384 GKE cluster.
 
 ## Training dataset
 
-This recipe uses a mock pretraining dataset provided by the Megatron-Bridge framework.
+This recipe uses a mock pretraining dataset provided by the NeMo framework.
+
+## Hugging Face Token
+
+This recipe requires a Hugging Face account with access to [meta-llama/Llama-3.1-70B](https://huggingface.co/meta-llama/Llama-3.1-70B). Create an access token with read access and save the value of the token.
 
 ## Docker container image
 
 This recipe uses the following docker images:
 
-- `nvcr.io/nvidia/nemo:26.02`
-- `us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:v1.1.1`
+- `nvcr.io/nvidia/nemo:25.07`
 
 ## Run the recipe
 
@@ -46,8 +49,6 @@ Set the environment variables to match your environment:
  export CLUSTER_REGION=<CLUSTER_REGION>
  export CLUSTER_NAME=<CLUSTER_NAME>
  export GCS_BUCKET=<GCS_BUCKET> # Note: path should not be prefixed with gs://
- export KUEUE_NAME=<KUEUE_NAME>
- export HF_TOKEN=<YOUR_HF_TOKEN>
  ```
 
 Replace the following values:
@@ -56,8 +57,6 @@ Replace the following values:
  - `<CLUSTER_REGION>`: the region where your cluster is located.
  - `<CLUSTER_NAME>`: the name of your GKE cluster.
  - `<GCS_BUCKET>`: the name of your Cloud Storage bucket. Don't include the `gs://` prefix.
- - `<KUEUE_NAME>`: the name of the Kueue local queue. The default queue created by the cluster toolkit is `a4`. Make sure to verify the name of the local queue in your cluster.
- - `<YOUR_HF_TOKEN>`: Your HuggingFace token.
 
 Set the default project:
 
@@ -73,7 +72,7 @@ Clone the `gpu-recipes` repository and set a reference to the recipe folder.
 git clone https://github.com/ai-hypercomputer/gpu-recipes.git
 cd gpu-recipes
 export REPO_ROOT=`git rev-parse --show-toplevel`
-export RECIPE_ROOT=$REPO_ROOT/training/a4/llama3-8b/megatron-bridge-gke/nemo2602/8gpus-fp8cs-seq8192-gbs128/recipe
+export RECIPE_ROOT=$REPO_ROOT/training/g4/llama3_70b/nemo-finetuning-gke/nemo2507/8gpus-bf16-gbs32/recipe
 cd $RECIPE_ROOT
 ```
 
@@ -83,22 +82,28 @@ cd $RECIPE_ROOT
 gcloud container clusters get-credentials $CLUSTER_NAME --region $CLUSTER_REGION
 ```
 
+### Create Kubernetes secret
+Add your Hugging Face access token to the cluster as a secret. Replace <HF_TOKEN> with your token value.
+```
+kubectl create secret generic hf-token --from-literal=token=<HF_TOKEN>
+```
+
 ### Configure and submit a pretraining job
 
-#### Using 1 node (8 gpus) fp8cs precision
+#### Using 1 node (8 gpus) bf16 precision
 To execute the job with the default settings, run the following command from
 your client:
 
 ```bash
 cd $RECIPE_ROOT
-export WORKLOAD_NAME=$USER-a4-llama3-8b-1node
+export WORKLOAD_NAME=$USER-g4-8gpu-llama3-1-70b
 helm install $WORKLOAD_NAME . -f values.yaml \
 --set-file workload_launcher=launcher.sh \
---set workload.image=nvcr.io/nvidia/nemo:26.02 \
+--set-file workload_config=llama3-1-70b-fine-tuning.py \
+--set workload.image=nvcr.io/nvidia/nemo:25.07 \
 --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
 --set volumes.gcsMounts[0].mountPath=/job-logs \
 --set workload.envs[0].value=/job-logs/$WORKLOAD_NAME \
---set queue=${KUEUE_NAME}
 ```
 
 **Examples**
@@ -108,14 +113,14 @@ helm install $WORKLOAD_NAME . -f values.yaml \
 
     ```bash
     cd $RECIPE_ROOT
-    export WORKLOAD_NAME=$USER-a4-llama3-8b-1node
+    export WORKLOAD_NAME=$USER-g4-8gpu-llama3-1-70b
     helm install $WORKLOAD_NAME . -f values.yaml \
     --set-file workload_launcher=launcher.sh \
-    --set workload.image=nvcr.io/nvidia/nemo:26.02 \
+    --set-file workload_config=llama3-1-70b-fine-tuning.py \
+    --set workload.image=nvcr.io/nvidia/nemo:25.07 \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     --set volumes.gcsMounts[0].mountPath=/job-logs \
     --set workload.envs[0].value=/job-logs/$WORKLOAD_NAME \
-    --set queue=${KUEUE_NAME} \
     --set workload.arguments[0]="trainer.max_steps=100"
     ```
 
@@ -124,12 +129,12 @@ helm install $WORKLOAD_NAME . -f values.yaml \
 To check the status of pods in your job, run the following command:
 
 ```
-kubectl get pods | grep $USER-a4-llama3-8b-1node
+kubectl get pods | grep $USER-g4-8gpu-llama3-1-70b
 ```
 
 Replace the following:
 
-- JOB_NAME_PREFIX - your job name prefix. For example $USER-a4-llama3-8b-1node.
+- JOB_NAME_PREFIX - your job name prefix. For example $USER-g4-8gpu-llama3-1-70b.
 
 To get the logs for one of the pods, run the following command:
 
@@ -141,7 +146,7 @@ Information about the training job's progress, including crucial details such as
 loss, step count, and step time, is generated by the rank 0 process.
 This process runs on the pod whose name begins with
 `JOB_NAME_PREFIX-workload-0-0`.
-For example: `$USER-a4-llama3-8b-1node-workload-0-0-s9zrv`.
+For example: `$USER-g4-8gpu-llama3-1-70b-workload-0-0-s9zrv`.
 
 ### Uninstall the Helm release
 
@@ -149,5 +154,5 @@ You can delete the job and other resources created by the Helm chart. To
 uninstall Helm, run the following command from your client:
 
 ```bash
-helm uninstall $USER-a4-llama3-8b-1node
+helm uninstall $USER-g4-8gpu-llama3-1-70b
 ```
