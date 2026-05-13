@@ -1,4 +1,4 @@
-# Copyright 2026 Google LLC
+# Copyright 2025 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,53 +12,53 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-queue:
-
-dwsSettings:
-  maxRunDurationSeconds:
+targetPlatform: "gke"
+clusterName: ""
+queue: ""
 
 huggingface:
-  secretName: hf-secret
+  secretName: "hf-secret"
   secretData:
     token: "hf_api_token"
 
-volumes:
-  gcsVolumes: true
-  ssdMountPath: "/ssd"
-  gcsMounts:
-    - bucketName:
-      mountPath: "/gcs"
-
-service:
-  type: ClusterIP
-  ports:
-    http: 8000
-
 workload:
-  model:
-    name:
+  framework: "trtllm"
   gpus: 8
-  image:
-  framework:
-  configFile: serving-args.yaml
-  configPath: /workload/configs
-  envs:
-    - name: LAUNCHER_SCRIPT
-      value: "/workload/launcher/launch-workload.sh"
-    - name: HF_HUB_ENABLE_HF_TRANSFER
-      value: "0"
-    - name: SERVER_ARGS_FILE
-      value: "/workload/configs/serving-args.yaml"
+  image: ""
+  model:
+    name: ""
+    tp_size: 8
+    pp_size: 1
+  configPath: "/workload/configs"
+  configFile: "serving-args.yaml"
+
   benchmarks:
     experiments:
       - isl: 128
         osl: 128
         num_requests: 30000
 
+volumes:
+  gcsVolumes: true
+  ssdMountPath: "/ssd"
+  gcsMounts:
+    - bucketName: ""
+      mountPath: "/gcs"
+
+gpuPlatformSettings:
+  useHostPlugin: false
+  ncclPluginImage: "us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/nccl-plugin-gpudirecttcpx-dev:v1.0.8-1"
+  rxdmImage: "us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/tcpgpudmarxd-dev:v1.0.14"
+  ncclBuildType: "223"
+
 network:
   hostNetwork: true
-  subnetworks[]:
-  gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:v1.1.1
-  ncclSettings:
-    - name: NCCL_DEBUG
-      value: "VERSION"
+  subnetworks: []
+  ncclSettings: []
+
+trtllm:
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    ports:
+      http: 8000

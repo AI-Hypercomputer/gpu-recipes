@@ -1,8 +1,31 @@
-# Copyright 2026 Google LLC
+# Copyright 2025 Google LLC
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Release.Name }}-launcher"
+data:
+  launch-workload.sh: {{ .Values.workload_launcher | toJson }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Release.Name }}-config"
+data:
+  {{ .Values.workload.configFile | default "serving-args.yaml" }}: {{ .Values.serving_config | toJson }}
+---
 
 {{ $nodes := div .Values.workload.gpus 8 | max 1 }}
 {{ $gpusPerNode := min .Values.workload.gpus 8 }}
@@ -129,7 +152,7 @@ spec:
         - |
           set -ex
           chmod 755 /scripts/container_entry.sh
-          /scripts/container_entry.sh install --install-nccl --nccl-buildtype ${BUILD_TYPE}
+          /scripts/container_entry.sh install --install-nccl
           cp -r /var/lib/tcpxo/* /usr/local/nccl-plugin/
 
       {{- end }}
@@ -191,7 +214,9 @@ spec:
                   name: "{{ $root.Values.huggingface.secretName }}"
                   key: "{{ $root.Values.huggingface.secretData.token }}"
             - name: HF_HUB_ENABLE_HF_TRANSFER
-              value: "1"
+              value: "0"
+            - name: MODEL_DOWNLOAD_DIR
+              value: "/ssd/{{ $root.Values.workload.model.name }}"
             - name: TORCH_DISTRIBUTED_DEBUG
               value: "INFO"
             - name: GLOO_SOCKET_IFNAME
@@ -272,7 +297,7 @@ spec:
             - name: LAUNCHER_SCRIPT
               value: "/workload/launcher/launch-workload.sh"
             - name: SERVER_ARGS_FILE
-              value: "/workload/configs/{{ $root.Values.workload.configFile }}"
+              value: "/workload/configs/{{ $root.Values.workload.configFile | default "serving-args.yaml" }}"
             - name: NCCL_P2P_PXN_LEVEL
               value: "0"
             - name: NCCL_PROFILER_PLUGIN
