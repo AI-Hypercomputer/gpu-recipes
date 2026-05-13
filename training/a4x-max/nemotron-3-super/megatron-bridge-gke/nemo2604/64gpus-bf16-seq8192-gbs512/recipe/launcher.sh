@@ -77,7 +77,7 @@ cd /opt
 rm -rf Megatron-Bridge
 git clone https://github.com/NVIDIA-NeMo/Megatron-Bridge.git
 cd Megatron-Bridge
-git checkout 1ff09371d7f4e5306dae4673a38ceedc962c6258
+git checkout nemotron-3-super-bf16-64gpus/training/a4x-max/nemotron-3-super/megatron-bridge-gke
 git submodule update --init --recursive
 sed -i -e '/pretrain(config=recipe/i \    recipe.dist.distributed_timeout_minutes = 10' scripts/performance/run_script.py
 ls
@@ -114,8 +114,8 @@ worker_command=$(cat <<- EOM
     --gpu gb300 \
     --num_gpus 64 \
     --gpus_per_node 4 \
-    --compute_dtype bf16 \
-            --max_step 30
+    --compute_dtype fp8_mx \
+    --max_step 30
 EOM
 )
 
