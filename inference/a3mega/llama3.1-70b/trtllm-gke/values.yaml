@@ -54,9 +54,10 @@ gpuPlatformSettings:
 network:
   hostNetwork: true
   subnetworks: []
+  gibVersion: "us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:v1.1.1"
   ncclSettings:
     - name: NCCL_DEBUG
-      value: "VERSION"
+      value: "INFO"
 
 trtllm:
   replicaCount: 1
