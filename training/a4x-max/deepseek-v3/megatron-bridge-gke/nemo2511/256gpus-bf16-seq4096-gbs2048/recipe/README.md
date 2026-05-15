@@ -94,6 +94,7 @@ your client:
 cd $RECIPE_ROOT
 export WORKLOAD_NAME=$USER-deepseek-v3-256gpus
 helm install $WORKLOAD_NAME . -f values.yaml \
+--set-file workload_config=custom_setup_experiment.py \
 --set-file workload_launcher=launcher.sh \
 --set workload.image=nvcr.io/nvidia/nemo:25.11 \
 --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
@@ -111,6 +112,7 @@ helm install $WORKLOAD_NAME . -f values.yaml \
     cd $RECIPE_ROOT
     export WORKLOAD_NAME=$USER-deepseek-v3-256gpus
     helm install $WORKLOAD_NAME . -f values.yaml \
+    --set-file workload_config=custom_setup_experiment.py \
     --set-file workload_launcher=launcher.sh \
     --set workload.image=nvcr.io/nvidia/nemo:25.11 \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
