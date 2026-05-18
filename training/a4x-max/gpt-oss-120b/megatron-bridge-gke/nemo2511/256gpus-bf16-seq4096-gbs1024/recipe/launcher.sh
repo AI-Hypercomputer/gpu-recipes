@@ -127,7 +127,8 @@ worker_command=$(cat <<- EOM
     --expert_tensor_parallel_size 1 \
     --cuda_graph_impl transformer_engine \
     --cuda_graph_scope attn,moe_router,moe_preprocess \
-    --max_step 50
+    --max_step 50 \
+    --hf_token "$HF_TOKEN"
 EOM
 )
 
