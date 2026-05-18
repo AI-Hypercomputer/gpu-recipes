@@ -100,6 +100,8 @@ helm install $WORKLOAD_NAME . -f values.yaml \
 --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
 --set volumes.gcsMounts[0].mountPath=/job-logs \
 --set workload.envs[0].value=/job-logs/$WORKLOAD_NAME \
+--set workload.envs[3].name=HF_TOKEN \
+--set workload.envs[3].value="${HF_TOKEN}" \
 --set queue=${KUEUE_NAME}
 ```
 
@@ -118,6 +120,8 @@ helm install $WORKLOAD_NAME . -f values.yaml \
     --set volumes.gcsMounts[0].bucketName=${GCS_BUCKET} \
     --set volumes.gcsMounts[0].mountPath=/job-logs \
     --set workload.envs[0].value=/job-logs/$WORKLOAD_NAME \
+    --set workload.envs[3].name=HF_TOKEN \
+    --set workload.envs[3].value="${HF_TOKEN}" \
     --set queue=${KUEUE_NAME} \
     --set workload.arguments[0]="trainer.max_steps=100"
     ```
