@@ -265,7 +265,7 @@ main() {
 
 # Set environment variables
 export HF_HOME=/ssd
-export LD_LIBRARY_PATH=/usr/local/gib/lib64:/usr/local/lib/python3.12/dist-packages/torch/lib:/usr/local/lib/python3.12/dist-packages/torch_tensorrt/lib:/usr/local/cuda/compat/lib:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64:/usr/local/tensorrt/lib
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib/python3.12/dist-packages/torch/lib:/usr/local/lib/python3.12/dist-packages/torch_tensorrt/lib:/usr/local/cuda/compat/lib:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64:/usr/local/tensorrt/lib
 
 # Run the main function
 main "$@"

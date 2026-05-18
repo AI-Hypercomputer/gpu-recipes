@@ -1,10 +1,10 @@
-# Copyright 2025 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#      http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -142,7 +142,7 @@ spec:
         imagePullPolicy: Always
         volumeMounts:
           - name: nccl-plugin-volume
-            mountPath: /usr/local/nccl-plugin
+            mountPath: /usr/local/tcpxo
         env:
         - name: BUILD_TYPE
           value: "{{ $root.Values.gpuPlatformSettings.ncclBuildType }}"
@@ -152,11 +152,8 @@ spec:
         - |
           set -ex
           chmod 755 /scripts/container_entry.sh
-          /scripts/container_entry.sh install --install-nccl
-          cp -r /var/lib/tcpxo/* /usr/local/nccl-plugin/
-          find /usr/local/nccl-plugin -type f -name "libnccl.so*" -exec rm -f {} +
-          rm -f /usr/local/nccl-plugin/lib64/libnccl.so
-          rm -f /usr/local/nccl-plugin/lib64/libnccl.so.2*
+          /scripts/container_entry.sh install --install-nccl --nccl-buildtype ${BUILD_TYPE}
+          cp -r /var/lib/tcpxo/* /usr/local/tcpxo/
 
       {{- end }}
 
@@ -178,7 +175,7 @@ spec:
           mountPath: /hostprocsysfs
         env:
         - name: LD_LIBRARY_PATH
-          value: /usr/local/nccl-plugin:/usr/local/nccl-plugin/lib64:/usr/local/nvidia/lib64
+          value: /usr/local/tcpxo:/usr/local/tcpxo/lib64:/usr/local/nvidia/lib64
         command:
         - bash
         - -c
@@ -226,37 +223,31 @@ spec:
               value: "INFO"
             - name: GLOO_SOCKET_IFNAME
               value: "eth0"
-            {{- if  $root.Values.gpuPlatformSettings.useHostPlugin }}
+            
+            # CORE APPLICATION ROUTING PATHS (Fixed base tcpxo mount lookup address)
             - name: LD_LIBRARY_PATH
-              value: /usr/local/nccl-plugin:/usr/local/nccl-plugin/lib64:/usr/local/nvidia/lib64
-            - name: NCCL_LIB_DIR
-              value: /usr/local/nvidia/lib64
-            {{- else }}
-            - name: LD_LIBRARY_PATH
-              value: /usr/local/nccl-plugin:/usr/local/nccl-plugin/lib64:/usr/local/nvidia/lib64
-            - name: NCCL_WIN_ENABLE
-              value: "0"
-            - name: NCCL_LIB_DIR
-              value: /usr/local/nccl-plugin/lib64
-            {{- end }}
+              value: "/usr/local/tcpxo:/usr/local/tcpxo/lib64:/usr/local/cuda/lib64:/usr/local/nvidia/lib64:/usr/lib/x86_64-linux-gnu"
+            
             - name: NCCL_FASTRAK_LLCM_DEVICE_DIRECTORY
               value: /dev/aperture_devices
 
-            # NCCL settings from A3Mega configuration
+            # REQUIRED INFRASTRUCTURE SWITCH LINKS
             - name: NCCL_FASTRAK_CTRL_DEV
               value: "eth0"
             - name: NCCL_SOCKET_IFNAME
               value: "eth0"
+            - name: NCCL_FASTRAK_IFNAME
+              value: "eth1,eth2,eth3,eth4,eth5,eth6,eth7,eth8"
+
+            # PRODUCTION ALIGNMENT MATRIX WITH GUEST CONFIG AUDIT CONTRACTS
             - name: NCCL_CROSS_NIC
               value: "0"
-            - name: NCCL_ALGO
-              value: "Ring,Tree"
             - name: NCCL_PROTO
-              value: "Simple"
+              value: "Simple,LL128"
             - name: NCCL_MIN_NCHANNELS
               value: "4"
-            - name: NCCL_DYNAMIC_CHUNK_SIZE
-              value: "524288"
+            - name: NCCL_NVLSTREE_MAX_CHUNKSIZE
+              value: "131072"
             - name: NCCL_P2P_NET_CHUNKSIZE
               value: "524288"
             - name: NCCL_P2P_PCI_CHUNKSIZE
@@ -265,56 +256,40 @@ spec:
               value: "1048576"
             - name: NCCL_FASTRAK_NUM_FLOWS
               value: "2"
-            - name: NCCL_BUFFSIZE
-              value: "8388608"
-            - name: NCCL_NET_GDR_LEVEL
-              value: "PIX"
-            - name: NCCL_DEBUG_SUBSYS
-              value: "INIT,GRAPH,ENV,TUNING,NET"
-            - name: NCCL_FASTRAK_ENABLE_HOTPATH_LOGGING
-              value: "0"
             - name: NCCL_FASTRAK_USE_SNAP
               value: "1"
             - name: NCCL_FASTRAK_ENABLE_CONTROL_CHANNEL
               value: "0"
+            - name: NCCL_BUFFSIZE
+              value: "8388608"
+            - name: NCCL_NET_GDR_LEVEL
+              value: "PIX"
+            - name: NCCL_FASTRAK_ENABLE_HOTPATH_LOGGING
+              value: "0"
             - name: NCCL_FASTRAK_USE_LLCM
               value: "1"
+            - name: NCCL_SHIMNET_GUEST_CONFIG_CHECKER_CONFIG_FILE
+              value: "/usr/local/tcpxo/lib64/a3plus_guest_config.textproto"
+
+            # RECOMMENDED EXTENSIONS
             - name: NCCL_TUNER_PLUGIN
               value: "libnccl-tuner.so"
             - name: NCCL_TUNER_CONFIG_PATH
-              value: "/usr/local/nccl-plugin/lib64/a3plus_tuner_config.textproto"
-            - name: NCCL_SHIMNET_GUEST_CONFIG_CHECKER_CONFIG_FILE
-              value: "/usr/local/nccl-plugin/lib64/a3plus_guest_config.textproto"
-            - name: NCCL_NVLS_ENABLE
-              value: "0"
+              value: "/usr/local/tcpxo/a3plus_tuner_config.textproto"
             - name: NCCL_FASTRAK_PLUGIN_ACCEPT_TIMEOUT_MS
               value: "600000"
             - name: CUDA_VISIBLE_DEVICES
               value: "0,1,2,3,4,5,6,7"
-            - name: NCCL_FASTRAK_IFNAME
-              value: "eth1,eth2,eth3,eth4,eth5,eth6,eth7,eth8"
-
-            # The following is needed to prevent send-receive stalling execution
             - name: NVTE_FWD_LAYERNORM_SM_MARGIN
               value: "8"
             - name: NVTE_BWD_LAYERNORM_SM_MARGIN
               value: "8"
 
-            # NCCL settings
+            # WORKLOAD DEFINITIONS
             - name: LAUNCHER_SCRIPT
               value: "/workload/launcher/launch-workload.sh"
             - name: SERVER_ARGS_FILE
               value: "/workload/configs/{{ $root.Values.workload.configFile | default "serving-args.yaml" }}"
-            - name: NCCL_P2P_PXN_LEVEL
-              value: "0"
-            - name: NCCL_PROFILER_PLUGIN
-              value: "none"
-            - name: NCCL_TUNER_PLUGIN
-              value: "none"
-            - name: TRTLLM_DISABLE_AUTOTUNER
-              value: "1"
-            - name: TRTLLM_CUSTOM_ALLREDUCE
-              value: "0"
             - name: MODEL_NAME
               value: "{{ $root.Values.workload.model.name }}"
 
@@ -327,8 +302,7 @@ spec:
           - bash
           - -c
           - |
-            # Launch the server
-
+            # Launch the server loop based on reference structures
             if [[ -n "${NCCL_INIT_SCRIPT}" ]]; then
                 echo "Running NCCL init script: ${NCCL_INIT_SCRIPT}"
                 source ${NCCL_INIT_SCRIPT}
@@ -352,13 +326,13 @@ spec:
 
                   if [ -n "$key" ]; then
                     if [[ "$value" == "true" ]]; then
-                     ARGS+=("--$key")
+                      ARGS+=("--$key")
                     elif [[ "$value" == "false" ]]; then
-                     ARGS+=("--$key" "false")
+                      ARGS+=("--$key" "false")
                     elif [ -n "$value" ]; then
-                     ARGS+=("--$key" "$value")
+                      ARGS+=("--$key" "$value")
                     else
-                     ARGS+=("--$key")
+                      ARGS+=("--$key")
                     fi
                   fi
                 done < "$SERVER_ARGS_FILE"
@@ -384,7 +358,7 @@ spec:
             mountPath: /dev/aperture_devices
           {{- if not $root.Values.gpuPlatformSettings.useHostPlugin }}
           - name: nccl-plugin-volume
-            mountPath: /usr/local/nccl-plugin
+            mountPath: /usr/local/tcpxo
           {{- end }}
           - name: sys
             mountPath: /hostsysfs
