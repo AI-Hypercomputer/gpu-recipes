@@ -1,4 +1,4 @@
-# Copyright 2025 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -124,6 +124,7 @@ parse_serving_config() {
     streaming=${SERVING_CONFIG_DICT["streaming"]:="false"}
     max_input_len=${SERVING_CONFIG_DICT["max_input_len"]:=""}
     max_batch_size=${SERVING_CONFIG_DICT["max_batch_size"]:=""}
+    max_num_tokens=${SERVING_CONFIG_DICT["max_num_tokens"]:=""}
     custom_dataset=${SERVING_CONFIG_DICT["dataset"]:=""}
 }
 
@@ -145,6 +146,7 @@ print_configuration() {
     echo "streaming:               $streaming"
     echo "max input length:        $max_input_len"
     echo "max batch size:          $max_batch_size"
+    echo "max num tokens:          $max_num_tokens"
     echo "kv_cache_free_gpu_mem_fraction: $kv_cache_free_gpu_mem_fraction"
     echo "--------------------------------"
 }
@@ -174,6 +176,7 @@ run_benchmark() {
     if [ "$streaming" == "true" ]; then vl_args="$vl_args --streaming"; fi
     if [ -n "$max_input_len" ]; then vl_args="$vl_args --max_input_len $max_input_len"; fi
     if [ -n "$max_batch_size" ]; then vl_args="$vl_args --max_batch_size $max_batch_size"; fi
+    if [ -n "$max_num_tokens" ]; then vl_args="$vl_args --max_num_tokens $max_num_tokens"; fi
 
     dataset_file=$custom_dataset
     # If custom_dataset is not set, generate a textual dataset with tokens sampled in normal distribution
@@ -198,14 +201,13 @@ run_benchmark() {
     fi
 
     export TOKENIZERS_PARALLELISM=false
-    echo "enable_cuda_graph: false" > /tmp/extra_llm_api_args.yaml
 
     if [[ $backend == "pytorch" ]]; then
         echo "Running throughput benchmark"
         export NCCL_P2P_LEVEL=PHB
         trtllm-bench \
         --model $model_name \
-        --model_path /ssd/${model_name} throughput \
+        --model_path /ssd/${model_name} throughput --tp $tp_size --pp $pp_size \
         --dataset $dataset_file \
         --num_requests $num_requests \
         --tp $tp_size \
@@ -231,10 +233,10 @@ run_benchmark() {
         echo "Running throughput benchmark"
         trtllm-bench \
             --model $model_name \
-            --model_path /ssd/${model_name} throughput \
+            --model_path /ssd/${model_name} throughput --tp $tp_size --pp $pp_size \
             --dataset $dataset_file \
             --engine_dir $engine_dir \
-            --kv_cache_free_gpu_mem_fraction $kv_cache_free_gpu_mem_fraction $extra_args >$output_file
+            --kv_cache_free_gpu_mem_fraction $kv_cache_free_gpu_mem_fraction $extra_args $vl_args >$output_file
     fi
 
     cat $output_file
@@ -263,7 +265,8 @@ main() {
 
 # Set environment variables
 export HF_HOME=/ssd
-export LD_LIBRARY_PATH=/usr/local/lib/python3.12/dist-packages/torch/lib:/usr/local/lib/python3.12/dist-packages/torch_tensorrt/lib:/usr/local/cuda/compat/lib:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64:/usr/local/tensorrt/lib
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib/python3.12/dist-packages/torch/lib:/usr/local/lib/python3.12/dist-packages/torch_tensorrt/lib:/usr/local/cuda/compat/lib:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64:/usr/local/tensorrt/lib
 
 # Run the main function
 main "$@"
+
