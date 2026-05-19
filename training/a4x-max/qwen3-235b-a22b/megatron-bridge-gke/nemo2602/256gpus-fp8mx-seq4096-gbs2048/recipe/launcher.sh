@@ -82,7 +82,6 @@ git clone https://github.com/NVIDIA-NeMo/Megatron-Bridge.git
 cd Megatron-Bridge
 git checkout r0.3.0
 git submodule update --init --recursive
-sed -i -e '/pretrain(config=recipe/i \    recipe.dist.distributed_timeout_minutes = 10' scripts/performance/run_script.py
 ls
 
 cp $CUSTOM_SETUP_EXPERIMENT_SCRIPT_PATH scripts/performance/
@@ -129,8 +128,7 @@ worker_command=$(cat <<- EOM
     --cuda_graph_impl transformer_engine \
     --cuda_graph_scope moe_router,moe_preprocess \
     --hf_token "${HF_TOKEN}" \
-    --max_step 30 \
-    ${config_overrides}
+    --max_step 30
 EOM
 )
 
