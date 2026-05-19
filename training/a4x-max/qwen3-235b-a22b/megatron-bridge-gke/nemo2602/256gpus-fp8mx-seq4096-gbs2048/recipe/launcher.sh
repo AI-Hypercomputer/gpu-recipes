@@ -129,7 +129,8 @@ worker_command=$(cat <<- EOM
     --cuda_graph_impl transformer_engine \
     --cuda_graph_scope moe_router,moe_preprocess \
     --hf_token "${HF_TOKEN}" \
-    --max_step 30
+    --max_step 30 \
+    ${config_overrides}
 EOM
 )
 
