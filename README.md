@@ -188,8 +188,8 @@ basis.
 For general guidance on how to get started using Compute products, refer to the official
 documentation and tutorials:
 
-- [Official Compute Engine tutorials](https://docs.cloud.google.com/compute/docs/overview)
-- [Official Compute Engine samples](https://docs.cloud.google.com/compute/docs/samples)
+- [Compute Engine overview](https://docs.cloud.google.com/compute/docs/overview)
+- [Compute Engine samples](https://docs.cloud.google.com/compute/docs/samples)
 - [Cloud GPU documentation](https://cloud.google.com/compute/docs/gpus)
 - [AI Hypercomputer documentation](https://docs.cloud.google.com/ai-hypercomputer/docs)
 - [Automated GPU environment deployment with Cluster Toolkit](https://docs.cloud.google.com/cluster-toolkit/docs/deploy/gke/gke-gpu-overview)
