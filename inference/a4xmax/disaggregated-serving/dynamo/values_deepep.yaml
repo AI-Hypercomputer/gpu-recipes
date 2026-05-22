@@ -15,7 +15,7 @@
 dynamo:
   namespace: dynamo-cloud
   releaseVersion: "1.0.1"
-  deploymentName: dynamo-disagg10p8d
+  deploymentName: ""
   computeDomain:
     name: a4x-max-domain
     numNodes: 18
