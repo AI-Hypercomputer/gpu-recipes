@@ -15,7 +15,7 @@
 apiVersion: nvidia.com/v1alpha1
 kind: DynamoGraphDeployment
 metadata:
-  name: {{ .Values.dynamo.deploymentName }}
+  name: {{ .Values.dynamo.deploymentName | default .Release.Name }}
   namespace: {{ .Values.dynamo.namespace }}
 spec:
   {{- if .Values.workload.framework }}
