@@ -290,7 +290,7 @@ kubectl exec -it bench-client -- bash -c "cd /workspace/dynamo/examples/backends
 Or we can send a benchmark request to a frontend pod like this:
 
 ```bash
-kubectl exec -n ${NAMESPACE} $USER-dynamo-multi-node-serving-frontend -- python3 -u -m sglang.bench_serving    --backend sglang-oai-chat    --base-url http://localhost:8000    --model "deepseek-ai/DeepSeek-R1"    --tokenizer /data/model/deepseek-ai/DeepSeek-R1    --dataset-name random    --num-prompts 10240   --random-input-len 8192  --random-range-ratio 0.8   --random-output-len 1024   --max-concurrency 2048
+kubectl exec -n ${NAMESPACE} $USER-dynamo-a4xmax-multi-node-frontend -- python3 -u -m sglang.bench_serving    --backend sglang-oai-chat    --base-url http://localhost:8000    --model "deepseek-ai/DeepSeek-R1"    --tokenizer /data/model/deepseek-ai/DeepSeek-R1    --dataset-name random    --num-prompts 10240   --random-input-len 8192  --random-range-ratio 0.8   --random-output-len 1024   --max-concurrency 2048
 ```
 
 <a name="monitoring"></a>
@@ -307,17 +307,17 @@ kubectl get pods -n ${NAMESPACE}
 
 Frontend logs:
 ```bash
-kubectl logs -f deployment/$USER-dynamo-multi-node-serving-frontend -n ${NAMESPACE}
+kubectl logs -f deployment/$USER-dynamo-a4xmax-multi-node-frontend -n ${NAMESPACE}
 ```
 
 Decode worker logs:
 ```bash
-kubectl logs -f deployment/$USER-dynamo-multi-node-serving-decode-worker -n ${NAMESPACE}
+kubectl logs -f deployment/$USER-dynamo-a4xmax-multi-node-decode-worker -n ${NAMESPACE}
 ```
 
 Prefill worker logs:
 ```bash
-kubectl logs -f deployment/$USER-dynamo-multi-node-serving-prefill-worker -n ${NAMESPACE}
+kubectl logs -f deployment/$USER-dynamo-a4xmax-multi-node-prefill-worker -n ${NAMESPACE}
 ```
 
 Common issues:
@@ -339,7 +339,7 @@ helm list -n ${NAMESPACE} --filter $USER-dynamo-
 
 Uninstall specific deployments:
 ```bash
-helm uninstall $USER-dynamo-multi-node-serving -n ${NAMESPACE}
+helm uninstall $USER-dynamo-a4xmax-multi-node -n ${NAMESPACE}
 ```
 
 Uninstall Dynamo platform (if no longer needed):
