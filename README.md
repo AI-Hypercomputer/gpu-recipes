@@ -20,32 +20,53 @@ Welcome to the reproducible benchmark recipes repository for GPUs! This reposito
 
 Models            | GPU Machine Type                                                                                          | Framework | Workload Type | Orchestrator | Link to the recipe
 ----------------- | --------------------------------------------------------------------------------------------------------- | --------- | ------------- | ------------ | ------------------
-**GPT3-175B**     | [A3 Mega (NVIDIA H100)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-mega-vms) | NeMo      | Pre-training  | GKE          | [Link](./training/a3mega/gpt3-175b/nemo-pretraining-gke/README.md)
-**Llama-3-70B**   | [A3 Mega (NVIDIA H100)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-mega-vms) | NeMo      | Pre-training  | GKE          | [Link](./training/a3mega/llama3-70b/nemo-pretraining-gke/README.md)
-**Llama-3.1-70B** | [A3 Mega (NVIDIA H100)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-mega-vms) | NeMo      | Pre-training  | GKE          | [Link](./training/a3mega/llama3-1-70b/nemo-pretraining-gke/README.md)
-**Mixtral-8-7B**  | [A3 Mega (NVIDIA H100)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-mega-vms) | NeMo      | Pre-training  | GKE          | [Link](./training/a3mega/mixtral-8x7b/nemo-pretraining-gke/README.md)
+**GPT3-175B**     | [A3 Mega (NVIDIA H100)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-mega-vms) | NeMo (25.07) | Pre-training  | GKE          | [Link](./training/a3mega/gpt3_175b/nemo-gke/nemo2507/recipe/)
+**Llama-3-70B**   | [A3 Mega (NVIDIA H100)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-mega-vms) | NeMo (25.07) | Pre-training  | GKE          | [Link](./training/a3mega/llama3_70b/nemo-gke/nemo2507/128gpus-bf16/recipe/)
+**Mixtral-8-7B**  | [A3 Mega (NVIDIA H100)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-mega-vms) | NeMo (25.07) | Pre-training  | GKE          | [Link](./training/a3mega/mixtral_8x7b/nemo-gke/nemo2507/recipe/)
 
 
 ### Training benchmarks A3 Ultra
 
 Models             | GPU Machine Type                                                                                            | Framework | Workload Type | Orchestrator | Link to the recipe
 ------------------ | ----------------------------------------------------------------------------------------------------------- | --------- | ------------- | ------------ | ------------------
-**Llama-3.1-70B**  | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) | MaxText   | Pre-training  | GKE          | [Link](./training/a3ultra/llama3-1-70b/maxtext-pretraining-gke/README.md)
-**Llama-3.1-70B**  | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) | NeMo      | Pre-training  | GKE          | [Link](./training/a3ultra/llama3-1-70b/nemo-pretraining-gke/README.md)
-**Llama-3.1-405B** | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) | MaxText   | Pre-training  | GKE          | [Link](./training/a3ultra/llama3-1-405b/maxtext-pretraining-gke/README.md)
-**Llama-3.1-405B** | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) | NeMo.     | Pre-training  | GKE          | [Link](./training/a3ultra/llama3-1-405b/nemo-pretraining-gke/README.md)
-**Mixtral-8-7B**   | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) | NeMo      | Pre-training  | GKE          | [Link](./training/a3ultra/mixtral-8x7b/nemo-pretraining-gke/README.md)
+**Llama-3.1-70B**  | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) | MaxText | Pre-training  | GKE          | [Link](./training/a3ultra/llama3-1-70b/maxtext-pretraining-gke/README.md)
+**Llama-3.1-70B**  | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) | NeMo (24.07) | Pre-training  | GKE          | [Link](./training/a3ultra/llama3_70b/nemo-gke/nemo2407/recipe/)
+**Llama-3-70B**    | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) | Megatron-Bridge (26.02) | Pre-training  | GKE          | [Link](./training/a3ultra/llama3_70b/megatron-bridge-gke/nemo2602/)
+**Llama-3-70B**    | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) | Megatron-Bridge (25.11) | Pre-training  | Slurm          | [Link](./training/a3ultra/llama3_70b/megatron-bridge-slurm/nemo2511/)
+**Llama-3-8B**     | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) | Megatron-Bridge (25.11) | Pre-training  | Slurm          | [Link](./training/a3ultra/llama3_8b/megatron-bridge-slurm/nemo2511/)
+**Llama-3.1-405B** | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) | MaxText | Pre-training  | GKE          | [Link](./training/a3ultra/llama3-1-405b/maxtext-pretraining-gke/README.md)
+**Llama-3.1-405B** | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) | NeMo (24.12) | Pre-training  | GKE          | [Link](./training/a3ultra/llama31_405b/nemo-gke/nemo2412/recipe/)
+**Mixtral-8-7B**   | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) | NeMo (24.07) | Pre-training  | GKE          | [Link](./training/a3ultra/mixtral_8x7b/nemo-gke/nemo2407/recipe/)
+**DeepSeek-V3**    | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) | Megatron-Bridge (26.02) | Pre-training  | GKE          | [Link](./training/a3ultra/deepseek_v3/megatron-bridge-gke/nemo2602/)
+**GPT OSS 120B**   | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) | NeMo (26.02) | Pre-training  | GKE          | [Link](./training/a3ultra/gpt_oss_120b/nemo-gke/nemo2602/)
+**Qwen-3-30B**     | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) | NeMo (26.02) | Pre-training  | GKE          | [Link](./training/a3ultra/qwen3_30b_a3b/nemo-gke/nemo2602/)
+**Wan-2.1**        | [A3 Ultra (NVIDIA H200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a3-ultra-vms) | Megatron-Bridge (26.02) | Pre-training  | GKE          | [Link](./training/a3ultra/wan/megatron-bridge-gke/nemo2602/)
+
 
 ### Training benchmarks A4
 
 Models             | GPU Machine Type                                                                                     | Framework / Library | Workload Type | Orchestrator | Link to the recipe
------------------- | ---------------------------------------------------------------------------------------------------- | --------- | ------------- | ------------ | ------------------
-**Llama-3.1-70B** | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | MaxText   | Pre-training  | GKE          | [Link](./training/a4/llama3-1-70b/maxtext-pretraining-gke/README.md)
-**Llama-3.1-70B** | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | NeMo      | Pre-training  | GKE          | [Link](./training/a4/llama3-1-70b/nemo-pretraining-gke)
-**Llama-3.1-405B** | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | MaxText   | Pre-training  | GKE          | [Link](./training/a4/llama3-1-405b/maxtext-pretraining-gke/README.md)
-**Llama-3.1-405B** | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | NeMo      | Pre-training  | GKE          | [Link](./training/a4/llama3-1-405b/nemo-pretraining-gke/README.md)
-**Mixtral-8-7B**   | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | NeMo      | Pre-training  | GKE          | [Link](./training/a4/mixtral-8x7b/nemo-pretraining-gke/README.md)
-**PaliGemma2**     | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | Hugging Face Accelerate | Finetuning | GKE     | [Link](./training/a4/paligemma2/README.md)
+------------------ | ---------------------------------------------------------------------------------------------------- | ------------------- | ------------- | ------------ | ------------------
+**Llama-3.1-70B**  | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | MaxText | Pre-training  | GKE          | [Link](./training/a4/llama3-1-70b/maxtext-pretraining-gke/README.md)
+**Llama-3.1-70B**  | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | NeMo (25.07) | Pre-training  | GKE          | [Link](./training/a4/llama3_70b/nemo-gke/nemo2507/)
+**Llama-3.1-70B**  | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | NeMo (26.02) | Pre-training  | GKE          | [Link](./training/a4/llama3_70b/nemo-gke/nemo2602/)
+**Llama-3.1-70B**  | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | Megatron-Bridge (25.09) | Pre-training  | Slurm          | [Link](./training/a4/llama3_70b/megatron-bridge-slurm/nemo2509/)
+**Llama-3.1-405B** | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | MaxText | Pre-training  | GKE          | [Link](./training/a4/llama3-1-405b/maxtext-pretraining-gke/README.md)
+**Llama-3.1-405B** | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | NeMo (25.07) | Pre-training  | GKE          | [Link](./training/a4/llama31_405b/nemo-gke/nemo2507/)
+**Llama-3.1-405B** | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | NeMo (26.02) | Pre-training  | GKE          | [Link](./training/a4/llama31_405b/nemo-gke/nemo2602/)
+**Llama-3.1-405B** | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | Megatron-Bridge (25.09) | Pre-training  | Slurm          | [Link](./training/a4/llama31_405b/megatron-bridge-slurm/nemo2509/)
+**Mixtral-8-7B**   | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | NeMo (25.07) | Pre-training  | GKE          | [Link](./training/a4/mixtral_8x7b/nemo-gke/nemo2507/recipe/)
+**PaliGemma2**     | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | Hugging Face Accelerate | Finetuning | GKE          | [Link](./training/a4/paligemma2/README.md)
+**DeepSeek-V3**    | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | Megatron-Bridge (25.11) | Pre-training  | GKE          | [Link](./training/a4/deepseek_v3/megatron-bridge-gke/nemo2511/)
+**DeepSeek-V3**    | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | Megatron-Bridge (26.02) | Pre-training  | GKE          | [Link](./training/a4/deepseek_v3/megatron-bridge-gke/nemo2602/)
+**GPT OSS 120B**   | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | Megatron-Bridge (26.02) | Pre-training  | GKE          | [Link](./training/a4/gpt_oss_120b/megatron-bridge-gke/nemo2602/)
+**Llama-3-8B**     | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | Megatron-Bridge (26.02) | Pre-training  | GKE          | [Link](./training/a4/llama3-8b/megatron-bridge-gke/nemo2602/)
+**Qwen-3-235B**    | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | Megatron-Bridge (25.11) | Pre-training  | GKE          | [Link](./training/a4/qwen3_235b_a22b/megatron-bridge-gke/nemo2511/)
+**Qwen-3-235B**    | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | Megatron-Bridge (26.02) | Pre-training  | GKE          | [Link](./training/a4/qwen3_235b_a22b/megatron-bridge-gke/nemo2602/)
+**Qwen-3-235B**    | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | Megatron-Bridge (25.11) | Pre-training  | Slurm          | [Link](./training/a4/qwen3_235b_a22b/megatron-bridge-slurm/nemo2511/)
+**Qwen-3-30B**     | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | NeMo (26.02) | Pre-training  | GKE          | [Link](./training/a4/qwen3_30b_a3b/nemo-gke/nemo2602/)
+**Wan-2.1-14B**    | [A4 (NVIDIA B200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4-vms)      | NeMo (25.11) | Pre-training  | GKE          | [Link](./training/a4/wan_14b/nemo-gke/nemo2511/)
+
 
 ### Training benchmarks A4X
 
