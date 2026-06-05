@@ -36,8 +36,8 @@ validate_model_name() {
 # Function to parse arguments
 parse_arguments() {
     model_name=$MODEL_NAME
-    isl_list="128"
-    osl_list="128"
+    isl="128"
+    osl="128"
     num_requests=1024
 
     # Parse known arguments and check for unknown option or missing argument
@@ -57,11 +57,11 @@ parse_arguments() {
             shift 2
             ;;
         --isl)
-            isl_list="$2"
+            isl="$2"
             shift 2
             ;;
         --osl)
-            osl_list="$2"
+            osl="$2"
             shift 2
             ;;
         --num_requests)
@@ -138,8 +138,8 @@ print_configuration() {
     echo "--------------------------------"
     echo "--- Parsed Arguments Summary ---"
     echo "model name:              $model_name"
-    echo "input seq lengths:       $isl_list"
-    echo "output seq lengths:      $osl_list"
+    echo "input seq length(s):     $isl"
+    echo "output seq length(s):    $osl"
     echo "number of requests:      $num_requests"
     echo "tensor parallel size:    $tp_size"
     echo "pipeline parallel size:  $pp_size"
@@ -311,12 +311,12 @@ main() {
 
     # Convert comma-separated lists to arrays
     # Remove spaces and split by comma
-    IFS=',' read -ra ISL_ARRAY <<< "${isl_list// /}"
-    IFS=',' read -ra OSL_ARRAY <<< "${osl_list// /}"
+    IFS=',' read -ra ISL_ARRAY <<< "${isl// /}"
+    IFS=',' read -ra OSL_ARRAY <<< "${osl// /}"
 
     # Validate array lengths match
     if [[ ${#ISL_ARRAY[@]} -ne ${#OSL_ARRAY[@]} ]]; then
-        echo "Error: The number of values in --isl and --osl must be the same."
+        echo "Error: The number of values in --isl and --osl list(s) must be the same."
         echo "ISL count: ${#ISL_ARRAY[@]}, OSL count: ${#OSL_ARRAY[@]}"
         exit 1
     fi
