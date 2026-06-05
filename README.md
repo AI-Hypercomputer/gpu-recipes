@@ -51,12 +51,25 @@ Models             | GPU Machine Type                                           
 
 Models             | GPU Machine Type                                                                                     | Framework | Workload Type | Orchestrator | Link to the recipe
 ------------------ | ---------------------------------------------------------------------------------------------------- | --------- | ------------- | ------------ | ------------------
-**Llama-3.1-8B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)      | NeMo   | Pre-training  | GKE          | [Link](./training/a4x/llama3-1-8b/nemo-pretraining-gke/)
-**Llama-3.1-70B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)      | NeMo      | Pre-training  | GKE          | [Link](./training/a4x/llama3-1-70b/nemo-pretraining-gke/)
-**Llama-3.1-405B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)      | NeMo      | Pre-training  | GKE          | [Link](./training/a4x/llama3-1-405b/nemo-pretraining-gke/)
-**Nemotron-4-340B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)      | NeMo      | Pre-training  | GKE          | [Link](./training/a4x/nemotron4-340B/nemo-pretraining-gke/)
-**Wan-2.1-14B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)      | NeMo      | Pre-training  | GKE          | [Link](./training/a4x/wan2-1-14b/nemo-pretraining-gke/)
-**Wan-2.1-14B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)      | NeMo      | Pre-training  | Slurm          | [Link](./training/a4x/wan2-1-14b/nemo-pretraining-slurm/)
+**Llama-3.1-8B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | NeMo (25.07) | Pre-training | GKE | [Link](./training/a4x/llama3_8b/nemo-gke/nemo2507/)
+**Llama-3.1-8B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Megatron-Bridge (25.11) | Pre-training | GKE | [Link](./training/a4x/llama3_8b/megatron-bridge-gke/nemo2511/)
+**Llama-3.1-8B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Megatron-Bridge (25.11) | Pre-training | Slurm | [Link](./training/a4x/llama3_8b/megatron-bridge-slurm/nemo2511/)
+**Llama-3.1-70B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | NeMo (25.07) | Pre-training | GKE | [Link](./training/a4x/llama3_70b/nemo-gke/nemo2507/)
+**Llama-3.1-70B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Megatron-Bridge (26.02) | Pre-training | GKE | [Link](./training/a4x/llama3_70b/nemo-gke/nemo2602/)
+**Llama-3.1-405B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | NeMo (25.07) | Pre-training | GKE | [Link](./training/a4x/llama31_405b/nemo-gke/nemo2507/)
+**Llama-3.1-405B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | NeMo (26.02) | Pre-training | GKE | [Link](./training/a4x/llama31_405b/nemo-gke/nemo2602/)
+**Llama-3.1-405B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Megatron-Bridge (26.02) | Pre-training | GKE | [Link](./training/a4x/llama31_405b/megatron-bridge-gke/nemo2602/)
+**Llama-3.1-405B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Megatron-Bridge (25.09) | Pre-training | Slurm | [Link](./training/a4x/llama31_405b/megatron-bridge-slurm/nemo2509/)
+**Nemotron-4-340B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | NeMo (25.09) | Pre-training | GKE | [Link](./training/a4x/nemotron4_340b/nemo-gke/nemo2509/)
+**Wan-2.1-14B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | NeMo (25.11) | Pre-training | GKE | [Link](./training/a4x/wan_14b/nemo-gke/nemo2511/)
+**Wan-2.1-14B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | NeMo (26.02) | Pre-training | GKE | [Link](./training/a4x/wan_14b/nemo-gke/nemo2602/)
+**Wan-2.1-14B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | NeMo (25.11) | Pre-training | Slurm | [Link](./training/a4x/wan_14b/nemo-slurm/nemo2511/)
+**DeepSeek-V3** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Megatron-Bridge (25.11) | Pre-training | GKE | [Link](./training/a4x/deepseek_v3/megatron-bridge-gke/nemo2511/)
+**Qwen-3-235B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Megatron-Bridge (25.11) | Pre-training | GKE | [Link](./training/a4x/qwen3_235b_a22b/megatron-bridge-gke/nemo2511/)
+**Qwen-3-235B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Megatron-Bridge (25.11) | Pre-training | Slurm | [Link](./training/a4x/qwen3_235b_a22b/megatron-bridge-slurm/nemo2511/)
+**Qwen-3-30B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Megatron-Bridge (25.11) | Pre-training | GKE | [Link](./training/a4x/qwen3_30b_a3b/megatron-bridge-gke/nemo2511/)
+**Qwen-3-30B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Megatron-Bridge (25.11) | Pre-training | Slurm | [Link](./training/a4x/qwen3_30b_a3b/megatron-bridge-slurm/nemo2511/)
+
 
 ### Inference benchmarks A3 Mega
 
