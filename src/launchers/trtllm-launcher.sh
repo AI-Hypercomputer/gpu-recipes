@@ -21,6 +21,9 @@ echo "TensorRT-LLM benchmark arguments received:"
 echo "  $@"
 echo ""
 
+# Define model download directory if not set
+MODEL_DOWNLOAD_DIR=${MODEL_DOWNLOAD_DIR:-/ssd}
+
 # Function to validate model name
 validate_model_name() {
     if [ -z "$MODEL_NAME" ]; then
@@ -33,9 +36,9 @@ validate_model_name() {
 # Function to parse arguments
 parse_arguments() {
     model_name=$MODEL_NAME
-    isl=128
-    osl=128
-    num_requests=30000
+    isl_list="128"
+    osl_list="128"
+    num_requests=1024
 
     # Parse known arguments and check for unknown option or missing argument
     PARSED_OPTIONS=$(getopt -o "" -l model_name:,isl:,osl:,num_requests: -- "$@")
@@ -54,11 +57,11 @@ parse_arguments() {
             shift 2
             ;;
         --isl)
-            isl="$2"
+            isl_list="$2"
             shift 2
             ;;
         --osl)
-            osl="$2"
+            osl_list="$2"
             shift 2
             ;;
         --num_requests)
@@ -119,12 +122,13 @@ parse_serving_config() {
     pp_size=${SERVING_CONFIG_DICT["pp_size"]:=1}
     ep_size=${SERVING_CONFIG_DICT["ep_size"]:=1}
     backend=${SERVING_CONFIG_DICT["backend"]:="tensorrt"}
-    kv_cache_free_gpu_mem_fraction=${SERVING_CONFIG_DICT["kv_cache_free_gpu_mem_fraction"]:=0.95}
+    kv_cache_free_gpu_mem_fraction=${SERVING_CONFIG_DICT["kv_cache_free_gpu_mem_fraction"]:=0.70}
     modality=${SERVING_CONFIG_DICT["modality"]:=""}
     streaming=${SERVING_CONFIG_DICT["streaming"]:="false"}
     max_input_len=${SERVING_CONFIG_DICT["max_input_len"]:=""}
     max_batch_size=${SERVING_CONFIG_DICT["max_batch_size"]:=""}
     custom_dataset=${SERVING_CONFIG_DICT["dataset"]:=""}
+    quantization=${SERVING_CONFIG_DICT["quantization"]:="FP8"}
 }
 
 print_configuration() {
@@ -134,8 +138,8 @@ print_configuration() {
     echo "--------------------------------"
     echo "--- Parsed Arguments Summary ---"
     echo "model name:              $model_name"
-    echo "input seq length:        $isl"
-    echo "output seq length:       $osl"
+    echo "input seq lengths:       $isl_list"
+    echo "output seq lengths:      $osl_list"
     echo "number of requests:      $num_requests"
     echo "tensor parallel size:    $tp_size"
     echo "pipeline parallel size:  $pp_size"
@@ -144,6 +148,7 @@ print_configuration() {
     echo "modality:                $modality"
     echo "streaming:               $streaming"
     echo "max input length:        $max_input_len"
+    echo "quantization:            $quantization"
     echo "max batch size:          $max_batch_size"
     echo "kv_cache_free_gpu_mem_fraction: $kv_cache_free_gpu_mem_fraction"
     echo "--------------------------------"
@@ -152,7 +157,8 @@ print_configuration() {
 download_model() {
     echo "Downloading model from HuggingFace... This may take a while when downloading for the first time."
     echo "NOTE: by default, huggingface-cli response can be verbose."
-    huggingface-cli download $model_name --exclude="*original*" --local-dir ${MODEL_DOWNLOAD_DIR} --local-dir-use-symlinks False
+    # Ensure we download into a model-specific subdirectory
+    huggingface-cli download $model_name --exclude="*original*" --local-dir ${MODEL_DOWNLOAD_DIR}/${model_name##*/} --local-dir-use-symlinks False
 }
 
 # Function to run benchmarks
@@ -167,6 +173,24 @@ run_benchmark() {
     local backend=$8
     local kv_cache_free_gpu_mem_fraction=$9
 
+    local engine_dir=""
+    local generated_dataset=""
+    local output_file="${MODEL_DOWNLOAD_DIR}/output_${model_name##*/}_isl${isl}_osl${osl}_tp${tp_size}.txt"
+    local benchmark_rc=0
+
+    export TOKENIZERS_PARALLELISM=false
+    
+    # Emergency cleanup on crash
+    cleanup_on_exit() {
+        local exit_code=$?
+        if [[ $exit_code -ne 0 ]]; then
+            echo "Benchmark interrupted (Exit code: $exit_code). Cleaning up temporary files..."
+            [[ -n "${engine_dir:-}" && -d "${engine_dir:-}" ]] && rm -rf "${engine_dir}" || true
+            [[ -n "${generated_dataset:-}" && -f "${generated_dataset:-}" ]] && rm -f "${generated_dataset}" || true
+        fi
+    }
+    trap cleanup_on_exit EXIT SIGINT SIGTERM
+
     echo "Running benchmark for $model_name with ISL=$isl, OSL=$osl, TP=$tp_size, PP=$pp_size, EP=$ep_size, backend=$backend"
 
     vl_args=""
@@ -176,12 +200,18 @@ run_benchmark() {
     if [ -n "$max_batch_size" ]; then vl_args="$vl_args --max_batch_size $max_batch_size"; fi
 
     dataset_file=$custom_dataset
-    # If custom_dataset is not set, generate a textual dataset with tokens sampled in normal distribution
+    local tokenizer_arg=$model_name
+    if [ -d "/serving-model" ]; then
+        tokenizer_arg="/serving-model"
+    fi
+
+    # Point 3 & 4: Tokenizer logic
     if [ -z "$dataset_file" ]; then
-        dataset_file="/ssd/token-norm-dist_${model_name##*/}_${isl}_${osl}_tp${tp_size}.json"
+        dataset_file="${MODEL_DOWNLOAD_DIR}/token-norm-dist_${model_name##*/}_${isl}_${osl}_tp${tp_size}.json"
+        generated_dataset=$dataset_file
         echo "Preparing dataset"
         python3 $TRTLLM_DIR/benchmarks/cpp/prepare_dataset.py \
-            --tokenizer=$model_name \
+            --tokenizer=$tokenizer_arg \
             --stdout token-norm-dist \
             --num-requests=$num_requests \
             --input-mean=$isl \
@@ -190,58 +220,83 @@ run_benchmark() {
             --output-stdev=0 >$dataset_file
     fi 
 
-    output_file="/ssd/output_${model_name##*/}_isl${isl}_osl${osl}_tp${tp_size}.txt"
+    # Clean up any leftover extra args to prevent "invalid argument: enable_cuda_graph"
+    rm -f /tmp/extra_llm_api_args.yaml || true
+
     extra_args_file="/tmp/extra_llm_api_args.yaml"
     extra_args=""
     if [ -f "$extra_args_file" ]; then
         extra_args="--extra_llm_api_options $extra_args_file"
     fi
 
-    export TOKENIZERS_PARALLELISM=false
-    echo "enable_cuda_graph: false" > /tmp/extra_llm_api_args.yaml
+    # Point 5: Determine model path
+    local model_path_arg="${MODEL_DOWNLOAD_DIR}/${model_name}"
+    if [ -d "/serving-model" ]; then
+        model_path_arg="/serving-model"
+    fi
 
+    # Point 6, 7, 8: Throughput call
     if [[ $backend == "pytorch" ]]; then
         echo "Running throughput benchmark"
-        export NCCL_P2P_LEVEL=PHB
+        set +e
         trtllm-bench \
         --model $model_name \
-        --model_path /ssd/${model_name} throughput \
+        --model_path $model_path_arg throughput \
         --dataset $dataset_file \
         --num_requests $num_requests \
         --tp $tp_size \
         --pp $pp_size \
         --ep $ep_size \
-        --backend "pytorch" \
+        --backend $backend \
         --kv_cache_free_gpu_mem_fraction $kv_cache_free_gpu_mem_fraction \
-        $extra_args $vl_args > $output_file
+        $extra_args $vl_args | tee "$output_file"
+        benchmark_rc=${PIPESTATUS[0]}
+        set -e
     else
-        echo "Building engine"
+        # Point 9: Build engine
         trtllm-bench \
             --model $model_name \
-            --model_path /ssd/${model_name} \
-            --workspace /ssd build \
+            --model_path $model_path_arg \
+            --workspace ${MODEL_DOWNLOAD_DIR} build \
             --tp_size $tp_size \
             --pp_size $pp_size \
-            --quantization FP8 \
+            --quantization $quantization \
             --dataset $dataset_file
 
-        engine_dir="/ssd/${model_name}/tp_${tp_size}_pp_${pp_size}"
+        # Point 10: Engine Dir path
+        engine_dir="${model_path_arg}/tp_${tp_size}_pp_${pp_size}"
 
-        # Save throughput output to a file
+        # Point 11 & 12: Run throughput with engine
         echo "Running throughput benchmark"
+        set +e
         trtllm-bench \
             --model $model_name \
-            --model_path /ssd/${model_name} throughput \
+            --model_path $model_path_arg throughput \
             --dataset $dataset_file \
             --engine_dir $engine_dir \
-            --kv_cache_free_gpu_mem_fraction $kv_cache_free_gpu_mem_fraction $extra_args >$output_file
+            --tp $tp_size \
+            --pp $pp_size \
+            --ep $ep_size \
+            --backend $backend \
+            --kv_cache_free_gpu_mem_fraction $kv_cache_free_gpu_mem_fraction \
+            $extra_args | tee "$output_file"
+        benchmark_rc=${PIPESTATUS[0]}
+        set -e
     fi
 
-    cat $output_file
-    gcloud storage cp $output_file /gcs/benchmark_logs/trtllm/
+    # Point 13: Immediate sync of results to GCS
+    mkdir -p /gcs/benchmark_logs/trtllm || true
+    cp "$output_file" /gcs/benchmark_logs/trtllm/ || true
 
-    rm -rf $engine_dir
-    rm -f $dataset_file
+    # Standard cleanup after successful iteration
+    [[ -n "${engine_dir:-}" && -d "${engine_dir:-}" ]] && rm -rf "${engine_dir}" || true
+    [[ -n "${dataset_file:-}" ]] && rm -f "${dataset_file}" || true
+    trap - EXIT SIGINT SIGTERM
+
+    if [ $benchmark_rc -ne 0 ]; then
+        echo "Error: Benchmark command failed with exit code $benchmark_rc."
+        exit $benchmark_rc
+    fi
 }
 
 # Main function to run the benchmark
@@ -250,20 +305,49 @@ main() {
     validate_model_name
     parse_arguments "$@"
     parse_serving_config
-    print_configuration "$@"
 
     # download model
     download_model
 
+    # Convert comma-separated lists to arrays
+    # Remove spaces and split by comma
+    IFS=',' read -ra ISL_ARRAY <<< "${isl_list// /}"
+    IFS=',' read -ra OSL_ARRAY <<< "${osl_list// /}"
+
+    # Validate array lengths match
+    if [[ ${#ISL_ARRAY[@]} -ne ${#OSL_ARRAY[@]} ]]; then
+        echo "Error: The number of values in --isl and --osl must be the same."
+        echo "ISL count: ${#ISL_ARRAY[@]}, OSL count: ${#OSL_ARRAY[@]}"
+        exit 1
+    fi
+
+    print_configuration "$@"
+
     # run benchmark
     mkdir -p /gcs/benchmark_logs/trtllm
     echo "Running benchmarks"
-    run_benchmark "$model_name" $isl $osl $num_requests $tp_size $pp_size $ep_size $backend $kv_cache_free_gpu_mem_fraction
+    for i in "${!ISL_ARRAY[@]}"; do
+        current_isl="${ISL_ARRAY[$i]}"
+        current_osl="${OSL_ARRAY[$i]}"
+        
+        echo "Starting iteration $((i+1))/${#ISL_ARRAY[@]}: ISL=$current_isl, OSL=$current_osl, REQ=$num_requests"
+        run_benchmark "$model_name" "$current_isl" "$current_osl" "$num_requests" $tp_size $pp_size $ep_size $backend $kv_cache_free_gpu_mem_fraction
+    done
+
+    echo "-----------------------------------------------------------"
+    echo "Benchmarks complete. Keeping container alive for result inspection."
+    sleep infinity
 }
 
-# Set environment variables
-export HF_HOME=/ssd
-export LD_LIBRARY_PATH=/usr/local/lib/python3.12/dist-packages/torch/lib:/usr/local/lib/python3.12/dist-packages/torch_tensorrt/lib:/usr/local/cuda/compat/lib:/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64:/usr/local/tensorrt/lib
+# Force load the container's internal NCCL to resolve symbol mismatches on GKE
+for loc in "/usr/local/lib/python3.12/dist-packages/torch/lib/libnccl.so.2" "/usr/local/lib/python3.12/dist-packages/nvidia/nccl/lib/libnccl.so.2" "/usr/local/cuda/lib64/libnccl.so.2" "/usr/lib/x86_64-linux-gnu/libnccl.so.2"; do
+    if [ -f "$loc" ]; then
+        if nm -D "$loc" 2>/dev/null | grep -q "ncclCommWindowDeregister"; then
+            export LD_PRELOAD="$loc"
+            break
+        fi
+    fi
+done
 
 # Run the main function
 main "$@"
