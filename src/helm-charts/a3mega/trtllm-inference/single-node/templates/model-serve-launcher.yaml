@@ -273,6 +273,8 @@ spec:
             - name: LD_LIBRARY_PATH
               value: "/usr/local/tcpxo/lib64:/usr/local/cuda/lib64:/usr/local/nvidia/lib64"
             {{- end }}
+            - name: LD_PRELOAD
+              value: "/usr/local/lib/python3.12/dist-packages/nvidia/nccl/lib/libnccl.so.2"
             - name: NCCL_NET_PLUGIN_PATH
               value: "/usr/local/tcpxo/lib64"
             - name: NCCL_P2P_LEVEL
@@ -351,8 +353,6 @@ spec:
           - bash
           - -c
           - |
-            # locate NCCL library
-            export LD_PRELOAD=$(find /usr/local/lib -name "libnccl.so.2" | head -n 1)
 
             # Performance Tuning and NCCL Fixes for A3 Mega
             ulimit -l unlimited

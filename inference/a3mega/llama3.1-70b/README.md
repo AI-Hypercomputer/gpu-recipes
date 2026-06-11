@@ -297,12 +297,12 @@ Running benchmark for nvidia/Llama3.1-70b with ISL=128, OSL=128, TP=8, EP=1, PP=
 ===========================================================
 = PYTORCH BACKEND
 ===========================================================
-Model:			nvidia/Llama3.1-70b
-Model Path:		/ssd/nvidia/Llama3.1-70b
+Model:			          nvidia/Llama3.1-70b
+Model Path:	        	/ssd/nvidia/Llama3.1-70b
 TensorRT LLM Version:	1.2
-Dtype:			bfloat16
-KV Cache Dtype:		FP8
-Quantization:		FP8
+Dtype:			          bfloat16
+KV Cache Dtype:		    FP8
+Quantization:		      FP8
 
 ===========================================================
 = REQUEST DETAILS 
