@@ -26,15 +26,7 @@ workload:
   gpus: 8
   image: ""
   model:
-    # NOTE: tp_size, pp_size, quantization, kv_cache_free_gpu_mem_fraction, and backend
-    # will be OVERWRITTEN if a model config file (e.g., llama3.1-70b.yaml) 
-    # is passed via --set-file serving_config during helm install.
     name: ""
-    tp_size: 8
-    pp_size: 1
-  quantization: "FP8"
-  kv_cache_free_gpu_mem_fraction: 0.70
-  backend: "tensorrt"
   configPath: "/workload/configs"
   configFile: "serving-args.yaml"
 
@@ -61,7 +53,7 @@ network:
   hostNetwork: true
   ncclSettings:
     - name: NCCL_DEBUG
-      value: "TRACE"
+      value: "WARN"
   subnetworks: []
 
 trtllm:

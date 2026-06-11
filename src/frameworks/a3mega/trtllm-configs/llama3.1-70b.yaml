@@ -1,8 +1,4 @@
-# Model Profile: Llama-3.1-70B
-# Note: Values defined here override the defaults in values.yaml and the launcher script.
 tp_size: 8
 pp_size: 1
-quantization: FP8
-kv_cache_free_gpu_mem_fraction: 0.70
-# Supported backends: "tensorrt" (builds/uses optimized engine), "pytorch" (uses high-level LLM API)
-backend: tensorrt
+kv_cache_free_gpu_mem_fraction: 0.85
+backend: pytorch

@@ -200,11 +200,18 @@ kubectl create secret generic hf-secret \
 
 [Back to Top](#table-of-contents)
 
-This recipe supports the deployment of the following models:
+This recipe supports the following models. Running TRTLLM inference benchmarking on these models are only tested and validated on A3-Mega GKE nodes with certain combination of TP, PP, EP, number of GPU chips, input & output sequence length, precision, etc.
+
+Example model configuration YAML files included in this repo only show a certain combination of parallelism hyperparameters and configs for benchmarking purposes. Input and output length in `/home/akrishnakanth/gpu-recipes/inference/a3mega/llama3.1-70b/trtllm-gke/values.yaml` need to be adjusted according to the model and its configs.
+
+As the PyTorch backend requires pre-quantized models for optimal performance, we use the FP8 quantized version for Llama 3.1 70B.
 
 | Model Name | Hugging Face ID | Configuration File | Release Name Suffix |
 | :--- | :--- | :--- | :--- |
-| **Llama 3.1 70B** | `meta-llama/Llama-3.1-70B-Instruct` | `llama-3.1-70b.yaml` | `llama-3-1-70b` |
+| **Llama 3.1 70B (FP8)** | `nvidia/Llama-3.1-70B-Instruct-FP8` | `llama-3.1-70b.yaml` | `llama-3-1-70b` |
+
+> [!TIP]
+> You can use the NVIDIA Model Optimizer to quantize these models to FP8 for improved performance.
 
 <a name="deploy-model"></a>
 ### 4.2. Deploy and Benchmark a Model
@@ -216,15 +223,14 @@ The recipe uses [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/mai
 1.  **Configure model-specific variables.** Choose a model from the [table above](#supported-models) and set the variables:
 
     ```bash
-    # Example for Llama 3.1 70B
-    export HF_MODEL_ID="meta-llama/Llama-3.1-70B-Instruct"
+    # Example for Llama 3.1 70B (FP8)
+    export HF_MODEL_ID="nvidia/Llama-3.1-70B-Instruct-FP8"
     export CONFIG_FILE="llama-3.1-70b.yaml"
     export RELEASE_NAME="$USER-serving-llama-3-1-70b"
     ```
 
 2.  **Install the helm chart.** You can run a single benchmark configuration or a sequence of multiple experiments by indexing the `experiments` list.
 
-    **Option A: Single Benchmark Configuration**
     ```bash
     cd $RECIPE_ROOT
     helm install -f values.yaml \
@@ -238,35 +244,12 @@ The recipe uses [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/mai
     --set workload.model.name=${HF_MODEL_ID} \
     --set workload.image=nvcr.io/nvidia/tensorrt-llm/release:${TRTLLM_VERSION} \
     --set workload.framework=trtllm \
-    --set gpuPlatformSettings.useHostPlugin=true \
     ${RELEASE_NAME} \
     $REPO_ROOT/src/helm-charts/a3mega/trtllm-inference/single-node
     ```
-
-    **Option B: Multiple Benchmark Experiments (Sequence)**
-    The launcher supports running multiple configurations sequentially by providing comma-separated lists. 
+    > [!NOTE]
+    > You can modify the benchmark configuration at runtime by changing the values for `isl`, `osl`, and `num_requests` (number of prompts) in the Helm command to test different scenarios.
     
-    > [!IMPORTANT]
-    > When using `--set` in Helm, commas in list strings must be escaped with a backslash (`\,`), otherwise Helm will fail to parse the command.
-
-    ```bash
-    cd $RECIPE_ROOT
-    helm install -f values.yaml \
-    --set workload.benchmarks.experiments[0].isl="2048\,2048" \
-    --set workload.benchmarks.experiments[0].osl="128\,2048" \
-    --set workload.benchmarks.experiments[0].num_requests=1000 \
-    --set-file workload_launcher=$REPO_ROOT/src/launchers/trtllm-launcher.sh \
-    --set-file serving_config=$REPO_ROOT/src/frameworks/a3mega/trtllm-configs/${CONFIG_FILE} \
-    --set queue=${KUEUE_NAME} \
-    --set "volumes.gcsMounts[0].bucketName=${GCS_BUCKET}" \
-    --set workload.model.name=${HF_MODEL_ID} \
-    --set workload.image=nvcr.io/nvidia/tensorrt-llm/release:${TRTLLM_VERSION} \
-    --set workload.framework=trtllm \
-    --set gpuPlatformSettings.useHostPlugin=true \
-    ${RELEASE_NAME} \
-    $REPO_ROOT/src/helm-charts/a3mega/trtllm-inference/single-node
-    ```
-
 3.  **Check the deployment status:**
 
     ```bash
@@ -288,8 +271,8 @@ After the model is deployed via Helm as described in the sections [above](#run-t
 Check the status of your deployment. Replace the name if you deployed a different model.
 
 ```bash
-# Example for Llama 3.1 70B
-kubectl get deployment/$USER-serving-llama3.1-70b
+# Example for Llama 3.1 70B (FP8)
+kubectl get deployment/$USER-serving-llama-3-1-70b
 ```
 
 Wait until the `READY` column shows `1/1`. If it shows `0/1`, the pod is still starting up.

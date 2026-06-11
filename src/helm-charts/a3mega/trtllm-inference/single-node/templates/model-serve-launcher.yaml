@@ -48,6 +48,12 @@ data:
 {{ $nodes := div .Values.workload.gpus 8 | max 1 }}
 {{ $gpusPerNode := min .Values.workload.gpus 8 }}
 
+{{- /* Extract benchmark parameters from Helm values */ -}}
+{{- $experiment := index .Values.workload.benchmarks.experiments 0 -}}
+{{- $isl := $experiment.isl -}}
+{{- $osl := $experiment.osl -}}
+{{- $num_requests := $experiment.num_requests -}}
+
 {{- $root := . -}}
 
 apiVersion: apps/v1
@@ -114,8 +120,7 @@ spec:
       - name: nvidia-dir-host
         hostPath:
           path: /home/kubernetes/bin/nvidia
-      
-      # INFRASTRUCTURE CORE: Dynamic configuration maps for cluster workers
+
       - name: serving-configuration
         configMap:
           name: "{{ .Release.Name }}-config"
@@ -245,7 +250,7 @@ spec:
             - name: HF_HOME
               value: "/ssd"
             - name: MODEL_DOWNLOAD_DIR
-              value: "/ssd"
+              value: "/ssd/{{ $root.Values.workload.model.name }}"
             - name: MODEL_NAME
               value: "{{ $root.Values.workload.model.name }}"
             - name: LAUNCHER_SCRIPT
@@ -259,7 +264,6 @@ spec:
             - name: GLOO_SOCKET_IFNAME
               value: "eth0"
             
-            # RUNTIME MAPPING MATRIX (Includes fallback OS search parameters)
             {{- if  $root.Values.gpuPlatformSettings.useHostPlugin }}
             - name: LD_LIBRARY_PATH
               value: "/usr/local/nvidia/lib64"
@@ -267,11 +271,12 @@ spec:
               value: "/usr/local/nvidia/lib64"
             {{- else }}
             - name: LD_LIBRARY_PATH
-              value: "/usr/local/tcpxo/lib64:/usr/local/nvidia/lib64"
-            - name: NCCL_LIB_DIR
-              value: "/usr/local/tcpxo/lib64"
+              value: "/usr/local/tcpxo/lib64:/usr/local/cuda/lib64:/usr/local/nvidia/lib64"
             {{- end }}
-
+            - name: NCCL_NET_PLUGIN_PATH
+              value: "/usr/local/tcpxo/lib64"
+            - name: NCCL_P2P_LEVEL
+              value: "NVL"
             - name: NCCL_FASTRAK_LLCM_DEVICE_DIRECTORY
               value: /dev/aperture_devices
             - name: NCCL_FASTRAK_CTRL_DEV
@@ -346,42 +351,13 @@ spec:
           - bash
           - -c
           - |
-            # Point 14: Environment and NCCL Fixes for A3 Mega
-            export HF_HOME=/ssd
-            export LD_LIBRARY_PATH=/usr/local/cuda/compat/lib:/usr/local/lib/python3.12/dist-packages/torch/lib:/usr/local/lib/python3.12/dist-packages/torch_tensorrt/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64:/usr/local/tensorrt/lib:/usr/local/tcpxo/lib64
-            export NCCL_DEBUG=WARN
+            # locate NCCL library
+            export LD_PRELOAD=$(find /usr/local/lib -name "libnccl.so.2" | head -n 1)
+
+            # Performance Tuning and NCCL Fixes for A3 Mega
+            ulimit -l unlimited
             export NCCL_NET_PLUGIN=none
             export NCCL_TUNER_PLUGIN=none
-            export NCCL_P2P_LEVEL=NVL
-
-            # Force load the container's internal NCCL to resolve the 'ncclCommWindowDeregister' symbol mismatch
-            for loc in "/usr/local/lib/python3.12/dist-packages/torch/lib/libnccl.so.2" "/usr/local/lib/python3.12/dist-packages/nvidia/nccl/lib/libnccl.so.2" "/usr/local/cuda/lib64/libnccl.so.2" "/usr/lib/x86_64-linux-gnu/libnccl.so.2"; do
-                if [ -f "$loc" ]; then
-                    if nm -D "$loc" 2>/dev/null | grep -q "ncclCommWindowDeregister"; then
-                        export LD_PRELOAD="$loc"
-                        break
-                    fi
-                fi
-            done
-
-            echo "--- START DEBUG INFO ---"
-            echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
-            echo "LD_PRELOAD: ${LD_PRELOAD:-NOT_SET}"
-            echo "Searching for all libnccl.so.2 instances:"
-            find /usr -name "libnccl.so.2" 2>/dev/null | xargs ls -lh || true
-            echo "Checking for 'ncclCommWindowDeregister' symbol in found libraries:"
-            for lib in $(find /usr -name "libnccl.so.2" 2>/dev/null); do
-                if nm -D "$lib" 2>/dev/null | grep -q "ncclCommWindowDeregister"; then
-                    echo "  [OK] Symbol FOUND in: $lib"
-                else
-                    echo "  [!!] Symbol MISSING in: $lib"
-                fi
-            done
-            echo "Checking what libtorch_cuda.so is linked against:"
-            ldd /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so | grep nccl || true
-            echo "GPU Info:"
-            nvidia-smi --query-gpu=name,driver_version --format=csv || true
-            echo "--- END DEBUG INFO ---"
 
             trtllm-bench() {
                 unset NCCL_P2P_LEVEL
@@ -399,21 +375,11 @@ spec:
                 if [[ "$value" == "true" ]]; then ARGS+=("--$key"); elif [[ "$value" == "false" ]]; then ARGS+=("--$key" "false"); elif [ -n "$value" ]; then ARGS+=("--$key" "$value"); else ARGS+=("--$key"); fi
             done < "/workload/configs/serving-args.yaml"
 
-            echo "Starting automated benchmark sequence..."
-            {{- $isl_list := list -}}
-            {{- $osl_list := list -}}
-            {{- $num_requests := 1024 -}}
-            {{- range .Values.workload.benchmarks.experiments -}}
-              {{- $isl_list = append $isl_list (toString .isl) -}}
-              {{- $osl_list = append $osl_list (toString .osl) -}}
-              {{- $num_requests = .num_requests -}}
-            {{- end -}}
-            {{- if $isl_list }}
-            "$LAUNCHER_SCRIPT" --model_name "{{ $.Values.workload.model.name }}" --isl "{{ join "," $isl_list }}" --osl "{{ join "," $osl_list }}" --num_requests {{ $num_requests }} -- "${ARGS[@]}"
-            {{- else }}
-            "$LAUNCHER_SCRIPT" --model_name "{{ $.Values.workload.model.name }}" -- "${ARGS[@]}"
-            {{- end }}
-            echo "Benchmarks complete. Job exiting."
+            echo "Starting benchmark..."
+            "$LAUNCHER_SCRIPT" --model_name "{{ .Values.workload.model.name }}" --isl "{{ $isl }}" --osl "{{ $osl }}" --num_requests "{{ $num_requests }}" -- "${ARGS[@]}"
+            echo "-----------------------------------------------------------"
+            echo "Benchmarks complete. Keeping container alive for result inspection."
+            sleep infinity
           ports:
             - containerPort: {{ $root.Values.trtllm.service.ports.http }}
 
