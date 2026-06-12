@@ -224,7 +224,7 @@ The recipe uses [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/mai
     # Example for Llama 3.1 70B (FP8)
     export HF_MODEL_ID="nvidia/Llama-3.1-70B-Instruct-FP8"
     export CONFIG_FILE="llama3.1-70b.yaml"
-    export RELEASE_NAME="$USER-serving-llama-3-1-70b"
+    export RELEASE_NAME="$USER-llama-3-1-70b"
     ```
 
 2.  **Install the helm chart.** You can run a single benchmark configuration or a sequence of multiple experiments by indexing the `experiments` list.
@@ -251,7 +251,7 @@ The recipe uses [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/mai
 3.  **Check the deployment status:**
 
     ```bash
-    kubectl get deployment/${RELEASE_NAME}
+    kubectl get deployment/${RELEASE_NAME}-serving
     ```
 
     Wait until the `READY` column shows `1/1`. See the [Monitoring and Troubleshooting](#monitoring) section to view the deployment logs.
@@ -261,7 +261,7 @@ The recipe uses [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/mai
 
 [Back to Top](#table-of-contents)
 
-After the model is deployed via Helm as described in the sections [above](#run-the-recipe), use the following steps to monitor the deployment and interact with the model. Replace `<deployment-name>` and `<service-name>` with the appropriate names from the model-specific deployment instructions (e.g., `$USER-serving-llama3.1-70b` and `$USER-serving-llama3.1-70b-svc`).
+After the model is deployed via Helm as described in the sections [above](#run-the-recipe), use the following steps to monitor the deployment and interact with the model. Replace `<deployment-name>` and `<service-name>` with the appropriate names from the model-specific deployment instructions (e.g., `$USER-llama3.1-70b` and `$USER-llama3.1-70b-svc`).
 
 <a name="check-status"></a>
 ### 5.1. Check Deployment Status
@@ -269,7 +269,7 @@ After the model is deployed via Helm as described in the sections [above](#run-t
 Check the status of your deployment. Replace the name if you deployed a different model.
 
 ```bash
-kubectl get deployment/$USER-serving-llama-3-1-70b
+kubectl get deployment/$RELEASE_NAME-serving
 ```
 
 Wait until the `READY` column shows `1/1`. If it shows `0/1`, the pod is still starting up.
@@ -283,7 +283,7 @@ Wait until the `READY` column shows `1/1`. If it shows `0/1`, the pod is still s
 To see the logs from the TRTLLM server (useful for debugging), use the `-f` flag to follow the log stream:
 
 ```bash
-kubectl logs -f deployment/$USER-serving-llama3.1-70b
+kubectl logs -f deployment/$RELEASE_NAME-serving
 ```
 
 You should see logs indicating preparing the model, and then running the throughput benchmark test, similar to this:
@@ -372,7 +372,7 @@ To avoid incurring further charges, clean up the resources you created.
 
     ```bash
     # list deployed models
-    helm list --filter $USER-serving-
+    helm list --filter $USER
     ```
 
     Then, uninstall the desired release:
