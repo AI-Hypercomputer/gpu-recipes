@@ -202,8 +202,6 @@ kubectl create secret generic hf-secret \
 
 This recipe supports the following models. Running TRTLLM inference benchmarking on these models are only tested and validated on A3-Mega GKE nodes with certain combination of TP, PP, EP, number of GPU chips, input & output sequence length, precision, etc.
 
-Example model configuration YAML files included in this repo only show a certain combination of parallelism hyperparameters and configs for benchmarking purposes. Input and output length in `/home/akrishnakanth/gpu-recipes/inference/a3mega/llama3.1-70b/trtllm-gke/values.yaml` need to be adjusted according to the model and its configs.
-
 As the PyTorch backend requires pre-quantized models for optimal performance, we use the FP8 quantized version for Llama 3.1 70B.
 
 | Model Name | Hugging Face ID | Configuration File | Release Name Suffix |
@@ -211,7 +209,7 @@ As the PyTorch backend requires pre-quantized models for optimal performance, we
 | **Llama 3.1 70B (FP8)** | `nvidia/Llama-3.1-70B-Instruct-FP8` | `llama-3.1-70b.yaml` | `llama-3-1-70b` |
 
 > [!TIP]
-> You can use the NVIDIA Model Optimizer to quantize these models to FP8 for improved performance.
+> You can use the NVIDIA Model Optimizer to quantize these models to FP8.
 
 <a name="deploy-model"></a>
 ### 4.2. Deploy and Benchmark a Model
@@ -247,8 +245,8 @@ The recipe uses [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/mai
     ${RELEASE_NAME} \
     $REPO_ROOT/src/helm-charts/a3mega/trtllm-inference/single-node
     ```
-    > [!NOTE]
-    > You can modify the benchmark configuration at runtime by changing the values for `isl`, `osl`, and `num_requests` (number of prompts) in the Helm command to test different scenarios.
+  > [!NOTE]
+  > You can modify the benchmark configuration at runtime by changing the values for `isl`, `osl`, and `num_requests` (number of prompts) in the Helm command to test different scenarios.
     
 3.  **Check the deployment status:**
 
@@ -271,7 +269,6 @@ After the model is deployed via Helm as described in the sections [above](#run-t
 Check the status of your deployment. Replace the name if you deployed a different model.
 
 ```bash
-# Example for Llama 3.1 70B (FP8)
 kubectl get deployment/$USER-serving-llama-3-1-70b
 ```
 
@@ -295,24 +292,24 @@ You should see logs indicating preparing the model, and then running the through
 Running benchmark for nvidia/Llama3.1-70b with ISL=128, OSL=128, TP=8, EP=1, PP=1
 
 ===========================================================
-= PYTORCH BACKEND
+PYTORCH BACKEND
 ===========================================================
-Model:			          nvidia/Llama3.1-70b
-Model Path:	        	/ssd/nvidia/Llama3.1-70b
-TensorRT LLM Version:	1.2
-Dtype:			          bfloat16
-KV Cache Dtype:		    FP8
-Quantization:		      FP8
+Model:                          nvidia/Llama3.1-70b
+Model Path:                     /ssd/nvidia/Llama3.1-70b
+TensorRT LLM Version:           1.2
+Dtype:                          bfloat16
+KV Cache Dtype:                 FP8
+Quantization:                   FP8
 
 ===========================================================
-= REQUEST DETAILS 
+REQUEST DETAILS 
 ===========================================================
 Number of requests:             1000
 Number of concurrent requests:  985.9849
 Average Input Length (tokens):  128.0000
 Average Output Length (tokens): 128.0000
 ===========================================================
-= WORLD + RUNTIME INFORMATION 
+WORLD + RUNTIME INFORMATION 
 ===========================================================
 TP Size:                8
 PP Size:                1
@@ -324,7 +321,7 @@ KV Memory Percentage:   85.00%
 Issue Rate (req/sec):   8.3913E+13
 
 ===========================================================
-= PERFORMANCE OVERVIEW 
+PERFORMANCE OVERVIEW 
 ===========================================================
 Request Throughput (req/sec):                     X.XX
 Total Output Throughput (tokens/sec):             X.XX
@@ -345,7 +342,7 @@ Per GPU Output Throughput (tps/gpu):              X.XX
 [Latency] AVERAGE: X.XX
 
 ===========================================================
-= DATASET DETAILS
+DATASET DETAILS
 ===========================================================
 Dataset Path:         /ssd/token-norm-dist_llama3.1-70b_128_128_tp4.json
 Number of Sequences:  1000
@@ -381,7 +378,6 @@ To avoid incurring further charges, clean up the resources you created.
     Then, uninstall the desired release:
 
     ```bash
-    # uninstall the deployed model
     helm uninstall <release_name>
     ```
     Replace `<release_name>` with the helm release names listed.

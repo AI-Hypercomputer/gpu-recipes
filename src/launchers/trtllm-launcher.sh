@@ -237,10 +237,10 @@ run_benchmark() {
             --kv_cache_free_gpu_mem_fraction $kv_cache_free_gpu_mem_fraction $extra_args | tee $output_file
     fi
 
-    gcloud storage cp "$output_file" /gcs/benchmark_logs/trtllm/ || true
+    gcloud storage cp "$output_file" /gcs/benchmark_logs/trtllm/
 
-    rm -rf $engine_dir || true
-    rm -f $dataset_file || true
+    rm -rf $engine_dir
+    rm -f $dataset_file
 }
 
 # Main function to run the benchmark
