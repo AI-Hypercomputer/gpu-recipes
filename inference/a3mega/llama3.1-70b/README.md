@@ -145,7 +145,7 @@ Replace the following values:
 | `KUEUE_NAME` | The name of the Kueue local queue. The default queue created by the cluster toolkit is `a3mega`. Verify the name in your cluster. | `a3mega` |
 | `ARTIFACT_REGISTRY` | Full path to your Artifact Registry repository. | `us-central1-docker.pkg.dev/gcp-project-12345/my-repo` |
 | `GCS_BUCKET` | Name of your GCS bucket (do not include `gs://`). | `my-benchmark-logs-bucket` |
-| `TRTLLM_VERSION` | The tag/version for the Docker image. Other verions can be found at https://catalog.ngc.nvidia.com/orgs/nvidia/teams/tensorrt-llm/containers/release | `1.3.0rc3` |
+| `TRTLLM_VERSION` | The tag/version for the Docker image. Other verions can be found at [NGC Catalog](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/tensorrt-llm/containers/release) | `1.3.0rc3` |
 
 
 <a name="connect-cluster"></a>
@@ -193,7 +193,7 @@ kubectl create secret generic hf-secret \
 > After running the recipe with `helm install`, it can take **up to 30 minutes** for the deployment to become fully available. This is because the GKE node must first pull the Docker image and then download the model weights from Hugging Face.
 
 > [!TIP]
-> You can use the [NVIDIA Model Optimizer](https://github.com/NVIDIA/Model-Optimizer/tree/main/examples/llm_ptq) to quantize these models to FP8 for improved performance.
+> You can use the [NVIDIA Model Optimizer](https://github.com/NVIDIA/Model-Optimizer/tree/main/examples/llm_ptq) to quantize these models to FP8.
 
 <a name="supported-models"></a>
 ### 4.1. Supported Models
