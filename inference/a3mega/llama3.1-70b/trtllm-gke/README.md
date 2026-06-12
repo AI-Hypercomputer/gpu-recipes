@@ -223,7 +223,7 @@ The recipe uses [`trtllm-bench`](https://github.com/NVIDIA/TensorRT-LLM/blob/mai
     ```bash
     # Example for Llama 3.1 70B (FP8)
     export HF_MODEL_ID="nvidia/Llama-3.1-70B-Instruct-FP8"
-    export CONFIG_FILE="llama-3.1-70b.yaml"
+    export CONFIG_FILE="llama3.1-70b.yaml"
     export RELEASE_NAME="$USER-serving-llama-3-1-70b"
     ```
 
