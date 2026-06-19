@@ -12,6 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+{{- /* Extract benchmark parameters from Helm values */ -}}
+{{- $experiment := index .Values.workload.benchmarks.experiments 0 -}}
+{{- $isl := $experiment.isl -}}
+{{- $osl := $experiment.osl -}}
+{{- $concurrency := $experiment.concurrency | default "" -}}
+{{- $max_seq_len := $experiment.max_seq_len | default "32768" -}}
+{{- $num_requests := $experiment.num_requests -}}
+
 # --- CONFIGMAPS ---
 apiVersion: v1
 kind: ConfigMap
@@ -47,12 +55,6 @@ data:
 
 {{ $nodes := div .Values.workload.gpus 8 | max 1 }}
 {{ $gpusPerNode := min .Values.workload.gpus 8 }}
-
-{{- /* Extract benchmark parameters from Helm values */ -}}
-{{- $experiment := index .Values.workload.benchmarks.experiments 0 -}}
-{{- $isl := $experiment.isl -}}
-{{- $osl := $experiment.osl -}}
-{{- $num_requests := $experiment.num_requests -}}
 
 {{- $root := . -}}
 
@@ -343,6 +345,8 @@ spec:
               value: "1"
             - name: NCCL_GPUVIZ_FILE_ROTATION_INTERVAL_IN_SECONDS
               value: "300"
+            - name: TLLM_NUMA_AWARE_WORKER_AFFINITY  
+              value: "1"
 
             {{- range $environment_variable := $root.Values.network.ncclSettings }}
             - name: {{ $environment_variable.name }}
@@ -361,7 +365,7 @@ spec:
 
             trtllm-bench() {
                 unset NCCL_P2P_LEVEL
-                command trtllm-bench "$@"
+                command trtllm-bench "$@" --concurrency {{ $concurrency }} --max_seq_len {{ $max_seq_len }}
             }
             export -f trtllm-bench
 
@@ -376,10 +380,9 @@ spec:
             done < "/workload/configs/serving-args.yaml"
 
             echo "Starting benchmark..."
-            "$LAUNCHER_SCRIPT" --model_name "{{ .Values.workload.model.name }}" --isl "{{ $isl }}" --osl "{{ $osl }}" --num_requests "{{ $num_requests }}" -- "${ARGS[@]}"
+            exec "$LAUNCHER_SCRIPT" --model_name "{{ .Values.workload.model.name }}" --isl "{{ $isl }}" --osl "{{ $osl }}" --num_requests "{{ $num_requests }}" -- "${ARGS[@]}"
             echo "-----------------------------------------------------------"
-            echo "Benchmarks complete. Keeping container alive for result inspection."
-            sleep infinity
+            echo "Benchmarks complete."
           ports:
             - containerPort: {{ $root.Values.trtllm.service.ports.http }}
 

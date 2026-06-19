@@ -206,7 +206,7 @@ As the PyTorch backend requires pre-quantized models for optimal performance, we
 
 | Model Name | Hugging Face ID | Configuration File | Release Name Suffix |
 | :--- | :--- | :--- | :--- |
-| **Llama 3.1 70B (FP8)** | `nvidia/Llama-3.1-70B-Instruct-FP8` | `llama-3.1-70b.yaml` | `llama-3-1-70b` |
+| **Llama 3.1 70B (FP8)** | `nvidia/Llama-3.1-70B-Instruct-FP8` | `llama3.1-70b.yaml` | `llama-3-1-70b` |
 
 > [!TIP]
 > You can use the NVIDIA Model Optimizer to quantize these models to FP8.
@@ -294,8 +294,8 @@ Running benchmark for nvidia/Llama3.1-70b with ISL=128, OSL=128, TP=8, EP=1, PP=
 ===========================================================
 PYTORCH BACKEND
 ===========================================================
-Model:                          nvidia/Llama3.1-70b
-Model Path:                     /ssd/nvidia/Llama3.1-70b
+Model:                          nvidia/Llama-3.1-70B-Instruct-FP8
+Model Path:                     /ssd/nvidia/Llama-3.1-70B-Instruct-FP8
 TensorRT LLM Version:           1.2
 Dtype:                          bfloat16
 KV Cache Dtype:                 FP8
@@ -344,7 +344,7 @@ Per GPU Output Throughput (tps/gpu):              X.XX
 ===========================================================
 DATASET DETAILS
 ===========================================================
-Dataset Path:         /ssd/token-norm-dist_llama3.1-70b_128_128_tp4.json
+Dataset Path:         /ssd/token-norm-dist_llama3.1-70b_128_128_tp8.json
 Number of Sequences:  1000
 
 -- Percentiles statistics ---------------------------------

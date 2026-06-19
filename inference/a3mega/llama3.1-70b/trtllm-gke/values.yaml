@@ -35,6 +35,8 @@ workload:
       - isl: 128
         osl: 128
         num_requests: 1000
+        concurrency: 128
+        max_seq_len: 32768
 
 volumes:
   gcsVolumes: true
@@ -62,7 +64,3 @@ trtllm:
     type: ClusterIP
     ports:
       http: 8000
-  serverArgs:
-    max-model-len: 32768
-    max-num-seqs: 128
-    gpu-memory-utilization: 0.90

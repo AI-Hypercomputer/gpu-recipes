@@ -237,7 +237,7 @@ run_benchmark() {
             --kv_cache_free_gpu_mem_fraction $kv_cache_free_gpu_mem_fraction $extra_args | tee $output_file
     fi
 
-    gcloud storage cp "$output_file" /gcs/benchmark_logs/trtllm/
+    gcloud storage cp $output_file /gcs/benchmark_logs/trtllm/
 
     rm -rf $engine_dir
     rm -f $dataset_file
