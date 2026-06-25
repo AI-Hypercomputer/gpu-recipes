@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bench-client
+  labels:
+    app: bench-client
+spec:
+  restartPolicy: Never
+  containers:
+  - name: benchmark
+    image: "<YOUR_TRTLLM_IMAGE>"
+    workingDir: /workspace
+    command: ["/bin/bash", "-c"]
+    args:
+    - |
+      echo "--- STARTING BENCHMARK POD ---"
+      echo "Pod is ready. You can exec into it to run:"
+      echo "python3 -m tensorrt_llm.serve.scripts.benchmark_serving ..."
+      sleep infinity

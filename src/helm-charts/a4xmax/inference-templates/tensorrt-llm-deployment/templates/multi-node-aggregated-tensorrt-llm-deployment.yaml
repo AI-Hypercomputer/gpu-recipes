@@ -1,0 +1,517 @@
+apiVersion: leaderworkerset.x-k8s.io/v1
+kind: LeaderWorkerSet
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Values.common.namespace | default "default" }}
+spec:
+  replicas: 1
+  leaderWorkerTemplate:
+    size: 2
+    restartPolicy: RecreateGroupOnPodRestart
+    leaderTemplate:
+      metadata:
+        labels:
+          app: {{ .Release.Name }}
+      spec:
+
+        tolerations:
+        - key: nvidia.com/gpu
+          operator: Equal
+          value: present
+          effect: NoSchedule
+        - key: kubernetes.io/arch
+          operator: Equal
+          value: arm64
+          effect: NoSchedule
+        - key: "cmcs-inferencing-team"
+          operator: "Exists"
+          effect: "NoSchedule"
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+              - matchExpressions:
+                - key: kubernetes.io/arch
+                  operator: In
+                  values:
+                  - arm64
+        setHostnameAsFQDN: true
+        subdomain: {{ .Release.Name }}
+        volumes:
+        - name: gib
+          hostPath:
+            path: /home/kubernetes/bin/gib
+        - name: nvidia
+          hostPath:
+            path: /home/kubernetes/bin/nvidia
+        - name: lib64
+          hostPath:
+            path: /lib64
+        - name: shared-memory
+          emptyDir:
+            medium: "Memory"
+            sizeLimit: 250Gi
+        - name: scratch-volume
+          emptyDir:
+            sizeLimit: 1000Gi
+        {{- if eq .Values.volumes.useGcs true }}
+        - name: local-ssd
+          emptyDir: {}
+        - name: gcs-model-volume
+          csi:
+            driver: gcsfuse.csi.storage.gke.io
+            volumeAttributes:
+              bucketName: {{ .Values.volumes.gcsfuse.bucketName }}
+              mountOptions: "implicit-dirs,file-cache:enable-parallel-downloads:true,file-cache:parallel-downloads-per-file:100,file-cache:max-parallel-downloads:-1,file-cache:download-chunk-size-mb:50,file-cache:max-size-mb:-1"
+        {{- end }}
+        - name: workload-terminated-volume
+          emptyDir: {}
+        - name: config-volume
+          configMap:
+            name: {{ .Release.Name }}-benchmark-config
+        containers:
+          - name: tensorrt-llm
+            image: {{ .Values.workload.image }}
+            imagePullPolicy: Always
+            securityContext:
+              privileged: true
+            volumeMounts:
+            - name: nvidia
+              mountPath: /usr/local/nvidia
+            - name: gib
+              mountPath: /usr/local/gib
+            - name: shared-memory
+              mountPath: /dev/shm
+            - name: scratch-volume
+              mountPath: /cache
+            {{- if eq .Values.volumes.useGcs true }}
+            - name: local-ssd
+              mountPath: /gcs-cache
+            - name: gcs-model-volume
+              mountPath: /data/model
+              readOnly: true
+            {{- end }}
+            - name: workload-terminated-volume
+              mountPath: /semaphore
+            - name: config-volume
+              mountPath: /etc/config
+              readOnly: true
+            command: [ "/bin/bash", "-c" ]
+            args:
+            - |
+              # Install gIB optimizations
+              curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /etc/apt/trusted.gpg.d/cloud.google.gpg
+              echo 'deb https://packages.cloud.google.com/apt gpudirect-gib-apt main' | tee /etc/apt/sources.list.d/nccl-gib.list
+              apt-get update && apt-get install -y nccl-gib-plugins
+
+              # Resolve NCCL ABI mismatch for gIB plugin (Upgrade to NCCL 2.30)
+              apt-get install -y libnccl2=2.30.4-1+cuda13.2
+              cp /usr/lib/aarch64-linux-gnu/libnccl.so.2 /usr/local/lib/python3.12/dist-packages/nvidia/nccl/lib/libnccl.so.2
+
+              # 0. UCX 1.20.0 In-Place Upgrade
+              if [[ "$(ucx_info -v 2>/dev/null | grep 'Library version')" != *"1.20.0"* ]]; then
+                echo "Upgrading UCX to 1.20.0..."
+                apt-get update && apt-get install -y libtool
+                cd /tmp && wget -q https://github.com/openucx/ucx/releases/download/v1.20.0/ucx-1.20.0.tar.gz
+                tar xzf ucx-1.20.0.tar.gz && cd ucx-1.20.0
+                ./configure --prefix=/usr/local/ucx --enable-mt --with-cuda=/usr/local/cuda --enable-cma --with-knem=no --with-xpmem=no --with-rdmacm=no
+                make -j$(nproc) install && cd /
+              fi
+              # FORCE the container to use the new UCX 1.20
+              export LD_LIBRARY_PATH=/usr/local/ucx/lib:$LD_LIBRARY_PATH
+
+              # ==========================================
+              # 1. MPI CONTROL PLANE (Healthy UCX 1.20 Path)
+              # ==========================================
+              export OMPI_MCA_pml=ucx
+              export OMPI_MCA_btl=self
+              export OMPI_MCA_oob_tcp_if_include=eth0
+              export OMPI_MCA_orte_keep_fqdn_hostnames=t
+
+              export UCX_COMPONENTS=^ucm
+              export UCX_MEMTYPE_CACHE=n
+              export UCX_NET_DEVICES=eth0
+              export UCX_IB_ETH_LINK_STATE_CHECK=n
+              export UCX_TLS=tcp,sm,self
+              export UCX_RDMACM_ENABLE=n
+
+              # ==========================================
+              # 2. NCCL DATA PLANE (THE GB300 FABRIC)
+              # ==========================================
+              export MC_FORCE_MNNVL=1 
+              export NCCL_MNNVL_ENABLE=1 
+              export NCCL_CUMEM_ENABLE=1
+              source /usr/local/gib/scripts/set_nccl_env.sh
+
+              # ==========================================
+              # 3. TRT-LLM MEMORY WORKSPACE
+              # ==========================================
+              export TRT_MAX_WORKSPACE_SIZE=1073741824
+
+              # Fix for hardcoded HPCX OPAL_PREFIX
+              mkdir -p /opt/hpcx
+              ln -s /usr/local/mpi /opt/hpcx/ompi
+
+              # STATIC WORLD FLAGS
+              export TRTLLM_USE_MPI_COMM_WORLD=1
+              export TRTLLM_ORCHESTRATOR=0
+
+              # 2. Setup SSH for MPI Communication
+              if [[ ! -f /root/.ssh/id_rsa ]]; then
+                ssh-keygen -t rsa -b 4096 -f /root/.ssh/id_rsa -N "" -q
+                cat /root/.ssh/id_rsa.pub >> /root/.ssh/authorized_keys
+                chmod 600 /root/.ssh/authorized_keys
+              fi
+              chmod 700 /root/.ssh
+              sed -i 's/^#*Port 22/Port 2222/' /etc/ssh/sshd_config || echo "Port 2222" >> /etc/ssh/sshd_config
+              echo "ClientAliveInterval 30" >> /etc/ssh/sshd_config
+              echo "ClientAliveCountMax 120" >> /etc/ssh/sshd_config
+              mkdir -p /run/sshd
+
+              # 3. Download Model
+              {{- if eq .Values.volumes.useGcs true }}
+              echo "Using GCS FUSE mapping for model..."
+              export CACHE_DIR="/data/model/{{ .Values.volumes.gcsfuse.modelPath }}"
+              {{- else }}
+              echo "GCS FUSE not enabled. Expected local hostPath or PVC at $MODEL_NAME"
+              export CACHE_DIR="/cache/$MODEL_NAME"
+              {{- end }}
+
+              /usr/sbin/sshd -p 2222
+                # Discover Workers and build hostfile
+                SUBDOMAIN="{{ .Release.Name }}"
+                FQDN_SUFFIX="${SUBDOMAIN}.default.svc.cluster.local"
+                rm -f /etc/job-worker-services.txt
+                echo "${JOB_NAME}-0.${FQDN_SUFFIX} slots=4" >> /etc/job-worker-services.txt
+                for JOB_INDEX in $(seq 1 $((NNODES-1))); do
+                  WORKER="${JOB_NAME}-0-${JOB_INDEX}.${FQDN_SUFFIX}"
+                  echo "Waiting for worker $WORKER to become ready..."
+                  while ! ssh -q -o LogLevel=ERROR -o StrictHostKeyChecking=no -p 2222 $WORKER hostname; do
+                    sleep 2
+                  done
+                  echo "$WORKER slots=4" >> /etc/job-worker-services.txt
+
+                  # Configure SSH to send keepalives to prevent GCP 10-minute idle timeout
+                  echo "Host $WORKER" >> /root/.ssh/config
+                  echo "  Port 2222" >> /root/.ssh/config
+                  echo "  StrictHostKeyChecking no" >> /root/.ssh/config
+                  echo "  ServerAliveInterval 30" >> /root/.ssh/config
+                  echo "  ServerAliveCountMax 120" >> /root/.ssh/config
+                done
+
+                # 1. Correct paths for your container image
+                export OPAL_PREFIX=/usr/local/mpi
+                export ORTE_PREFIX=/usr/local/mpi
+
+                # 2. Configure OpenMPI binding and networking
+                export OMPI_MCA_bind_to=numa
+                export OMPI_MCA_map_by=ppr:4:node
+                export OMPI_MCA_rmaps_base_oversubscribe=1
+                export OMPI_MCA_orte_keep_fqdn_hostnames=t
+
+                # 1. Hard-export the interfaces
+                export OMPI_MCA_oob_tcp_if_include=eth0
+                export OMPI_MCA_btl_tcp_if_include=eth0
+
+                # Patch TRT-LLM's hardcoded 127.0.0.1 loops so it can listen across nodes
+                sed -i "s/\"tcp:\/\/127.0.0.1:\*\"/f\"tcp:\/\/{os.environ.get('LWS_LEADER_ADDRESS', '127.0.0.1')}:\*\"/g" /usr/local/lib/python3.12/dist-packages/tensorrt_llm/executor/ipc.py || true
+                sed -i "s/os.environ\[\"MASTER_ADDR\"\] = \"127.0.0.1\"/os.environ[\"MASTER_ADDR\"] = os.environ.get('LWS_LEADER_ADDRESS', '127.0.0.1')/g" /usr/local/lib/python3.12/dist-packages/tensorrt_llm/_torch/auto_deploy/distributed/common.py || true
+
+                export HOSTS="${JOB_NAME}-0.${FQDN_SUFFIX}:4,${JOB_NAME}-0-1.${FQDN_SUFFIX}:4"
+                export CPATH=/usr/local/cuda/include:$CPATH
+                export TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
+
+                export TLLM_NUMA_AWARE_WORKER_AFFINITY=1
+                export TRTLLM_ENABLE_PDL=1
+
+                echo "Launching trtllm-serve in Static SPMD mode via mpirun -np 8..."
+
+                mpirun --allow-run-as-root \
+                  -np 8 \
+                  -H "${HOSTS}" \
+                  --map-by ppr:4:node \
+                  --bind-to numa \
+                  -mca plm_rsh_args "-p 2222 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+                  -x PATH -x LD_LIBRARY_PATH -x LD_PRELOAD -x CPATH -x TRITON_PTXAS_PATH \
+                  -x NCCL_DEBUG=INFO \
+                  -x MC_FORCE_MNNVL -x NCCL_MNNVL_ENABLE -x NCCL_CUMEM_ENABLE \
+                  -x CUDA_VISIBLE_DEVICES=0,1,2,3 \
+                  -x PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
+                  -x PYTHONUNBUFFERED=1 \
+                  -x OMPI_MCA_pml -x OMPI_MCA_btl -x OMPI_MCA_oob_tcp_if_include \
+                  -x UCX_COMPONENTS -x UCX_MEMTYPE_CACHE -x UCX_NET_DEVICES \
+                  -x UCX_IB_ETH_LINK_STATE_CHECK -x UCX_TLS -x UCX_RDMACM_ENABLE \
+                  -x TRTLLM_ORCHESTRATOR=0 \
+                  -x TLLM_DISABLE_MPI_SPAWN=1 -x LLM_DISABLE_MPI_SPAWN=1 \
+                  -x TRT_MAX_WORKSPACE_SIZE -x CACHE_DIR \
+                  -x TLLM_NUMA_AWARE_WORKER_AFFINITY -x TRTLLM_ENABLE_PDL \
+                  bash -c "source /usr/local/gib/scripts/set_nccl_env.sh && trtllm-llmapi-launch trtllm-serve serve \
+                    --max_batch_size 384 \
+                    --max_num_tokens 8192 \
+                    --backend pytorch \
+                    --extra_llm_api_options /etc/config/extra_llm_api_options.yaml \
+                    --trust_remote_code \
+                    --gpus_per_node 4 \
+                    --tp_size 8 \
+                    --ep_size 8 \
+                    --pp_size 1 \
+                    --host 0.0.0.0 \
+                    --port 8000 \
+                    $CACHE_DIR" &
+
+                SERVER_PID=$!
+                echo "Waiting for trtllm-serve to fully load the model..."
+                while ! curl -s http://127.0.0.1:8000/v1/models | grep -q "{{ .Values.workload.model }}"; do
+                  sleep 15
+                  echo "Still waiting for the model..."
+                done
+                echo "Server is ready! Keep running in background..."
+                wait $SERVER_PID
+            env:
+            - name: JOB_NAME
+              value: "{{ .Release.Name }}"
+            - name: OMPI_MCA_plm_rsh_args
+              value: "-p 2222"
+            - name: MODEL_NAME
+              value: "{{ .Values.workload.model }}"
+            - name: TP
+              value: "8"
+            - name: EP
+              value: "8"
+            - name: NNODES
+              value: "2"
+            - name: BACKEND
+              value: "pytorch"
+            - name: GCS_MODEL_PATH
+              value: "gs://{{ .Values.volumes.gcsfuse.bucketName }}/{{ .Values.volumes.gcsfuse.modelPath }}"
+            - name: CONFIG_OVERRIDES
+              value: ""
+            - name: HF_HOME
+              value: /cache/huggingface
+            - name: LD_LIBRARY_PATH
+              value: /usr/local/nvidia/lib64:/usr/local/gib/lib64
+            resources:
+              claims:
+              - name: compute-domain-channel
+              - name: rdma
+              limits:
+                nvidia.com/gpu: 4
+                ephemeral-storage: 2000Gi
+              requests:
+                nvidia.com/gpu: 4
+                ephemeral-storage: 2000Gi
+        resourceClaims:
+          - name: compute-domain-channel
+            resourceClaimTemplateName: {{ .Values.common.computeDomain.resourceClaimTemplateName | default "a4x-max-compute-domain-channel" }}
+          - name: rdma
+            resourceClaimTemplateName: {{ .Values.rdma.claimTemplateName | default "all-mrdma" }}
+    workerTemplate:
+      metadata:
+        labels:
+          app: {{ .Release.Name }}
+      spec:
+
+        tolerations:
+        - key: nvidia.com/gpu
+          operator: Equal
+          value: present
+          effect: NoSchedule
+        - key: kubernetes.io/arch
+          operator: Equal
+          value: arm64
+          effect: NoSchedule
+        - key: "cmcs-inferencing-team"
+          operator: "Exists"
+          effect: "NoSchedule"
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+              - matchExpressions:
+                - key: kubernetes.io/arch
+                  operator: In
+                  values:
+                  - arm64
+        setHostnameAsFQDN: true
+        subdomain: {{ .Release.Name }}
+        volumes:
+        - name: gib
+          hostPath:
+            path: /home/kubernetes/bin/gib
+        - name: nvidia
+          hostPath:
+            path: /home/kubernetes/bin/nvidia
+        - name: lib64
+          hostPath:
+            path: /lib64
+        - name: shared-memory
+          emptyDir:
+            medium: "Memory"
+            sizeLimit: 250Gi
+        - name: scratch-volume
+          emptyDir:
+            sizeLimit: 1000Gi
+        {{- if eq .Values.volumes.useGcs true }}
+        - name: local-ssd
+          emptyDir: {}
+        - name: gcs-model-volume
+          csi:
+            driver: gcsfuse.csi.storage.gke.io
+            volumeAttributes:
+              bucketName: {{ .Values.volumes.gcsfuse.bucketName }}
+              mountOptions: "implicit-dirs,file-cache:enable-parallel-downloads:true,file-cache:parallel-downloads-per-file:100,file-cache:max-parallel-downloads:-1,file-cache:download-chunk-size-mb:50,file-cache:max-size-mb:-1"
+        {{- end }}
+        - name: workload-terminated-volume
+          emptyDir: {}
+        - name: config-volume
+          configMap:
+            name: {{ .Release.Name }}-benchmark-config
+        containers:
+          - name: tensorrt-llm
+            image: {{ .Values.workload.image }}
+            imagePullPolicy: Always
+            securityContext:
+              privileged: true
+            volumeMounts:
+            - name: nvidia
+              mountPath: /usr/local/nvidia
+            - name: gib
+              mountPath: /usr/local/gib
+            - name: shared-memory
+              mountPath: /dev/shm
+            - name: scratch-volume
+              mountPath: /cache
+            {{- if eq .Values.volumes.useGcs true }}
+            - name: local-ssd
+              mountPath: /gcs-cache
+            - name: gcs-model-volume
+              mountPath: /data/model
+              readOnly: true
+            {{- end }}
+            - name: workload-terminated-volume
+              mountPath: /semaphore
+            - name: config-volume
+              mountPath: /etc/config
+              readOnly: true
+            command: [ "/bin/bash", "-c" ]
+            args:
+            - |
+              # Install gIB optimizations
+              curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /etc/apt/trusted.gpg.d/cloud.google.gpg
+              echo 'deb https://packages.cloud.google.com/apt gpudirect-gib-apt main' | tee /etc/apt/sources.list.d/nccl-gib.list
+              apt-get update && apt-get install -y nccl-gib-plugins
+
+              # Resolve NCCL ABI mismatch for gIB plugin (Upgrade to NCCL 2.30)
+              apt-get install -y libnccl2=2.30.4-1+cuda13.2
+              cp /usr/lib/aarch64-linux-gnu/libnccl.so.2 /usr/local/lib/python3.12/dist-packages/nvidia/nccl/lib/libnccl.so.2
+
+              # 0. UCX 1.20.0 In-Place Upgrade
+              if [[ "$(ucx_info -v 2>/dev/null | grep 'Library version')" != *"1.20.0"* ]]; then
+                echo "Upgrading UCX to 1.20.0..."
+                apt-get update && apt-get install -y libtool
+                cd /tmp && wget -q https://github.com/openucx/ucx/releases/download/v1.20.0/ucx-1.20.0.tar.gz
+                tar xzf ucx-1.20.0.tar.gz && cd ucx-1.20.0
+                ./configure --prefix=/usr/local/ucx --enable-mt --with-cuda=/usr/local/cuda --enable-cma --with-knem=no --with-xpmem=no --with-rdmacm=no
+                make -j$(nproc) install && cd /
+              fi
+              # FORCE the container to use the new UCX 1.20
+              export LD_LIBRARY_PATH=/usr/local/ucx/lib:$LD_LIBRARY_PATH
+
+              # ==========================================
+              # 1. MPI CONTROL PLANE (Healthy UCX 1.20 Path)
+              # ==========================================
+              export OMPI_MCA_pml=ucx
+              export OMPI_MCA_btl=self
+              export OMPI_MCA_oob_tcp_if_include=eth0
+              export OMPI_MCA_orte_keep_fqdn_hostnames=t
+
+              export UCX_COMPONENTS=^ucm 
+              export UCX_MEMTYPE_CACHE=n 
+              export UCX_NET_DEVICES=eth0
+              export UCX_IB_ETH_LINK_STATE_CHECK=n
+              export UCX_TLS=tcp,sm,self 
+              export UCX_RDMACM_ENABLE=n 
+
+              # ==========================================
+              # 2. NCCL DATA PLANE (THE GB300 FABRIC)
+              # ==========================================
+              export MC_FORCE_MNNVL=1 
+              export NCCL_MNNVL_ENABLE=1 
+              export NCCL_CUMEM_ENABLE=1
+              source /usr/local/gib/scripts/set_nccl_env.sh
+
+              # ==========================================
+              # 3. TRT-LLM MEMORY WORKSPACE
+              # ==========================================
+              export TRT_MAX_WORKSPACE_SIZE=1073741824
+
+              # Fix for hardcoded HPCX OPAL_PREFIX
+              mkdir -p /opt/hpcx
+              ln -s /usr/local/mpi /opt/hpcx/ompi
+
+              # STATIC WORLD FLAGS
+              export TRTLLM_USE_MPI_COMM_WORLD=1
+              export TRTLLM_ORCHESTRATOR=0
+
+              # 2. Setup SSH for MPI Communication
+              if [[ ! -f /root/.ssh/id_rsa ]]; then
+                ssh-keygen -t rsa -b 4096 -f /root/.ssh/id_rsa -N "" -q
+                cat /root/.ssh/id_rsa.pub >> /root/.ssh/authorized_keys
+                chmod 600 /root/.ssh/authorized_keys
+              fi
+              chmod 700 /root/.ssh
+              sed -i 's/^#*Port 22/Port 2222/' /etc/ssh/sshd_config || echo "Port 2222" >> /etc/ssh/sshd_config
+              echo "ClientAliveInterval 30" >> /etc/ssh/sshd_config
+              echo "ClientAliveCountMax 120" >> /etc/ssh/sshd_config
+              mkdir -p /run/sshd
+
+              # 3. Download Model
+              {{- if eq .Values.volumes.useGcs true }}
+              echo "Using GCS FUSE mapping for model..."
+              export CACHE_DIR="/data/model/{{ .Values.volumes.gcsfuse.modelPath }}"
+              {{- else }}
+              echo "GCS FUSE not enabled. Expected local hostPath or PVC at $MODEL_NAME"
+              export CACHE_DIR="/cache/$MODEL_NAME"
+              {{- end }}
+
+              /usr/sbin/sshd -p 2222
+                echo "Worker Node: Initialization complete. Waiting for MPI connections..."
+                sleep infinity
+            env:
+            - name: JOB_NAME
+              value: "{{ .Release.Name }}"
+            - name: OMPI_MCA_plm_rsh_args
+              value: "-p 2222"
+            - name: MODEL_NAME
+              value: "{{ .Values.workload.model }}"
+            - name: TP
+              value: "8"
+            - name: EP
+              value: "8"
+            - name: NNODES
+              value: "2"
+            - name: BACKEND
+              value: "pytorch"
+            - name: GCS_MODEL_PATH
+              value: "gs://{{ .Values.volumes.gcsfuse.bucketName }}/{{ .Values.volumes.gcsfuse.modelPath }}"
+            - name: CONFIG_OVERRIDES
+              value: ""
+            - name: HF_HOME
+              value: /cache/huggingface
+            - name: LD_LIBRARY_PATH
+              value: /usr/local/nvidia/lib64:/usr/local/gib/lib64
+            resources:
+              claims:
+              - name: compute-domain-channel
+              - name: rdma
+              limits:
+                nvidia.com/gpu: 4
+                ephemeral-storage: 2000Gi
+              requests:
+                nvidia.com/gpu: 4
+                ephemeral-storage: 2000Gi
+        resourceClaims:
+          - name: compute-domain-channel
+            resourceClaimTemplateName: {{ .Values.common.computeDomain.resourceClaimTemplateName | default "a4x-max-compute-domain-channel" }}
+          - name: rdma
+            resourceClaimTemplateName: {{ .Values.rdma.claimTemplateName | default "all-mrdma" }}
