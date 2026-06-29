@@ -1,4 +1,3 @@
-max-model-len: 1525
 tensor-parallel-size: 1
 gpu-memory-utilization: 0.90
 kv-cache-dtype: fp8
