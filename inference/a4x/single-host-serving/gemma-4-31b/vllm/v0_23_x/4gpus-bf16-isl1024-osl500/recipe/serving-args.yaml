@@ -1,0 +1,6 @@
+max-model-len: 1525
+tensor-parallel-size: 1
+gpu-memory-utilization: 0.90
+kv-cache-dtype: fp8
+max-num-seqs: 1024
+max-num-batched-tokens: 16384

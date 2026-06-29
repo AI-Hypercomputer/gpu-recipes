@@ -1,0 +1,8 @@
+max-model-len: 2645
+tensor-parallel-size: 1
+gpu-memory-utilization: 0.90
+kv-cache-dtype: fp8
+max-num-seqs: 512
+max-num-batched-tokens: 16384
+chat-template: /vllm-workspace/examples/tool_chat_template_gemma4.jinja
+limit-mm-per-prompt: image=4
