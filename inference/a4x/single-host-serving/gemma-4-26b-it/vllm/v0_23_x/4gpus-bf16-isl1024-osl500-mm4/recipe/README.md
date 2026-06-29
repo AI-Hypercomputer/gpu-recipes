@@ -19,3 +19,25 @@ helm install -f values.yaml \
   $USER-serving-gemma4-gemma-4-26b-it-bf16-mm4 \
   $REPO_ROOT/src/helm-charts/a4x/inference-templates/deployment
 ```
+
+## Benchmarking
+
+To benchmark the deployed model, run the following command inside the serving container (after the deployment is ready):
+
+```bash
+kubectl exec -it deployment/$USER-serving-gemma4-gemma-4-26b-it-bf16-mm4 -c serving -- \
+  vllm bench serve \
+  --model google/gemma-4-26B-A4B-it \
+  --dataset-name random-mm \
+  --ignore-eos \
+  --num-prompts 512 \
+  --random-input-len 1024 \
+  --random-output-len 500 \
+  --random-mm-bucket-config '{(512, 512, 1): 1.0}' \
+  --random-mm-limit-mm-per-prompt '{"image": 4}' \
+  --random-mm-base-items-per-request 4 \
+  --max-concurrency 256 \
+  --port 8000 \
+  --backend openai-chat \
+  --endpoint /v1/chat/completions
+```

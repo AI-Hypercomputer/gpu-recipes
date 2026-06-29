@@ -16,6 +16,24 @@ helm install -f values.yaml \
   --set queue=${KUEUE_NAME} \
   --set "volumes.gcsMounts[0].bucketName=${GCS_BUCKET}" \
   --set workload.image=${ARTIFACT_REGISTRY}/${VLLM_IMAGE}:vllm${VLLM_VERSION}-ngcvllm${NGC_VLLM_VERSION} \
-  $USER-serving-gemma4-gemma-4-31b-bf16-text \
+  $USER-serving-gemma4-gemma-4-31b-bf16 \
   $REPO_ROOT/src/helm-charts/a4x/inference-templates/deployment
+```
+
+## Benchmarking
+
+To benchmark the deployed model, run the following command inside the serving container (after the deployment is ready):
+
+```bash
+kubectl exec -it deployment/$USER-serving-gemma4-gemma-4-31b-bf16 -c serving -- \
+  vllm bench serve \
+  --model google/gemma-4-31B \
+  --dataset-name random \
+  --ignore-eos \
+  --num-prompts 1024 \
+  --random-input-len 1024 \
+  --random-output-len 500 \
+  --max-concurrency 512 \
+  --port 8000 \
+  --backend vllm
 ```
