@@ -13,6 +13,7 @@ This recipe provides the deployment configuration to run TensorRT-LLM aggregated
   * [2.4. Create Secrets](#create-secrets)
   * [2.5. Setup GCS Bucket for GKE](#setup-gcsfuse)
   * [2.6. Configure TensorRT-LLM Image](#configure-trtllm-image)
+  * [2.7. Install LeaderWorkerSet CRD](#install-lws-crd)
 * [3. Deploy with TensorRT-LLM Engine](#deploy-tensorrt-llm)
   * [3.1. Engine Architecture & Critical Setup](#system-architecture)
   * [3.2. TensorRT-LLM Deployment (8 GPUs across 2 Nodes)](#tensorrt-llm-deployment)
@@ -134,6 +135,20 @@ We will use the official NVIDIA TensorRT-LLM container artifact from the [NVIDIA
 export TRTLLM_IMAGE="nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc5"
 ```
 
+<a name="install-lws-crd"></a>
+### 2.7. Install LeaderWorkerSet CRD
+
+To install a released version of LeaderWorkerSet (LWS) in your cluster by Helm, run the following command:
+
+```bash
+CHART_VERSION=0.9.0
+helm install lws oci://registry.k8s.io/lws/charts/lws \
+  --version=$CHART_VERSION \
+  --namespace lws-system \
+  --create-namespace \
+  --wait --timeout 300s
+```
+
 <a name="deploy-tensorrt-llm"></a>
 ## 3. Deploy with TensorRT-LLM Engine
 
@@ -141,6 +156,58 @@ export TRTLLM_IMAGE="nvcr.io/nvidia/tensorrt-llm/release:1.2.0rc5"
 
 <a name="system-architecture"></a>
 ### 3.1. Engine Architecture & Critical Setup
+
+```mermaid
+graph TB
+    classDef node fill:#f8f9fa,stroke:#dee2e6,stroke-width:2px,rx:10,ry:10;
+    classDef app fill:#e3f2fd,stroke:#90caf9,stroke-width:2px,rx:5,ry:5;
+    classDef control fill:#fff3e0,stroke:#ffcc80,stroke-width:2px,rx:5,ry:5;
+    classDef data fill:#e8f5e9,stroke:#a5d6a7,stroke-width:2px,rx:5,ry:5;
+    classDef hardware fill:#f3e5f5,stroke:#ce93d8,stroke-width:2px,rx:5,ry:5;
+    classDef cluster fill:#ffffff,stroke:#adb5bd,stroke-width:2px,stroke-dasharray: 5 5;
+
+    subgraph Cluster ["GKE Cluster: LeaderWorkerSet (alisachen-trt)"]
+        direction LR
+        
+        subgraph Node0 ["Leader Node (alisachen-trt-0)"]
+            direction TB
+            App0["🚀 TRT-LLM Application"]:::app
+            MPI0["⚙️ OpenMPI + UCX 1.20<br/>(Control Plane)"]:::control
+            NCCL0["⚡ NCCL + gIB Plugin<br/>(Data Plane)"]:::data
+            GPU0["🖥️ 4x GB300 GPUs"]:::hardware
+            RDMA0["🔌 mrdma.google.com"]:::hardware
+
+            MPI0 -- "Spawns processes & binds to NUMA" --> App0
+            MPI0 -- "Injects Env Vars (e.g., -x NCCL_MNNVL_ENABLE)" --> NCCL0
+            App0 -- "Uses MPI_COMM_WORLD for Peer Discovery" --> NCCL0
+            NCCL0 -- "Tensor Transfers" --> GPU0
+            NCCL0 -- "High-Speed Data" --> RDMA0
+        end
+
+        subgraph Node1 ["Worker Node (alisachen-trt-0-1)"]
+            direction TB
+            App1["🚀 TRT-LLM Application"]:::app
+            MPI1["⚙️ OpenMPI + UCX 1.20<br/>(Control Plane)"]:::control
+            NCCL1["⚡ NCCL + gIB Plugin<br/>(Data Plane)"]:::data
+            GPU1["🖥️ 4x GB300 GPUs"]:::hardware
+            RDMA1["🔌 mrdma.google.com"]:::hardware
+
+            MPI1 -- "Spawns processes & binds to NUMA" --> App1
+            MPI1 -- "Injects Env Vars (e.g., -x NCCL_MNNVL_ENABLE)" --> NCCL1
+            App1 -- "Uses MPI_COMM_WORLD for Peer Discovery" --> NCCL1
+            NCCL1 -- "Tensor Transfers" --> GPU1
+            NCCL1 -- "High-Speed Data" --> RDMA1
+        end
+
+        %% Connections between nodes
+        MPI0 <-->|"Orchestrates Workers via SSH (eth0)"| MPI1
+        RDMA0 <-->|"MNNVL / RDMA Fabric (Tensor Data Plane)"| RDMA1
+    end
+
+    class Cluster cluster;
+    class Node0,Node1 node;
+```
+
 The Helm Chart utilizes specialized optimizations to squeeze multi-node FP8 and FP4 capabilities on the GB300:
 1. **Engine Architecture (Static SPMD):** To avoid MPI `Comm_spawn` segfaults in the containerized Kubernetes environment, the dynamic orchestrator must be disabled (`TRTLLM_ORCHESTRATOR=0`), and the engine must be launched explicitly with `mpirun` wrapping the FastAPI server.
 2. **NUMA CPU & Memory Isolation:** To prevent the OS from scattering worker threads across the 144-core Grace CPU (which causes massive cross-socket UPI latency), strict NUMA isolation is enforced (`--bind-to numa`, `TLLM_NUMA_AWARE_WORKER_AFFINITY=1`).
@@ -149,6 +216,9 @@ The Helm Chart utilizes specialized optimizations to squeeze multi-node FP8 and 
 5. **Multi-Node IP Resolution:** TensorRT-LLM hardcodes `127.0.0.1` for its TCP tensor-parallel IPC listeners. In a multi-node Kubernetes cluster via LeaderWorkerSet, strings are dynamically patched at runtime to substitute the leader's actual network address.
 6. **Triton JIT Compiler Paths:** The paths to the CUDA headers and PTX assembler are forwarded for Custom Attention and DeepGEMM compilations during the CUDA graph warmup phase.
 7. **Warmup Synchronization:** The runtime logic blocks incoming requests (via a polling curl loop) until the engine is fully warmed up to prevent premature OOM crashes.
+
+<a name="tensorrt-llm-deployment"></a>
+### 3.2. TensorRT-LLM Deployment (8 GPUs across 2 Nodes)
 
 1. Review and populate the `values.yaml` file variables representing the model identity.
 

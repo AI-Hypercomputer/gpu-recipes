@@ -13,7 +13,6 @@ spec:
         labels:
           app: {{ .Release.Name }}
       spec:
-
         tolerations:
         - key: nvidia.com/gpu
           operator: Equal
@@ -310,7 +309,6 @@ spec:
         labels:
           app: {{ .Release.Name }}
       spec:
-
         tolerations:
         - key: nvidia.com/gpu
           operator: Equal
