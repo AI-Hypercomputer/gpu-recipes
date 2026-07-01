@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Release.Name }}-benchmark-config"
+  namespace: {{ .Values.common.namespace | default "default" }}
+data:
+  extra_llm_api_options.yaml: |
+    attention_dp_config:
+      batching_wait_iters: 0
+      enable_balance: true
+      timeout_iters: 60
+    cuda_graph_config:
+      enable_padding: true
+      max_batch_size: 640
+    enable_attention_dp: true
+    kv_cache_config:
+      dtype: fp8
+      enable_block_reuse: false
+      free_gpu_memory_fraction: 0.8
+    moe_config:
+      backend: DEEPGEMM
+    print_iter_log: false
+    stream_interval: 10
