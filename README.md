@@ -112,6 +112,22 @@ Models             | GPU Machine Type                                           
 **Qwen-3-30B** | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Megatron-Bridge (25.11) | Pre-training | Slurm | [Link](./training/a4x/qwen3_30b_a3b/megatron-bridge-slurm/nemo2511/)
 
 
+### Training benchmarks A4X MAX
+
+Models             | GPU Machine Type                                                                                     | Framework | Workload Type | Orchestrator | Link to the recipe
+------------------ | ---------------------------------------------------------------------------------------------------- | --------- | ------------- | ------------ | ------------------
+**DeepSeek-V3** | [A4X MAX (NVIDIA GB300)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Megatron-Bridge (25.11) | Pre-training | GKE | [Link](./training/a4x-max/deepseek-v3/megatron-bridge-gke/nemo2511/)
+**DeepSeek-V3** | [A4X MAX (NVIDIA GB300)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Megatron-Bridge (26.04) | Pre-training | GKE | [Link](./training/a4x-max/deepseek-v3/megatron-bridge-gke/nemo2604/)
+**DeepSeek-V3** | [A4X MAX (NVIDIA GB300)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Megatron-Bridge (26.06) | Pre-training | GKE | [Link](./training/a4x-max/deepseek-v3/megatron-bridge-gke/nemo2606/)
+**GPT OSS 120B** | [A4X MAX (NVIDIA GB300)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Megatron-Bridge (25.11) | Pre-training | GKE | [Link](./training/a4x-max/gpt-oss-120b/megatron-bridge-gke/nemo2511/)
+**GPT OSS 120B** | [A4X MAX (NVIDIA GB300)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Megatron-Bridge (26.04) | Pre-training | GKE | [Link](./training/a4x-max/gpt-oss-120b/megatron-bridge-gke/nemo2604/)
+**Kimi-k2** | [A4X MAX (NVIDIA GB300)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Megatron-Bridge (26.04) | Pre-training | GKE | [Link](./training/a4x-max/kimi-k2/megatron-bridge-gke/nemo2604/)
+**Llama-3.1-405B** | [A4X MAX (NVIDIA GB300)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Megatron-Bridge (26.02) | Pre-training | GKE | [Link](./training/a4x-max/llama3-1-405b/megatron-bridge-gke/nemo2602/)
+**Llama-3.1-405B** | [A4X MAX (NVIDIA GB300)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Megatron-Bridge (26.04) | Pre-training | GKE | [Link](./training/a4x-max/llama3-1-405b/megatron-bridge-gke/nemo2604/)
+**Qwen-3-235B** | [A4X MAX (NVIDIA GB300)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Megatron-Bridge (26.02) | Pre-training | GKE | [Link](./training/a4x-max/qwen3-235b-a22b/megatron-bridge-gke/nemo2602/)
+**Qwen-3-235B** | [A4X MAX (NVIDIA GB300)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Megatron-Bridge (26.04) | Pre-training | GKE | [Link](./training/a4x-max/qwen3-235b-a22b/megatron-bridge-gke/nemo2604/)
+**Wan-2.1-14B** | [A4X MAX (NVIDIA GB300)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Megatron-Bridge (26.02) | Pre-training | GKE | [Link](./training/a4x-max/wan21-14b/megatron-bridge-gke/nemo2602/)
+
 ### Inference benchmarks A3 Mega
 
 | Models           | GPU Machine Type | Framework | Workload Type       | Orchestrator | Link to the recipe |
