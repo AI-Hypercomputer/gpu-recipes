@@ -7,6 +7,8 @@ This recipe provides instructions and templates for serving Moonshot AI's **Kimi
 * [1. Test Environment](#test-environment)
 * [2. High-Level Architecture](#architecture)
 * [3. Environment Setup](#environment-setup)
+  * [3.1. Configure Environment Variables](#configure-vars)
+  * [3.2. Pre-upload Model Weights to GCS](#preupload-weights)
 * [4. Deployment Instructions](#deployment-instructions)
 * [5. Inference Requests & Benchmarking](#inference-requests)
 * [6. Cleanup](#cleanup)
@@ -43,6 +45,9 @@ The deployment utilizes `LeaderWorkerSet` (LWS) with a 4-node pod group. A Kuber
 <a name="environment-setup"></a>
 ## 3. Environment Setup
 
+<a name="configure-vars"></a>
+### 3.1. Configure Environment Variables
+
 Configure your cluster and deployment environment variables:
 
 ```bash
@@ -54,6 +59,23 @@ export RELEASE_NAME="sglang-kimi-k3"
 export K8S_SERVICE_ACCOUNT="workload-identity-k8s-sa"
 
 gcloud container clusters get-credentials ${CLUSTER_NAME} --region ${REGION}
+```
+
+<a name="preupload-weights"></a>
+### 3.2. Pre-upload Model Weights to GCS
+
+To avoid downloading large model weights at pod startup, pre-upload the Kimi-K3 Hugging Face checkpoint to your Cloud Storage bucket under `/huggingface_model_cache/models--moonshotai--Kimi-K3`:
+
+```bash
+# 1. Install Hugging Face CLI and high-speed transfer library
+pip install -U "huggingface_hub[cli]" hf_transfer
+
+# 2. Download the Kimi-K3 model checkpoint locally
+export HF_HUB_ENABLE_HF_TRANSFER=1
+huggingface-cli download moonshotai/Kimi-K3 --local-dir ./models--moonshotai--Kimi-K3
+
+# 3. Upload the checkpoint directory to your Cloud Storage bucket
+gcloud storage cp -r ./models--moonshotai--Kimi-K3 gs://${GCS_BUCKET}/huggingface_model_cache/
 ```
 
 <a name="deployment-instructions"></a>
