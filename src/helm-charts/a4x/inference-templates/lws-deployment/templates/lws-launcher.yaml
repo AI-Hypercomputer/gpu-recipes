@@ -72,14 +72,13 @@ spec:
             name: gib
         containers:
         - name: sglang-server
-          image: {{ .Values.workload.image | default "lmsysorg/sglang:kimi-k3" }}
+          image: {{ .Values.workload.image }}
           imagePullPolicy: Always
           securityContext:
             privileged: true
           resources:
             requests:
               nvidia.com/gpu: 4
-              memory: "100Gi"
             limits:
               nvidia.com/gpu: 4
             claims:
@@ -113,16 +112,6 @@ spec:
             value: "PIX"
           - name: NCCL_NET_GDR_C2C
             value: "1"
-          - name: HF_HOME
-            value: "/gcs-cache/hf_cache"
-          - name: TMPDIR
-            value: "/gcs-cache/tmp"
-          - name: RUNAI_STREAMER_MEMORY_LIMIT
-            value: "34359738368"
-          - name: RUNAI_STREAMER_CONCURRENCY
-            value: "16"
-          - name: PYTORCH_CUDA_ALLOC_CONF
-            value: "expandable_segments:True"
           volumeMounts:
           - mountPath: /usr/local/gib
             name: gib
@@ -136,10 +125,11 @@ spec:
           args:
           - |
             set -e
-            mkdir -p /gcs-cache/hf_cache /gcs-cache/tmp
             nvidia-smi
             . /usr/local/gib/scripts/set_nccl_env.sh
-            pip install --break-system-packages hf_transfer fla-core google-cloud-storage || true
+            {{- if .Values.workload.extraPipPackages }}
+            pip install --break-system-packages {{ .Values.workload.extraPipPackages }} || true
+            {{- end }}
 
             MY_IP=$(hostname -I | awk '{print $1}')
             export SGLANG_HOST_IP="${MY_IP}"
@@ -156,19 +146,16 @@ spec:
             echo "Leader Address: ${LEADER_HOST}:20000"
 
             python3 -m sglang.launch_server \
-              --trust-remote-code \
-              --model-path {{ .Values.workload.modelPath | default "gs://pirillo-sct-bucket/huggingface_model_cache/models--moonshotai--Kimi-K3/" }} \
-              --served-model-name moonshotai/Kimi-K3 \
+              --model-path {{ .Values.workload.modelPath | default (printf "/data/model/%s" .Values.workload.model) }} \
               --tp-size {{ .Values.workload.tpSize | default 16 }} \
               --nnodes ${SIZE} \
               --node-rank ${RANK} \
               --dist-init-addr ${LEADER_HOST}:20000 \
-              --mem-fraction-static 0.85 \
-              --reasoning-parser kimi_k3 \
-              --tool-call-parser kimi_k3 \
-              --mamba-full-memory-ratio 0.86 \
               --host 0.0.0.0 \
-              --port 30100 2>&1 | tee /gcs-cache/sglang_server_${RANK}.log
+              --port 30100 \
+              {{- if .Values.workload.extraArgs }}
+              {{ .Values.workload.extraArgs | nindent 14 }}
+              {{- end }} 2>&1 | tee /gcs-cache/sglang_server_${RANK}.log
 
     workerTemplate:
       metadata:
@@ -232,14 +219,13 @@ spec:
             name: gib
         containers:
         - name: sglang-server
-          image: {{ .Values.workload.image | default "lmsysorg/sglang:kimi-k3" }}
+          image: {{ .Values.workload.image }}
           imagePullPolicy: Always
           securityContext:
             privileged: true
           resources:
             requests:
               nvidia.com/gpu: 4
-              memory: "100Gi"
             limits:
               nvidia.com/gpu: 4
             claims:
@@ -273,16 +259,6 @@ spec:
             value: "PIX"
           - name: NCCL_NET_GDR_C2C
             value: "1"
-          - name: HF_HOME
-            value: "/gcs-cache/hf_cache"
-          - name: TMPDIR
-            value: "/gcs-cache/tmp"
-          - name: RUNAI_STREAMER_MEMORY_LIMIT
-            value: "34359738368"
-          - name: RUNAI_STREAMER_CONCURRENCY
-            value: "16"
-          - name: PYTORCH_CUDA_ALLOC_CONF
-            value: "expandable_segments:True"
           volumeMounts:
           - mountPath: /usr/local/gib
             name: gib
@@ -296,10 +272,11 @@ spec:
           args:
           - |
             set -e
-            mkdir -p /gcs-cache/hf_cache /gcs-cache/tmp
             nvidia-smi
             . /usr/local/gib/scripts/set_nccl_env.sh
-            pip install --break-system-packages hf_transfer fla-core google-cloud-storage || true
+            {{- if .Values.workload.extraPipPackages }}
+            pip install --break-system-packages {{ .Values.workload.extraPipPackages }} || true
+            {{- end }}
 
             MY_IP=$(hostname -I | awk '{print $1}')
             export SGLANG_HOST_IP="${MY_IP}"
@@ -316,16 +293,13 @@ spec:
             echo "Leader Address: ${LEADER_HOST}:20000"
 
             python3 -m sglang.launch_server \
-              --trust-remote-code \
-              --model-path {{ .Values.workload.modelPath | default "gs://pirillo-sct-bucket/huggingface_model_cache/models--moonshotai--Kimi-K3/" }} \
-              --served-model-name moonshotai/Kimi-K3 \
+              --model-path {{ .Values.workload.modelPath | default (printf "/data/model/%s" .Values.workload.model) }} \
               --tp-size {{ .Values.workload.tpSize | default 16 }} \
               --nnodes ${SIZE} \
               --node-rank ${RANK} \
               --dist-init-addr ${LEADER_HOST}:20000 \
-              --mem-fraction-static 0.85 \
-              --reasoning-parser kimi_k3 \
-              --tool-call-parser kimi_k3 \
-              --mamba-full-memory-ratio 0.86 \
               --host 0.0.0.0 \
-              --port 30100 2>&1 | tee /gcs-cache/sglang_server_${RANK}.log
+              --port 30100 \
+              {{- if .Values.workload.extraArgs }}
+              {{ .Values.workload.extraArgs | nindent 14 }}
+              {{- end }} 2>&1 | tee /gcs-cache/sglang_server_${RANK}.log

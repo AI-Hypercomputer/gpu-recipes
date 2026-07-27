@@ -1,12 +1,19 @@
 workload:
   model: moonshotai/Kimi-K3
-  modelPath: gs://pirillo-sct-bucket/huggingface_model_cache/models--moonshotai--Kimi-K3/
+  modelPath: /data/model/huggingface_model_cache/models--moonshotai--Kimi-K3
   image: lmsysorg/sglang:kimi-k3
   framework: sglang
   nnodes: 4
   tpSize: 16
   serviceAccountName: workload-identity-k8s-sa
+  extraArgs: |
+    --trust-remote-code \
+    --reasoning-parser kimi_k3 \
+    --tool-call-parser kimi_k3 \
+    --mamba-full-memory-ratio 7.21 \
+    --dcp-size 16 \
+    --mem-fraction-static 0.85
 
 volumes:
   gcsfuse:
-    bucketName: pirillo-sct-bucket
+    bucketName: <YOUR_GCS_BUCKET>

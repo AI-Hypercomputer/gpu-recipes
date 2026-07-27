@@ -2,7 +2,7 @@ apiVersion: resource.nvidia.com/v1beta1
 kind: ComputeDomain
 metadata:
   name: {{ .Release.Name }}-compute-domain
-  namespace: default
+  namespace: {{ .Release.Namespace }}
 spec:
   numNodes: {{ .Values.workload.nnodes | default 4 }}
   channel:
