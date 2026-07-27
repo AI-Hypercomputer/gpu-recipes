@@ -50,7 +50,7 @@ spec:
           csi:
             driver: gcsfuse.csi.storage.gke.io
             volumeAttributes:
-              bucketName: "{{ .Values.volumes.gcsfuse.bucketName | default "pirillo-sct-bucket" }}"
+              bucketName: "{{ .Values.volumes.gcsfuse.bucketName }}"
               mountOptions: "implicit-dirs,file-cache:enable-parallel-downloads:true,file-cache:parallel-downloads-per-file:100,file-cache:max-parallel-downloads:-1,file-cache:download-chunk-size-mb:50,file-cache:max-size-mb:-1"
         - name: shared-memory
           emptyDir:
@@ -79,8 +79,10 @@ spec:
           resources:
             requests:
               nvidia.com/gpu: 4
+              memory: "750Gi"
             limits:
               nvidia.com/gpu: 4
+              memory: "800Gi"
             claims:
             - name: compute-domain-channel
           env:
@@ -112,6 +114,8 @@ spec:
             value: "PIX"
           - name: NCCL_NET_GDR_C2C
             value: "1"
+          - name: PYTORCH_CUDA_ALLOC_CONF
+            value: "expandable_segments:True"
           volumeMounts:
           - mountPath: /usr/local/gib
             name: gib
@@ -127,7 +131,7 @@ spec:
             set -e
             nvidia-smi
             . /usr/local/gib/scripts/set_nccl_env.sh
-            pip install --break-system-packages hf_transfer fla-core || true
+            pip install --break-system-packages hf_transfer fla-core google-cloud-storage || true
 
             MY_IP=$(hostname -I | awk '{print $1}')
             export SGLANG_HOST_IP="${MY_IP}"
@@ -145,7 +149,7 @@ spec:
 
             python3 -m sglang.launch_server \
               --trust-remote-code \
-              --model-path /data/model/huggingface_model_cache/models--moonshotai--Kimi-K3 \
+              --model-path {{ .Values.workload.modelPath | default "gs://pirillo-sct-bucket/huggingface_model_cache/models--moonshotai--Kimi-K3/" }} \
               --tp-size {{ .Values.workload.tpSize | default 16 }} \
               --nnodes ${SIZE} \
               --node-rank ${RANK} \
@@ -197,7 +201,7 @@ spec:
           csi:
             driver: gcsfuse.csi.storage.gke.io
             volumeAttributes:
-              bucketName: "{{ .Values.volumes.gcsfuse.bucketName | default "pirillo-sct-bucket" }}"
+              bucketName: "{{ .Values.volumes.gcsfuse.bucketName }}"
               mountOptions: "implicit-dirs,file-cache:enable-parallel-downloads:true,file-cache:parallel-downloads-per-file:100,file-cache:max-parallel-downloads:-1,file-cache:download-chunk-size-mb:50,file-cache:max-size-mb:-1"
         - name: shared-memory
           emptyDir:
@@ -226,8 +230,10 @@ spec:
           resources:
             requests:
               nvidia.com/gpu: 4
+              memory: "750Gi"
             limits:
               nvidia.com/gpu: 4
+              memory: "800Gi"
             claims:
             - name: compute-domain-channel
           env:
@@ -259,6 +265,8 @@ spec:
             value: "PIX"
           - name: NCCL_NET_GDR_C2C
             value: "1"
+          - name: PYTORCH_CUDA_ALLOC_CONF
+            value: "expandable_segments:True"
           volumeMounts:
           - mountPath: /usr/local/gib
             name: gib
@@ -274,7 +282,7 @@ spec:
             set -e
             nvidia-smi
             . /usr/local/gib/scripts/set_nccl_env.sh
-            pip install --break-system-packages hf_transfer fla-core || true
+            pip install --break-system-packages hf_transfer fla-core google-cloud-storage || true
 
             MY_IP=$(hostname -I | awk '{print $1}')
             export SGLANG_HOST_IP="${MY_IP}"
@@ -292,7 +300,7 @@ spec:
 
             python3 -m sglang.launch_server \
               --trust-remote-code \
-              --model-path /data/model/huggingface_model_cache/models--moonshotai--Kimi-K3 \
+              --model-path {{ .Values.workload.modelPath | default "gs://pirillo-sct-bucket/huggingface_model_cache/models--moonshotai--Kimi-K3/" }} \
               --tp-size {{ .Values.workload.tpSize | default 16 }} \
               --nnodes ${SIZE} \
               --node-rank ${RANK} \
