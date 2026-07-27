@@ -10,7 +10,7 @@ workload:
     --trust-remote-code \
     --reasoning-parser kimi_k3 \
     --tool-call-parser kimi_k3 \
-    --mamba-full-memory-ratio 0.86 \
+    --mamba-full-memory-ratio 7.21 \
     --mem-fraction-static 0.85
 
 volumes:
