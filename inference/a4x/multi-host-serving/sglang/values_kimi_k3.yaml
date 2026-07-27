@@ -5,13 +5,13 @@ workload:
   framework: sglang
   nnodes: 4
   tpSize: 16
-  trustRemoteCode: true
-  reasoningParser: kimi_k3
-  toolCallParser: kimi_k3
-  mambaFullMemoryRatio: 0.86
-  memFractionStatic: 0.85
-  extraPipPackages: hf_transfer fla-core
   serviceAccountName: workload-identity-k8s-sa
+  extraArgs: |
+    --trust-remote-code \
+    --reasoning-parser kimi_k3 \
+    --tool-call-parser kimi_k3 \
+    --mamba-full-memory-ratio 0.86 \
+    --mem-fraction-static 0.85
 
 volumes:
   gcsfuse:
