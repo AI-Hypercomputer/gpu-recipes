@@ -1,6 +1,6 @@
 workload:
   model: moonshotai/Kimi-K3
-  modelPath: gs://pirillo-sct-bucket/huggingface_model_cache/models--moonshotai--Kimi-K3/
+  modelPath: /data/model/huggingface_model_cache/models--moonshotai--Kimi-K3
   image: lmsysorg/sglang:kimi-k3
   framework: sglang
   nnodes: 4
