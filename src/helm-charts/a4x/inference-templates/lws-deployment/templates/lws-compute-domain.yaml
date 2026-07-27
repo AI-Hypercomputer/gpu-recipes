@@ -1,0 +1,10 @@
+apiVersion: resource.nvidia.com/v1beta1
+kind: ComputeDomain
+metadata:
+  name: {{ .Release.Name }}-compute-domain
+  namespace: default
+spec:
+  numNodes: {{ .Values.workload.nnodes | default 4 }}
+  channel:
+    resourceClaimTemplate:
+      name: {{ .Release.Name }}-compute-domain-claim
