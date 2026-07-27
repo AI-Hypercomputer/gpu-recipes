@@ -18,7 +18,7 @@ This recipe provides instructions and templates for serving Moonshot AI's **Kimi
 * **Compute**: 4 × `a4x-highgpu-4g` nodes (16 NVIDIA GB200 GPUs total)
 * **Serving Engine**: `lmsysorg/sglang:kimi-k3`
 * **Inter-Node Interconnect**: NVIDIA Multi-Node NVLink (MNNVL / NVL72) via `resource.nvidia.com/v1beta1` `ComputeDomain` DRA resource claim
-* **Parallelism Strategy**: Tensor Parallelism (`TP=16`), Decode Context Parallelism (`DCP=16`), Mamba State Ratio `0.86`, Extra Slots `16`
+* **Parallelism Strategy**: Tensor Parallelism (`TP=16`), Mamba State Ratio `0.86`
 
 <a name="architecture"></a>
 ## 2. High-Level Architecture
@@ -43,12 +43,15 @@ The deployment utilizes `LeaderWorkerSet` (LWS) with a 4-node pod group. A Kuber
 <a name="environment-setup"></a>
 ## 3. Environment Setup
 
-Ensure your GKE cluster is connected and your environment variables are exported:
+Configure your cluster and deployment environment variables:
 
 ```bash
-export CLUSTER_NAME="a4x-baker"
-export REGION="us-central1"
+export CLUSTER_NAME="<YOUR_CLUSTER_NAME>"
+export REGION="<YOUR_CLUSTER_REGION>"
 export NAMESPACE="default"
+export GCS_BUCKET="<YOUR_GCS_BUCKET_NAME>"
+export RELEASE_NAME="sglang-kimi-k3"
+export K8S_SERVICE_ACCOUNT="workload-identity-k8s-sa"
 
 gcloud container clusters get-credentials ${CLUSTER_NAME} --region ${REGION}
 ```
@@ -61,16 +64,18 @@ Deploy the LeaderWorkerSet Helm chart for Kimi-K3:
 ```bash
 cd inference/a4x/multi-host-serving/sglang
 
-helm install -f values_kimi_k3.yaml \
+helm install ${RELEASE_NAME} \
   --namespace ${NAMESPACE} \
-  pirillo-sglang-kimi-k3 \
+  -f values_kimi_k3.yaml \
+  --set volumes.gcsfuse.bucketName=${GCS_BUCKET} \
+  --set workload.serviceAccountName=${K8S_SERVICE_ACCOUNT} \
   ../../../../src/helm-charts/a4x/inference-templates/lws-deployment
 ```
 
 Monitor pod status:
 
 ```bash
-kubectl get pods -n ${NAMESPACE} -l leaderworkerset.sigs.k8s.io/name=pirillo-sglang-kimi-k3 -o wide
+kubectl get pods -n ${NAMESPACE} -l leaderworkerset.sigs.k8s.io/name=${RELEASE_NAME} -o wide
 ```
 
 <a name="inference-requests"></a>
@@ -79,7 +84,7 @@ kubectl get pods -n ${NAMESPACE} -l leaderworkerset.sigs.k8s.io/name=pirillo-sgl
 ### 5.1. OpenAI-Compatible Chat Completion API (Vision & Text)
 
 ```bash
-curl http://pirillo-sglang-kimi-k3-svc.default.svc.cluster.local:30100/v1/chat/completions \
+curl http://${RELEASE_NAME}-svc.${NAMESPACE}.svc.cluster.local:30100/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "moonshotai/Kimi-K3",
@@ -102,7 +107,7 @@ Run the SGLang benchmark client against port 30100:
 ```bash
 python3 -m sglang.bench_serving \
   --backend sglang \
-  --host pirillo-sglang-kimi-k3-svc \
+  --host ${RELEASE_NAME}-svc \
   --port 30100 \
   --dataset-name random \
   --num-prompts 100 \
@@ -115,5 +120,5 @@ python3 -m sglang.bench_serving \
 ## 6. Cleanup
 
 ```bash
-helm uninstall pirillo-sglang-kimi-k3 -n ${NAMESPACE}
+helm uninstall ${RELEASE_NAME} -n ${NAMESPACE}
 ```
