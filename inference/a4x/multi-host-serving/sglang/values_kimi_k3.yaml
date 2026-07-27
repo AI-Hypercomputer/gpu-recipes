@@ -11,6 +11,7 @@ workload:
     --reasoning-parser kimi_k3 \
     --tool-call-parser kimi_k3 \
     --mamba-full-memory-ratio 7.21 \
+    --dcp-size 16 \
     --mem-fraction-static 0.85
 
 volumes:
