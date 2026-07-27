@@ -1,0 +1,6 @@
+apiVersion: v2
+name: lws-deployment
+description: A Helm chart for multi-host SGLang inference deployment using LeaderWorkerSet on A4X GKE
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

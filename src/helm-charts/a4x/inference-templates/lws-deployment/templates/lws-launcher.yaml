@@ -1,0 +1,305 @@
+apiVersion: leaderworkerset.x-k8s.io/v1
+kind: LeaderWorkerSet
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+spec:
+  replicas: 1
+  leaderWorkerTemplate:
+    size: {{ .Values.workload.nnodes | default 4 }}
+    restartPolicy: RecreateGroupOnPodRestart
+    leaderTemplate:
+      metadata:
+        labels:
+          role: leader
+          app: {{ .Release.Name }}
+        annotations:
+          gke-gcsfuse/volumes: "true"
+          gke-gcsfuse/cpu-limit: "0"
+          gke-gcsfuse/memory-limit: "0"
+          gke-gcsfuse/ephemeral-storage-limit: "0"
+          gke-gcsfuse/file-cache-capacity: "500Gi"
+          gke-gcsfuse/cache-path: "/gcs-cache"
+          networking.gke.io/default-interface: "eth0"
+      spec:
+        hostNetwork: true
+        dnsPolicy: ClusterFirstWithHostNet
+        serviceAccountName: {{ .Values.workload.serviceAccountName | default "workload-identity-k8s-sa" }}
+        automountServiceAccountToken: true
+        subdomain: {{ .Release.Name }}
+        restartPolicy: Always
+        resourceClaims:
+        - name: compute-domain-channel
+          resourceClaimTemplateName: {{ .Release.Name }}-compute-domain-claim
+        tolerations:
+        - key: "kubernetes.io/arch"
+          operator: "Equal"
+          value: "arm64"
+          effect: "NoSchedule"
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+        volumes:
+        - name: gib
+          emptyDir: {}
+        - name: local-ssd
+          emptyDir: {}
+        - name: gcs-model-volume
+          csi:
+            driver: gcsfuse.csi.storage.gke.io
+            volumeAttributes:
+              bucketName: "{{ .Values.volumes.gcsfuse.bucketName }}"
+              mountOptions: "implicit-dirs,file-cache:enable-parallel-downloads:true,file-cache:parallel-downloads-per-file:100,file-cache:max-parallel-downloads:-1,file-cache:download-chunk-size-mb:50,file-cache:max-size-mb:-1"
+        - name: shared-memory
+          emptyDir:
+            medium: "Memory"
+            sizeLimit: 250Gi
+        initContainers:
+        - name: nccl-plugin-installer
+          image: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib-arm64:v1.0.7
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c"]
+          args:
+          - |
+            set -ex
+            /scripts/container_entry.sh install --install-nccl
+            cp -R /var/lib/gib/lib64/. /target/usr/local/gib/lib64
+            cp -R /var/lib/gib/. /target/usr/local/gib
+          volumeMounts:
+          - mountPath: /target/usr/local/gib
+            name: gib
+        containers:
+        - name: sglang-server
+          image: {{ .Values.workload.image }}
+          imagePullPolicy: Always
+          securityContext:
+            privileged: true
+          resources:
+            requests:
+              nvidia.com/gpu: 4
+            limits:
+              nvidia.com/gpu: 4
+            claims:
+            - name: compute-domain-channel
+          env:
+          - name: LWS_WORKER_INDEX
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.labels['leaderworkerset.sigs.k8s.io/worker-index']
+          - name: LWS_LEADER_ADDRESS
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.annotations['leaderworkerset.sigs.k8s.io/leader-address']
+          - name: LWS_GROUP_SIZE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.annotations['leaderworkerset.sigs.k8s.io/group-size']
+          - name: NCCL_PLUGIN_PATH
+            value: /usr/local/gib/lib64
+          - name: LD_LIBRARY_PATH
+            value: /usr/local/gib/lib64:/usr/local/nvidia/lib64
+          - name: NCCL_INIT_SCRIPT
+            value: /usr/local/gib/scripts/set_nccl_env.sh
+          - name: NCCL_DEBUG
+            value: "INFO"
+          - name: NCCL_MNNVL_ENABLE
+            value: "1"
+          - name: NCCL_CUMEM_ENABLE
+            value: "1"
+          - name: NCCL_NET_GDR_LEVEL
+            value: "PIX"
+          - name: NCCL_NET_GDR_C2C
+            value: "1"
+          volumeMounts:
+          - mountPath: /usr/local/gib
+            name: gib
+          - mountPath: /gcs-cache
+            name: local-ssd
+          - mountPath: /data/model
+            name: gcs-model-volume
+          - mountPath: /dev/shm
+            name: shared-memory
+          command: ["/bin/bash", "-c"]
+          args:
+          - |
+            set -e
+            nvidia-smi
+            . /usr/local/gib/scripts/set_nccl_env.sh
+            {{- if .Values.workload.extraPipPackages }}
+            pip install --break-system-packages {{ .Values.workload.extraPipPackages }} || true
+            {{- end }}
+
+            MY_IP=$(hostname -I | awk '{print $1}')
+            export SGLANG_HOST_IP="${MY_IP}"
+            export GLOO_SOCKET_IFNAME=eth0
+            export NCCL_SOCKET_IFNAME=eth0
+
+            LEADER_HOST="${LWS_LEADER_ADDRESS:-{{ .Release.Name }}-0.{{ .Release.Name }}}"
+            RANK="${LWS_WORKER_INDEX:-0}"
+            SIZE="${LWS_GROUP_SIZE:-{{ .Values.workload.nnodes | default 4 }}}"
+
+            echo "=== STARTING MULTI-HOST SGLANG SERVE ==="
+            echo "My IP: ${MY_IP}"
+            echo "Node Rank: ${RANK} / Total Nodes: ${SIZE}"
+            echo "Leader Address: ${LEADER_HOST}:20000"
+
+            python3 -m sglang.launch_server \
+              --model-path {{ .Values.workload.modelPath | default (printf "/data/model/%s" .Values.workload.model) }} \
+              --tp-size {{ .Values.workload.tpSize | default 16 }} \
+              --nnodes ${SIZE} \
+              --node-rank ${RANK} \
+              --dist-init-addr ${LEADER_HOST}:20000 \
+              --host 0.0.0.0 \
+              --port 30100 \
+              {{- if .Values.workload.extraArgs }}
+              {{ .Values.workload.extraArgs | nindent 14 }}
+              {{- end }} 2>&1 | tee /gcs-cache/sglang_server_${RANK}.log
+
+    workerTemplate:
+      metadata:
+        labels:
+          role: worker
+          app: {{ .Release.Name }}
+        annotations:
+          gke-gcsfuse/volumes: "true"
+          gke-gcsfuse/cpu-limit: "0"
+          gke-gcsfuse/memory-limit: "0"
+          gke-gcsfuse/ephemeral-storage-limit: "0"
+          gke-gcsfuse/file-cache-capacity: "500Gi"
+          gke-gcsfuse/cache-path: "/gcs-cache"
+          networking.gke.io/default-interface: "eth0"
+      spec:
+        hostNetwork: true
+        dnsPolicy: ClusterFirstWithHostNet
+        serviceAccountName: {{ .Values.workload.serviceAccountName | default "workload-identity-k8s-sa" }}
+        automountServiceAccountToken: true
+        subdomain: {{ .Release.Name }}
+        restartPolicy: Always
+        resourceClaims:
+        - name: compute-domain-channel
+          resourceClaimTemplateName: {{ .Release.Name }}-compute-domain-claim
+        tolerations:
+        - key: "kubernetes.io/arch"
+          operator: "Equal"
+          value: "arm64"
+          effect: "NoSchedule"
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+        volumes:
+        - name: gib
+          emptyDir: {}
+        - name: local-ssd
+          emptyDir: {}
+        - name: gcs-model-volume
+          csi:
+            driver: gcsfuse.csi.storage.gke.io
+            volumeAttributes:
+              bucketName: "{{ .Values.volumes.gcsfuse.bucketName }}"
+              mountOptions: "implicit-dirs,file-cache:enable-parallel-downloads:true,file-cache:parallel-downloads-per-file:100,file-cache:max-parallel-downloads:-1,file-cache:download-chunk-size-mb:50,file-cache:max-size-mb:-1"
+        - name: shared-memory
+          emptyDir:
+            medium: "Memory"
+            sizeLimit: 250Gi
+        initContainers:
+        - name: nccl-plugin-installer
+          image: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib-arm64:v1.0.7
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c"]
+          args:
+          - |
+            set -ex
+            /scripts/container_entry.sh install --install-nccl
+            cp -R /var/lib/gib/lib64/. /target/usr/local/gib/lib64
+            cp -R /var/lib/gib/. /target/usr/local/gib
+          volumeMounts:
+          - mountPath: /target/usr/local/gib
+            name: gib
+        containers:
+        - name: sglang-server
+          image: {{ .Values.workload.image }}
+          imagePullPolicy: Always
+          securityContext:
+            privileged: true
+          resources:
+            requests:
+              nvidia.com/gpu: 4
+            limits:
+              nvidia.com/gpu: 4
+            claims:
+            - name: compute-domain-channel
+          env:
+          - name: LWS_WORKER_INDEX
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.labels['leaderworkerset.sigs.k8s.io/worker-index']
+          - name: LWS_LEADER_ADDRESS
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.annotations['leaderworkerset.sigs.k8s.io/leader-address']
+          - name: LWS_GROUP_SIZE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.annotations['leaderworkerset.sigs.k8s.io/group-size']
+          - name: NCCL_PLUGIN_PATH
+            value: /usr/local/gib/lib64
+          - name: LD_LIBRARY_PATH
+            value: /usr/local/gib/lib64:/usr/local/nvidia/lib64
+          - name: NCCL_INIT_SCRIPT
+            value: /usr/local/gib/scripts/set_nccl_env.sh
+          - name: NCCL_DEBUG
+            value: "INFO"
+          - name: NCCL_MNNVL_ENABLE
+            value: "1"
+          - name: NCCL_CUMEM_ENABLE
+            value: "1"
+          - name: NCCL_NET_GDR_LEVEL
+            value: "PIX"
+          - name: NCCL_NET_GDR_C2C
+            value: "1"
+          volumeMounts:
+          - mountPath: /usr/local/gib
+            name: gib
+          - mountPath: /gcs-cache
+            name: local-ssd
+          - mountPath: /data/model
+            name: gcs-model-volume
+          - mountPath: /dev/shm
+            name: shared-memory
+          command: ["/bin/bash", "-c"]
+          args:
+          - |
+            set -e
+            nvidia-smi
+            . /usr/local/gib/scripts/set_nccl_env.sh
+            {{- if .Values.workload.extraPipPackages }}
+            pip install --break-system-packages {{ .Values.workload.extraPipPackages }} || true
+            {{- end }}
+
+            MY_IP=$(hostname -I | awk '{print $1}')
+            export SGLANG_HOST_IP="${MY_IP}"
+            export GLOO_SOCKET_IFNAME=eth0
+            export NCCL_SOCKET_IFNAME=eth0
+
+            LEADER_HOST="${LWS_LEADER_ADDRESS:-{{ .Release.Name }}-0.{{ .Release.Name }}}"
+            RANK="${LWS_WORKER_INDEX:-0}"
+            SIZE="${LWS_GROUP_SIZE:-{{ .Values.workload.nnodes | default 4 }}}"
+
+            echo "=== STARTING MULTI-HOST SGLANG SERVE ==="
+            echo "My IP: ${MY_IP}"
+            echo "Node Rank: ${RANK} / Total Nodes: ${SIZE}"
+            echo "Leader Address: ${LEADER_HOST}:20000"
+
+            python3 -m sglang.launch_server \
+              --model-path {{ .Values.workload.modelPath | default (printf "/data/model/%s" .Values.workload.model) }} \
+              --tp-size {{ .Values.workload.tpSize | default 16 }} \
+              --nnodes ${SIZE} \
+              --node-rank ${RANK} \
+              --dist-init-addr ${LEADER_HOST}:20000 \
+              --host 0.0.0.0 \
+              --port 30100 \
+              {{- if .Values.workload.extraArgs }}
+              {{ .Values.workload.extraArgs | nindent 14 }}
+              {{- end }} 2>&1 | tee /gcs-cache/sglang_server_${RANK}.log
