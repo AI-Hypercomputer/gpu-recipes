@@ -112,6 +112,9 @@ spec:
             value: "PIX"
           - name: NCCL_NET_GDR_C2C
             value: "1"
+          {{- if .Values.workload.extraEnv }}
+          {{- toYaml .Values.workload.extraEnv | nindent 10 }}
+          {{- end }}
           volumeMounts:
           - mountPath: /usr/local/gib
             name: gib
@@ -125,6 +128,7 @@ spec:
           args:
           - |
             set -e
+            mkdir -p /gcs-cache/hf_cache /gcs-cache/tmp || true
             nvidia-smi
             . /usr/local/gib/scripts/set_nccl_env.sh
             {{- if .Values.workload.extraPipPackages }}
@@ -147,6 +151,9 @@ spec:
 
             python3 -m sglang.launch_server \
               --model-path {{ .Values.workload.modelPath | default (printf "/data/model/%s" .Values.workload.model) }} \
+              {{- if .Values.workload.servedModelName }}
+              --served-model-name {{ .Values.workload.servedModelName }} \
+              {{- end }}
               --tp-size {{ .Values.workload.tpSize | default 16 }} \
               --nnodes ${SIZE} \
               --node-rank ${RANK} \
@@ -259,6 +266,9 @@ spec:
             value: "PIX"
           - name: NCCL_NET_GDR_C2C
             value: "1"
+          {{- if .Values.workload.extraEnv }}
+          {{- toYaml .Values.workload.extraEnv | nindent 10 }}
+          {{- end }}
           volumeMounts:
           - mountPath: /usr/local/gib
             name: gib
@@ -272,6 +282,7 @@ spec:
           args:
           - |
             set -e
+            mkdir -p /gcs-cache/hf_cache /gcs-cache/tmp || true
             nvidia-smi
             . /usr/local/gib/scripts/set_nccl_env.sh
             {{- if .Values.workload.extraPipPackages }}
@@ -294,6 +305,9 @@ spec:
 
             python3 -m sglang.launch_server \
               --model-path {{ .Values.workload.modelPath | default (printf "/data/model/%s" .Values.workload.model) }} \
+              {{- if .Values.workload.servedModelName }}
+              --served-model-name {{ .Values.workload.servedModelName }} \
+              {{- end }}
               --tp-size {{ .Values.workload.tpSize | default 16 }} \
               --nnodes ${SIZE} \
               --node-rank ${RANK} \

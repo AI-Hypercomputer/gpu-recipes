@@ -1,17 +1,29 @@
 workload:
   model: moonshotai/Kimi-K3
-  modelPath: /data/model/huggingface_model_cache/models--moonshotai--Kimi-K3
+  servedModelName: moonshotai/Kimi-K3
+  modelPath: gs://<YOUR_GCS_BUCKET>/huggingface_model_cache/models--moonshotai--Kimi-K3/
   image: lmsysorg/sglang:kimi-k3
   framework: sglang
   nnodes: 4
   tpSize: 16
   serviceAccountName: workload-identity-k8s-sa
+  extraPipPackages: "hf_transfer fla-core google-cloud-storage"
+  extraEnv:
+  - name: HF_HOME
+    value: "/gcs-cache/hf_cache"
+  - name: TMPDIR
+    value: "/gcs-cache/tmp"
+  - name: RUNAI_STREAMER_MEMORY_LIMIT
+    value: "34359738368"
+  - name: RUNAI_STREAMER_CONCURRENCY
+    value: "16"
+  - name: PYTORCH_CUDA_ALLOC_CONF
+    value: "expandable_segments:True"
   extraArgs: |
     --trust-remote-code \
     --reasoning-parser kimi_k3 \
     --tool-call-parser kimi_k3 \
-    --mamba-full-memory-ratio 7.21 \
-    --dcp-size 16 \
+    --mamba-full-memory-ratio 0.86 \
     --mem-fraction-static 0.85
 
 volumes:
