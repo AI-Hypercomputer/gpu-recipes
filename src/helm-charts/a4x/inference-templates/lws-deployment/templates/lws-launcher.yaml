@@ -2,7 +2,7 @@ apiVersion: leaderworkerset.x-k8s.io/v1
 kind: LeaderWorkerSet
 metadata:
   name: {{ .Release.Name }}
-  namespace: default
+  namespace: {{ .Release.Namespace }}
   labels:
     app: {{ .Release.Name }}
 spec:
@@ -79,10 +79,9 @@ spec:
           resources:
             requests:
               nvidia.com/gpu: 4
-              memory: "750Gi"
+              memory: "100Gi"
             limits:
               nvidia.com/gpu: 4
-              memory: "800Gi"
             claims:
             - name: compute-domain-channel
           env:
@@ -114,6 +113,14 @@ spec:
             value: "PIX"
           - name: NCCL_NET_GDR_C2C
             value: "1"
+          - name: HF_HOME
+            value: "/gcs-cache/hf_cache"
+          - name: TMPDIR
+            value: "/gcs-cache/tmp"
+          - name: RUNAI_STREAMER_MEMORY_LIMIT
+            value: "34359738368"
+          - name: RUNAI_STREAMER_CONCURRENCY
+            value: "16"
           - name: PYTORCH_CUDA_ALLOC_CONF
             value: "expandable_segments:True"
           volumeMounts:
@@ -129,6 +136,7 @@ spec:
           args:
           - |
             set -e
+            mkdir -p /gcs-cache/hf_cache /gcs-cache/tmp
             nvidia-smi
             . /usr/local/gib/scripts/set_nccl_env.sh
             pip install --break-system-packages hf_transfer fla-core google-cloud-storage || true
@@ -150,6 +158,7 @@ spec:
             python3 -m sglang.launch_server \
               --trust-remote-code \
               --model-path {{ .Values.workload.modelPath | default "gs://pirillo-sct-bucket/huggingface_model_cache/models--moonshotai--Kimi-K3/" }} \
+              --served-model-name moonshotai/Kimi-K3 \
               --tp-size {{ .Values.workload.tpSize | default 16 }} \
               --nnodes ${SIZE} \
               --node-rank ${RANK} \
@@ -230,10 +239,9 @@ spec:
           resources:
             requests:
               nvidia.com/gpu: 4
-              memory: "750Gi"
+              memory: "100Gi"
             limits:
               nvidia.com/gpu: 4
-              memory: "800Gi"
             claims:
             - name: compute-domain-channel
           env:
@@ -265,6 +273,14 @@ spec:
             value: "PIX"
           - name: NCCL_NET_GDR_C2C
             value: "1"
+          - name: HF_HOME
+            value: "/gcs-cache/hf_cache"
+          - name: TMPDIR
+            value: "/gcs-cache/tmp"
+          - name: RUNAI_STREAMER_MEMORY_LIMIT
+            value: "34359738368"
+          - name: RUNAI_STREAMER_CONCURRENCY
+            value: "16"
           - name: PYTORCH_CUDA_ALLOC_CONF
             value: "expandable_segments:True"
           volumeMounts:
@@ -280,6 +296,7 @@ spec:
           args:
           - |
             set -e
+            mkdir -p /gcs-cache/hf_cache /gcs-cache/tmp
             nvidia-smi
             . /usr/local/gib/scripts/set_nccl_env.sh
             pip install --break-system-packages hf_transfer fla-core google-cloud-storage || true
@@ -301,6 +318,7 @@ spec:
             python3 -m sglang.launch_server \
               --trust-remote-code \
               --model-path {{ .Values.workload.modelPath | default "gs://pirillo-sct-bucket/huggingface_model_cache/models--moonshotai--Kimi-K3/" }} \
+              --served-model-name moonshotai/Kimi-K3 \
               --tp-size {{ .Values.workload.tpSize | default 16 }} \
               --nnodes ${SIZE} \
               --node-rank ${RANK} \
