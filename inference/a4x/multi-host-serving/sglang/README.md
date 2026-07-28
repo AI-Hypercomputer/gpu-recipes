@@ -57,6 +57,7 @@ export NAMESPACE="default"
 export GCS_BUCKET="<YOUR_GCS_BUCKET_NAME>"
 export RELEASE_NAME="sglang-kimi-k3"
 export K8S_SERVICE_ACCOUNT="workload-identity-k8s-sa"
+export MODEL_PATH="gs://${GCS_BUCKET}/huggingface_model_cache/models--moonshotai--Kimi-K3/"
 
 gcloud container clusters get-credentials ${CLUSTER_NAME} --region ${REGION}
 ```
@@ -90,6 +91,7 @@ helm install ${RELEASE_NAME} \
   --namespace ${NAMESPACE} \
   -f values_kimi_k3.yaml \
   --set volumes.gcsfuse.bucketName=${GCS_BUCKET} \
+  --set workload.modelPath=${MODEL_PATH} \
   --set workload.serviceAccountName=${K8S_SERVICE_ACCOUNT} \
   ../../../../src/helm-charts/a4x/inference-templates/lws-deployment
 ```
