@@ -90,6 +90,7 @@ helm install ${RELEASE_NAME} \
   --namespace ${NAMESPACE} \
   -f values_kimi_k3.yaml \
   --set volumes.gcsfuse.bucketName=${GCS_BUCKET} \
+  --set workload.modelPath=gs://${GCS_BUCKET}/huggingface_model_cache/models--moonshotai--Kimi-K3/ \
   --set workload.serviceAccountName=${K8S_SERVICE_ACCOUNT} \
   ../../../../src/helm-charts/a4x/inference-templates/lws-deployment
 ```
