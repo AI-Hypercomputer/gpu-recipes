@@ -30,6 +30,24 @@ spec:
         automountServiceAccountToken: true
         subdomain: {{ .Release.Name }}
         restartPolicy: Always
+        {{- if .Values.workload.nodeSelector }}
+        nodeSelector:
+          {{- toYaml .Values.workload.nodeSelector | nindent 10 }}
+        {{- end }}
+        affinity:
+        {{- if .Values.workload.affinity }}
+          {{- toYaml .Values.workload.affinity | nindent 10 }}
+        {{- else }}
+          podAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - {{ .Release.Name }}
+              topologyKey: "cloud.google.com/gce-topology-subblock"
+        {{- end }}
         resourceClaims:
         - name: compute-domain-channel
           resourceClaimTemplateName: {{ .Release.Name }}-compute-domain-claim
@@ -159,10 +177,8 @@ spec:
               --node-rank ${RANK} \
               --dist-init-addr ${LEADER_HOST}:20000 \
               --host 0.0.0.0 \
-              --port 30100 \
-              {{- if .Values.workload.extraArgs }}
-              {{ .Values.workload.extraArgs | nindent 14 }}
-              {{- end }} 2>&1 | tee /gcs-cache/sglang_server_${RANK}.log
+              --port 30100 {{- if .Values.workload.extraArgs }} \
+              {{ .Values.workload.extraArgs | trim | nindent 14 | trimPrefix "\n" }}{{- end }} 2>&1 | tee /gcs-cache/sglang_server_${RANK}.log
 
     workerTemplate:
       metadata:
@@ -184,6 +200,24 @@ spec:
         automountServiceAccountToken: true
         subdomain: {{ .Release.Name }}
         restartPolicy: Always
+        {{- if .Values.workload.nodeSelector }}
+        nodeSelector:
+          {{- toYaml .Values.workload.nodeSelector | nindent 10 }}
+        {{- end }}
+        affinity:
+        {{- if .Values.workload.affinity }}
+          {{- toYaml .Values.workload.affinity | nindent 10 }}
+        {{- else }}
+          podAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - {{ .Release.Name }}
+              topologyKey: "cloud.google.com/gce-topology-subblock"
+        {{- end }}
         resourceClaims:
         - name: compute-domain-channel
           resourceClaimTemplateName: {{ .Release.Name }}-compute-domain-claim
@@ -313,7 +347,5 @@ spec:
               --node-rank ${RANK} \
               --dist-init-addr ${LEADER_HOST}:20000 \
               --host 0.0.0.0 \
-              --port 30100 \
-              {{- if .Values.workload.extraArgs }}
-              {{ .Values.workload.extraArgs | nindent 14 }}
-              {{- end }} 2>&1 | tee /gcs-cache/sglang_server_${RANK}.log
+              --port 30100 {{- if .Values.workload.extraArgs }} \
+              {{ .Values.workload.extraArgs | trim | nindent 14 | trimPrefix "\n" }}{{- end }} 2>&1 | tee /gcs-cache/sglang_server_${RANK}.log

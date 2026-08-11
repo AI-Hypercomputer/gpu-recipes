@@ -19,14 +19,26 @@ workload:
     value: "16"
   - name: PYTORCH_CUDA_ALLOC_CONF
     value: "expandable_segments:True"
+  - name: TORCH_NCCL_ENABLE_MONITORING
+    value: "0"
+  - name: TORCH_NCCL_ASYNC_ERROR_HANDLING
+    value: "0"
+  - name: TORCH_DISTRIBUTED_TIMEOUT
+    value: "3600"
+  - name: TORCH_NCCL_HEARTBEAT_TIMEOUT_SEC
+    value: "0"
   extraArgs: |
+    --dist-timeout 3600 \
     --trust-remote-code \
     --reasoning-parser kimi_k3 \
     --tool-call-parser kimi_k3 \
     --mamba-full-memory-ratio 7.21 \
-    --dcp-size 16 \
-    --mem-fraction-static 0.85
+    --dcp-size 16
+    --mem-fraction-static 0.85 \
+    --speculative-algorithm DSPARK \
+    --speculative-draft-model-path RadixArk/Kimi-K3-DSpark \
+    --speculative-dspark-block-size 7 \
 
 volumes:
   gcsfuse:
-    bucketName: <YOUR_GCS_BUCKET>
+    bucketName: <YOUR_GCS_BUCKET> 
