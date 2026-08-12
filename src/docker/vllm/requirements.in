@@ -18,7 +18,7 @@ numpy==2.1.0
 packaging==24.2
 pandas==2.2.3
 propcache==0.3.1
-pyarrow==19.0.1
+pyarrow==23.0.1
 python-dateutil==2.9.0.post0
 pytz==2025.2
 PyYAML==6.0.2
