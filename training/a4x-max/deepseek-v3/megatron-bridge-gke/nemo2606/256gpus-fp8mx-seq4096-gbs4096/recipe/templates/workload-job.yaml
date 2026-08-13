@@ -1,3 +1,4 @@
+# yamllint disable
 # Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -66,17 +67,17 @@ spec:
         completions: {{ $nodes }}
         backoffLimit: 0
         completionMode: Indexed
-        activeDeadlineSeconds: 28800 # 4 hours (4 * 60 * 60)
+        activeDeadlineSeconds: 14400 # 4 hours (4 * 60 * 60)
         ttlSecondsAfterFinished: 43200 # 12 hours (12 * 60 * 60)
         template:
           metadata:
             annotations:
               kubectl.kubernetes.io/default-container: workload
-              gke-gcsfuse/volumes: "true"
               {{- if $root.Values.volumes.gcsVolumes }}
-              gke-gcsfuse/cpu-limit: "500m"
-              gke-gcsfuse/memory-limit: "1Ti"
-              gke-gcsfuse/ephemeral-storage-limit: "2Ti"
+              gke-gcsfuse/volumes: "true"
+              gke-gcsfuse/cpu-limit: "0"
+              gke-gcsfuse/memory-limit: "0"
+              gke-gcsfuse/ephemeral-storage-limit: "0"
               {{- end }}
               {{- if $root.Values.volumes.psVolumes }}
               gke-parallelstore/volumes: "true"
@@ -92,6 +93,9 @@ spec:
 
           spec:
             hostNetwork: {{ .Values.network.hostNetwork }}
+            {{- if .Values.network.hostNetwork }}
+            dnsPolicy: ClusterFirstWithHostNet
+            {{- end }}
             hostIPC: {{ .Values.network.hostIPC }}
 
             subdomain: "{{.Release.Name}}"
@@ -156,7 +160,6 @@ spec:
                 claimName: "{{ $pvc.claimName }}"
             {{- end }}
 
-            {{- if $root.Values.volumes.gcsVolumes }}
             {{- range $gcs := $root.Values.volumes.gcsMounts }}
             - name: "{{ $gcs.bucketName }}"
               csi:
@@ -167,12 +170,6 @@ spec:
                   mountOptions: "{{ $gcs.mountOptions }}"
                   {{- end }}
             {{- end}}
-            {{- else }}
-            {{- range $gcs := $root.Values.volumes.gcsMounts }}
-            - name: "{{ $gcs.bucketName }}"
-              emptyDir: {}
-            {{- end }}
-            {{- end }}
 
             {{- if $root.Values.volumes.ssdMountPath }}
             - name: local-ssd
@@ -185,8 +182,10 @@ spec:
             resourceClaims:
             - name: compute-domain-channel
               resourceClaimTemplateName: "{{ .Release.Name }}-{{ $jobSuffix }}-channel"
+            {{- if not $root.Values.network.hostNetwork }}
             - name: rdma
               resourceClaimTemplateName: "{{ .Release.Name }}-{{ $jobSuffix }}-all-mrdma"
+            {{- end }}
 
             containers:
             {{- if $root.Values.workload.gcsSidecarImage }}
@@ -205,12 +204,14 @@ spec:
               imagePullPolicy: Always
               resources:
                 requests:
-                  nvidia.com/gpu: 4
+                  nvidia.com/gpu: {{ $gpusPerNode }}
                 limits:
-                  nvidia.com/gpu: 4
+                  nvidia.com/gpu: {{ $gpusPerNode }}
                 claims:
                 - name: compute-domain-channel
+                {{- if not $root.Values.network.hostNetwork }}
                 - name: rdma
+                {{- end }}
               securityContext:
                 privileged: true
                 capabilities:
@@ -233,6 +234,10 @@ spec:
                   fieldRef:
 
                     fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
+              - name: POD_NAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.name
               - name: RANK_0_FQDN
                 value: "{{.Release.Name}}-workload-0-0.{{.Release.Name}}.default.svc.cluster.local"
               - name: HOSTNAME_PREFIX
@@ -269,6 +274,20 @@ spec:
               - bash
               - -c
               - |
+                if [[ -n "${ARTIFACT_DIR}" && -n "${JOB_COMPLETION_INDEX}" ]]; then
+                  if mkdir -p "${ARTIFACT_DIR}/logs/streaming-logs" 2>/dev/null; then
+                    export STREAMING_LOGS_ENABLED=1
+                    exec > >(tee -a "${ARTIFACT_DIR}/logs/streaming-logs/${POD_NAME:-$(hostname -s)}.log") 2>&1
+                  else
+                    echo "WARNING: ARTIFACT_DIR (${ARTIFACT_DIR}) is not writable or not mounted. Real-time GCS log streaming disabled."
+                  fi
+                elif [[ -n "${JOBSET_NAME}" && -n "${JOB_COMPLETION_INDEX}" ]]; then
+                  if mkdir -p "/runtime-logs/${JOBSET_NAME}/logs" 2>/dev/null; then
+                    export STREAMING_LOGS_ENABLED=1
+                    exec > >(tee -a "/runtime-logs/${JOBSET_NAME}/logs/${POD_NAME:-$(hostname -s)}.log") 2>&1
+                  fi
+                fi
+
                 echo "Pod on $(hostname --fqdn) is running"
                 echo "Pod is assigned job index of $JOB_COMPLETION_INDEX"
                 echo "Pod is using node $NODE_NAME"
@@ -296,7 +315,7 @@ spec:
                 echo 'deb https://packages.cloud.google.com/apt gpudirect-gib-apt main' | tee /etc/apt/sources.list.d/nccl-gib.list
 
                 apt update
-                apt install nccl-gib-plugins
+                apt install -y nccl-gib-plugins
 
                 set +e
                 set +o pipefail
@@ -312,7 +331,7 @@ spec:
                 {{- end }}
                 echo ""
 
-                echo "=== 🔦 GKE SYSTEM PROBE ==="
+                echo "=== GKE SYSTEM PROBE ==="
                 echo "--- env ---"
                 env | grep -iE "NCCL|CUDA|NVIDIA|GPU|TORCH|NEMO|MEGATRON|LD_LIBRARY" | sort
                 echo "--- ulimit -a ---"
@@ -322,7 +341,7 @@ spec:
                 echo "--- df /dev/shm ---"
                 df -h /dev/shm
                 echo "--- libnccl files ---"
-                find / -name "libnccl*" 2>/dev/null
+                find /usr /lib /opt /usr/local -name "libnccl*" 2>/dev/null
                 echo "--- ldconfig ---"
                 ldconfig -p | grep nccl || true
                 echo "--- framework versions ---"
