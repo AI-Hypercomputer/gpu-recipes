@@ -1,0 +1,265 @@
+---
+# Source: inferencepool/templates/rbac.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: llm-d-infpool-epp
+  labels:
+    app.kubernetes.io/name: llm-d-infpool-epp
+    app.kubernetes.io/version: "v1.3.0"
+---
+# Source: inferencepool/templates/epp-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llm-d-infpool-epp
+data:
+  default-plugins.yaml: |
+    apiVersion: inference.networking.x-k8s.io/v1alpha1
+    kind: EndpointPickerConfig
+    plugins:
+    - type: queue-scorer
+    - type: kv-cache-utilization-scorer
+    - type: prefix-cache-scorer
+    schedulingProfiles:
+    - name: default
+      plugins:
+      - pluginRef: queue-scorer
+        weight: 2
+      - pluginRef: kv-cache-utilization-scorer
+        weight: 2
+      - pluginRef: prefix-cache-scorer
+        weight: 3
+  custom-plugins.yaml: |
+    # ALWAYS DO PD IN THIS EXAMPLE (THRESHOLD 0)
+    # This example uses random routing
+    # since it's not yet possible to route to individual DP ranks
+    apiVersion: inference.networking.x-k8s.io/v1alpha1
+    kind: EndpointPickerConfig
+    plugins:
+    - type: prefill-header-handler
+    - type: prefill-filter
+    - type: decode-filter
+    - type: random-picker
+      parameters:
+        maxNumOfEndpoints: 1
+    - type: pd-profile-handler
+      parameters:
+        threshold: 0
+        hashBlockSize: 5
+    schedulingProfiles:
+    - name: prefill
+      plugins:
+      - pluginRef: prefill-filter
+      - pluginRef: random-picker
+    - name: decode
+      plugins:
+      - pluginRef: decode-filter
+      - pluginRef: random-picker
+---
+# Source: inferencepool/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: llm-d-infpool-epp
+  labels:
+    app.kubernetes.io/name: llm-d-infpool-epp
+    app.kubernetes.io/version: "v1.3.0"
+rules:
+- apiGroups: ["inference.networking.x-k8s.io"]
+  resources: ["inferenceobjectives", "inferencemodelrewrites"]
+  verbs: ["get", "watch", "list"]
+- apiGroups: ["inference.networking.k8s.io"]
+  resources: ["inferencepools"]
+  verbs: ["get", "watch", "list"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "watch", "list"]
+---
+# Source: inferencepool/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: llm-d-infpool-epp
+subjects:
+- kind: ServiceAccount
+  name: llm-d-infpool-epp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: llm-d-infpool-epp
+---
+# Source: inferencepool/templates/epp-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: llm-d-infpool-epp
+  labels:
+    app.kubernetes.io/name: llm-d-infpool-epp
+    app.kubernetes.io/version: "v1.3.0"
+spec:
+  selector:
+    inferencepool: llm-d-infpool-epp
+  ports:
+    - name: grpc-ext-proc
+      protocol: TCP
+      port: 9002
+    - name: http-metrics
+      protocol: TCP
+      port: 9090
+  type: ClusterIP
+---
+# Source: inferencepool/templates/epp-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llm-d-infpool-epp
+  labels:
+    app.kubernetes.io/name: llm-d-infpool-epp
+    app.kubernetes.io/version: "v1.3.0"
+spec:
+  replicas: 1
+  strategy:
+    # The current recommended EPP deployment pattern is to have a single active replica. This ensures
+    # optimal performance of the stateful operations such prefix cache aware scorer.
+    # The Recreate strategy the old replica is killed immediately, and allow the new replica(s) to
+    # quickly take over. This is particularly important in the high availability set up with leader
+    # election, as the rolling update strategy would prevent the old leader being killed because
+    # otherwise the maxUnavailable would be 100%.
+    type: Recreate
+  selector:
+    matchLabels:
+      inferencepool: llm-d-infpool-epp
+  template:
+    metadata:
+      labels:
+        inferencepool: llm-d-infpool-epp
+    spec:
+      serviceAccountName: llm-d-infpool-epp
+      # Conservatively, this timeout should mirror the longest grace period of the pods within the pool
+      terminationGracePeriodSeconds: 130
+      containers:
+      - name: epp
+        image: ghcr.io/llm-d/llm-d-inference-scheduler:v0.4.0
+        imagePullPolicy: Always
+        args:
+        - --pool-name
+        - llm-d-infpool
+        # The pool namespace is optional because EPP can default to the NAMESPACE env var.
+        # We still keep this here so that the template works with older versions of EPP, or other
+        # distros of EPP which may not have implemented the NAMESPACE env var defaulting behavior.
+        - --pool-namespace
+        - default
+        - --pool-group
+        - "inference.networking.k8s.io"
+        - --zap-encoder
+        - "json"
+        - --config-file
+        - "/config/custom-plugins.yaml"
+        # Pass additional flags via the inferenceExtension.flags field in values.yaml.
+        - --kv-cache-usage-percentage-metric
+        - "vllm:kv_cache_usage_perc"
+        - --v
+        - "1"
+        - --tracing=false
+        ports:
+        - name: grpc
+          containerPort: 9002
+        - name: grpc-health
+          containerPort: 9003
+        - name: metrics
+          containerPort: 9090
+        livenessProbe:
+          grpc:
+            port: 9003
+            service: inference-extension
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          grpc:
+            port: 9003
+            service: inference-extension
+          periodSeconds: 2
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+
+        volumeMounts:
+        - name: plugins-config-volume
+          mountPath: "/config"
+
+      volumes:
+      - name: plugins-config-volume
+        configMap:
+          name: llm-d-infpool-epp
+---
+# Source: inferencepool/templates/epp-config.yaml
+---
+---
+# Source: inferencepool/templates/gke.yaml
+apiVersion: networking.gke.io/v1
+kind: GCPBackendPolicy
+metadata:
+  name: llm-d-infpool
+  labels:
+    app.kubernetes.io/name: llm-d-infpool-epp
+    app.kubernetes.io/version: "v1.3.0"
+spec:
+  targetRef:
+    group: "inference.networking.k8s.io"
+    kind: InferencePool
+    name: llm-d-infpool
+  default:
+    timeoutSec: 300    # 5-minute timeout (adjust as needed)
+    logging:
+      enabled: true    # log all requests by default
+---
+# Source: inferencepool/templates/gke.yaml
+kind: HealthCheckPolicy
+apiVersion: networking.gke.io/v1
+metadata:
+  name: llm-d-infpool
+  labels:
+    app.kubernetes.io/name: llm-d-infpool-epp
+    app.kubernetes.io/version: "v1.3.0"
+spec:
+  targetRef:
+    group: "inference.networking.k8s.io"
+    kind: InferencePool
+    name: llm-d-infpool
+  default:
+    # Set a more aggressive health check than the default 5s for faster switch
+    # over during EPP rollout.
+    timeoutSec: 2
+    checkIntervalSec: 2
+    config:
+      type: HTTP
+      httpHealthCheck:
+          requestPath: /health
+          port:  8000
+---
+# Source: inferencepool/templates/inferencepool.yaml
+apiVersion: "inference.networking.k8s.io/v1"
+kind: InferencePool
+metadata:
+  name: llm-d-infpool
+  labels:
+    app.kubernetes.io/name: llm-d-infpool-epp
+    app.kubernetes.io/version: "v1.3.0"
+spec:
+  targetPorts:
+      - number: 8000
+  selector:
+    matchLabels:
+      llm-d.ai/inferenceServing: "true"
+      llm-d.ai/model: "DeepSeek-R1-0528"
+  endpointPickerRef:
+    name: llm-d-infpool-epp
+    port:
+      number: 9002
