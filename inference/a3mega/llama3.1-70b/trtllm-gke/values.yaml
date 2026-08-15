@@ -1,0 +1,66 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+targetPlatform: "gke"
+clusterName: ""
+queue: ""
+
+huggingface:
+  secretName: "hf-secret"
+  secretData:
+    token: "hf_api_token"
+
+workload:
+  framework: "trtllm"
+  gpus: 8
+  image: ""
+  model:
+    name: ""
+  configPath: "/workload/configs"
+  configFile: "serving-args.yaml"
+
+  benchmarks:
+    experiments:
+      - isl: 128
+        osl: 128
+        num_requests: 1000
+        concurrency: 128
+        max_seq_len: 32768
+
+volumes:
+  gcsVolumes: true
+  ssdMountPath: "/ssd"
+  gcsMounts:
+    - bucketName: ""
+      mountPath: "/gcs"
+
+gpuPlatformSettings:
+  useHostPlugin: false
+  ncclPluginImage: "us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/nccl-plugin-gpudirecttcpx-dev:v1.0.15"
+  rxdmImage: "us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/tcpgpudmarxd-dev:v1.0.21"
+  ncclBuildType: "228"
+
+network:
+  hostNetwork: true
+  ncclSettings:
+    - name: NCCL_DEBUG
+      value: "WARN"
+  subnetworks: []
+
+trtllm:
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    ports:
+      http: 8000
