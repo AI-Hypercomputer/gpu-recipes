@@ -1,4 +1,4 @@
-# inference-perf benchmark config for Qwen3-32B (NVFP4) on G4 with vLLM.
+# inference-perf benchmark config for Qwen3-32B-FP8 on G4 (8 GPUs, data-parallel).
 # High-throughput operating point: concurrency 2000, 4000 requests, ISL/OSL 1024/1024.
 load:
   type: concurrent
@@ -10,11 +10,11 @@ api:
   streaming: true
 server:
   type: vllm
-  model_name: RedHatAI/Qwen3-32B-NVFP4
+  model_name: Qwen/Qwen3-32B-FP8
   base_url: http://0.0.0.0:8000
   ignore_eos: true
 tokenizer:
-  pretrained_model_name_or_path: RedHatAI/Qwen3-32B-NVFP4
+  pretrained_model_name_or_path: Qwen/Qwen3-32B-FP8
 data:
   type: random
   input_distribution:

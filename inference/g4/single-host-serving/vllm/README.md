@@ -209,6 +209,56 @@ P99 ITL (ms):                            XX
 ==================================================
 ```
 
+## High-throughput serving (8 GPUs, data-parallel)
+
+For maximum aggregate throughput on the balanced `1024/1024` workload, serve the model **data-parallel** (one replica per GPU) instead of tensor-parallel. This saturates all 8 GPUs with independent request streams:
+
+```bash
+sudo docker run \
+    --runtime nvidia \
+    --gpus all \
+    -v ~/.cache/huggingface:/root/.cache/huggingface \
+    --env "HUGGING_FACE_HUB_TOKEN=$HF_TOKEN" \
+    --env "PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True" \
+    -p 8000:8000 \
+    --ipc=host \
+    vllm/vllm-openai:latest \
+    --model Qwen/Qwen3-32B-FP8 \
+    --kv-cache-dtype fp8 \
+    --max-model-len 2560 \
+    --gpu-memory-utilization 0.92 \
+    --max-num-seqs 512 \
+    --max-num-batched-tokens 8192 \
+    --no-enable-prefix-caching \
+    --block-size 256 \
+    --tensor-parallel-size 1 \
+    --data-parallel-size 8
+```
+
+## Benchmark with inference-perf
+
+[inference-perf](https://github.com/kubernetes-sigs/inference-perf) is a model-server-agnostic benchmarking tool that reports standardized throughput and latency metrics. Install it and run against the server above:
+
+```bash
+pip install inference-perf
+inference-perf --config_file inference-perf-config.yml
+```
+
+The provided [`inference-perf-config.yml`](./inference-perf-config.yml) drives 4000 requests at concurrency 2000 with ISL/OSL 1024/1024. See the [inference-perf configuration guide](https://github.com/kubernetes-sigs/inference-perf/blob/main/docs/config.md) to sweep other shapes or concurrency levels.
+
+### Results (Qwen3-32B-FP8, 8× G4, ISL/OSL 1024/1024)
+
+| Metric | Value |
+| --- | --- |
+| Output throughput | **16,181 tokens/s** |
+| Total throughput | 32,820 tokens/s |
+| Request throughput | 16.25 req/s |
+| TTFT (p50) | 9.7 s |
+| TPOT (p50) | 95 ms |
+| Successful requests | 4000 / 4000 (0 failures) |
+> This is a throughput-maximizing operating point (concurrency 2000). For latency-sensitive serving, lower the `concurrency_level` in the config to trade throughput for lower TTFT.
+
+
 ## Clean up
 
 ### 1. Delete the VM
