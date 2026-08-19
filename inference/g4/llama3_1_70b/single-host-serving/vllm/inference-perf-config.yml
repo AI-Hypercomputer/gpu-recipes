@@ -1,0 +1,39 @@
+# inference-perf benchmark config for Llama-3.1-70B-FP8 on G4 (8 GPUs, tensor-parallel).
+# Throughput-maximizing operating point: concurrency 960, 4000 requests, ISL/OSL 128/2048.
+# NOTE: OSL=2048 produces long (~360s) requests. inference-perf's default request
+# timeout is 300s, which would drop long requests; raise it via load.request_timeout.
+load:
+  type: concurrent
+  request_timeout: 900
+  stages:
+    - concurrency_level: 960
+      num_requests: 4000
+api:
+  type: completion
+  streaming: true
+server:
+  type: vllm
+  model_name: neuralmagic/Meta-Llama-3.1-70B-Instruct-FP8
+  base_url: http://0.0.0.0:8000
+  ignore_eos: true
+tokenizer:
+  pretrained_model_name_or_path: neuralmagic/Meta-Llama-3.1-70B-Instruct-FP8
+data:
+  type: random
+  input_distribution:
+    min: 128
+    max: 128
+    mean: 128
+    std_dev: 0
+    total_count: 4000
+  output_distribution:
+    min: 2048
+    max: 2048
+    mean: 2048
+    std_dev: 0
+    total_count: 4000
+report:
+  request_lifecycle:
+    summary: true
+    per_stage: true
+    per_request: false
