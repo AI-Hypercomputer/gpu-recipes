@@ -246,18 +246,6 @@ inference-perf --config_file inference-perf-config.yml
 
 The provided [`inference-perf-config.yml`](./inference-perf-config.yml) drives 4000 requests at concurrency 2000 with ISL/OSL 1024/1024. See the [inference-perf configuration guide](https://github.com/kubernetes-sigs/inference-perf/blob/main/docs/config.md) to sweep other shapes or concurrency levels.
 
-### Results (Qwen3-32B-FP8, 8× G4, ISL/OSL 1024/1024)
-
-| Metric | Value |
-| --- | --- |
-| Output throughput | **16,181 tokens/s** |
-| Total throughput | 32,820 tokens/s |
-| Request throughput | 16.25 req/s |
-| TTFT (p50) | 9.7 s |
-| TPOT (p50) | 95 ms |
-| Successful requests | 4000 / 4000 (0 failures) |
-> This is a throughput-maximizing operating point (concurrency 2000). For latency-sensitive serving, lower the `concurrency_level` in the config to trade throughput for lower TTFT.
-
 
 ## Clean up
 

@@ -73,27 +73,6 @@ requests at concurrency 960 with ISL/OSL 128/2048.
 > `load.request_timeout: 900` so long requests complete and are counted instead of being
 > dropped as timeouts.
 
-### Results (Llama-3.1-70B-FP8, 8× G4, tp8, ISL/OSL 128/2048)
-
-| Metric | Value |
-| --- | --- |
-| Output throughput | **4,937 tokens/s** |
-| Output throughput / GPU | 617 tokens/s |
-| Request throughput | 2.52 req/s |
-| TTFT (p50) | 3.70 s |
-| TPOT (p50) | 182 ms |
-| Successful requests | 4000 / 4000 (0 failures) |
-
-For comparison, a reference tensor-parallel run at the same 128/2048 shape reports
-~4,356 output tokens/s at ~11.1 s TTFT (p50). This operating point delivers
-**~13% higher output throughput with ~3× lower TTFT**.
-
-#### Latency-optimized operating point
-
-Lowering the offered load trades throughput for much lower latency. At a constant arrival
-rate of ~2.4 req/s (set `load.type: constant` with `rate: 2.4` in the config), the same
-server reaches ~4,300 output tokens/s at **TTFT p50 ~0.20 s** and **TPOT p50 ~62 ms** —
-throughput on par with the reference but with dramatically lower latency.
 
 ## Clean up
 
