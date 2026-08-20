@@ -1,26 +1,32 @@
-# Single host inference benchmark of Qwen3-32B-FP8 with vLLM on G4
+# Serve and benchmark Qwen3-32B on G4 (NVIDIA RTX PRO 6000) with vLLM
 
-This recipe shows how to serve and benchmark Qwen3-32B-FP8 model using [vLLM](https://github.com/vllm-project/vllm) on a single GCP VM with G4 GPUs. vLLM is a high-throughput and memory-efficient inference and serving engine for LLMs. For more information on G4 machine types, see the [GCP documentation](https://cloud.google.com/compute/docs/accelerator-optimized-machines#g4-machine-types).
+This recipe shows how to serve and benchmark Qwen3-32B on a single 8-GPU G4 instance
+with [vLLM](https://github.com/vllm-project/vllm), using
+[inference-perf](https://github.com/kubernetes-sigs/inference-perf) for standardized
+throughput/latency measurement. Both **FP8** (`Qwen/Qwen3-32B-FP8`) and **NVFP4**
+(`RedHatAI/Qwen3-32B-NVFP4`) checkpoints are covered.
+
+The 32B model fits on a single 96 GB RTX PRO 6000, so for maximum aggregate throughput it
+is served **data-parallel** (one replica per GPU, `--data-parallel-size 8`).
 
 ## Before you begin
 
 ### 1. Create a GCP VM with G4 GPUs
 
-First, we will create a Google Cloud Platform (GCP) Virtual Machine (VM) that has the necessary GPU resources.
-
 Make sure you have the following prerequisites:
 *   [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) is initialized.
-*   You have a project with a GPU quota. See [Request a quota increase](https://cloud.google.com/docs/quota/view-request#requesting_higher_quota).
+*   A project with GPU quota. See [Request a quota increase](https://cloud.google.com/docs/quota/view-request#requesting_higher_quota).
 *   [Enable required APIs](https://console.cloud.google.com/flows/enableapi?apiid=compute.googleapis.com).
 
-The following commands set up environment variables and create a GCE instance. The `MACHINE_TYPE` is set to `g4-standard-48` for a single GPU VM, More information on different machine types can be found in the [GCP documentation](https://docs.cloud.google.com/compute/docs/accelerator-optimized-machines#g4-machine-types). The boot disk is set to 200GB to accommodate the models and dependencies.
+The following commands set up environment variables and create a GCE instance.
+`MACHINE_TYPE` is set to `g4-standard-384` for an 8-GPU VM. The boot disk is set to 200GB
+to accommodate the models and dependencies.
 
 ```bash
 export VM_NAME="${USER}-g4-test"
 export PROJECT_ID="your-project-id"
 export ZONE="your-zone"
-# g4-standard-48 is for a single GPU VM. For a multi-GPU VM (e.g., 8 GPUs), you can use g4-standard-384.
-export MACHINE_TYPE="g4-standard-48"
+export MACHINE_TYPE="g4-standard-384"
 export IMAGE_PROJECT="ubuntu-os-accelerator-images"
 export IMAGE_FAMILY="ubuntu-accelerator-2404-amd64-with-nvidia-570"
 
@@ -36,182 +42,33 @@ gcloud compute instances create ${VM_NAME} \
 
 ### 2. Connect to the VM
 
-Use `gcloud compute ssh` to connect to the newly created instance.
-
 ```bash
 gcloud compute ssh ${VM_NAME?} --project=${PROJECT_ID?} --zone=${ZONE?}
-```
-
-```
-# Run NVIDIA smi to verify the driver installation and see the available GPUs.
+# Verify the driver installation and available GPUs.
 nvidia-smi
 ```
 
-## Install Dependencies
+## Install dependencies
 
 ### 1. Install Docker
 
-Before you can serve the model, you need to have Docker installed on your VM. You can follow the official documentation to install Docker on Ubuntu:
-[Install Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
-
-After installing Docker, make sure the Docker daemon is running.
+Follow the official documentation to install Docker on Ubuntu:
+[Install Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/). Make
+sure the Docker daemon is running.
 
 ### 2. Install NVIDIA Container Toolkit
 
-To enable Docker containers to access the GPU, you need to install the NVIDIA Container Toolkit. This toolkit allows the container to interact with the NVIDIA driver on the host machine, making the GPU resources available within the container.
+Follow the official NVIDIA documentation:
+[NVIDIA Container Toolkit Install Guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
+This lets the container access the host NVIDIA driver.
 
-You can follow the official NVIDIA documentation to install the container toolkit:
-[NVIDIA Container Toolkit Install Guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+## Serve the model (8 GPUs, data-parallel)
 
-##  Serve a Model
+For maximum aggregate throughput on the balanced `1024/1024` workload, serve the model
+data-parallel — one replica per GPU — so all 8 GPUs are saturated with independent request
+streams.
 
-### 1. Serving on Single-Chip (1 GPU):
-
-To run the vLLM server, you can use the following command:
-
-```bash
-sudo docker run \
-    --runtime nvidia \
-    --gpus all \
-    -v ~/.cache/huggingface:/root/.cache/huggingface \
-    --env "HUGGING_FACE_HUB_TOKEN=$HF_TOKEN" \
-    -p 8000:8000 \
-    --ipc=host \
-    vllm/vllm-openai:latest \
-    --model Qwen/Qwen3-32B-FP8 \
-    --kv-cache-dtype fp8 \
-    --max-num-batched-tokens 4096 \
-    --max-num-seqs 256 \
-    --max-model-len 2300 \ 
-    --gpu-memory-utilization 0.95 \
-    --tensor-parallel-size 1  
-```
-
-For the 32B model on a G4 (1 chip) instance, we recommend `--max-num-batched-tokens 4096`, `--max-num-seqs 256`, and `--max-model-len 2300` for a `2048/128` workload.
-
-Here's a breakdown of the arguments:
--   `--runtime nvidia --gpus all`: This makes the NVIDIA GPUs available inside the container.
--   `-v ~/.cache/huggingface:/root/.cache/huggingface`: This mounts the Hugging Face cache directory from the host to the container. This is useful for caching downloaded models.
--   `--env "HUGGING_FACE_HUB_TOKEN=$HF_TOKEN"`: This sets the Hugging Face Hub token as an environment variable in the container. This is required for downloading models that require authentication.
--   `-p 8000:8000`: This maps port 8000 on the host to port 8000 in the container.
--   `--ipc=host`: This allows the container to share the host's IPC namespace, which can improve performance.
--   `vllm/vllm-openai:latest`: This is the name of the official vLLM docker image.
--   `--model Qwen/Qwen3-32B-FP8`: The model to be served from Hugging Face.
--   `--kv-cache-dtype fp8`: Sets the data type for the key-value cache to FP8 to save GPU memory.
--   `--max-num-batched-tokens 4096`: Maximum number of tokens to be processed in a single iteration.
--   `--max-num-seqs 256`: This sets the maximum number of concurrent requests (sequences) the VLLM scheduler keeps actively running in the GPU's KV cache. 
--   `--max-model-len 2300`: This limits the total sequence length to 2300 tokens. This is sufficient to cover our target workload (Input 2048 + Output 128) while leaving a small buffer for prompt variations.
--   `--gpu-memory-utilization 0.95`: The fraction of GPU memory to be used by vLLM.
--   `--tensor-parallel-size 1`: It specifies the number of gpu's to use.
-
-### 2. Serving on Multi-Chip (8 GPU): 
-
-G4 instances enhance multi-GPU workload performance by using direct GPU [peer-to-peer](https://cloud.google.com/blog/products/compute/g4-vms-p2p-fabric-boosts-multi-gpu-workloads/) communication. This capability allows GPUs that attach to the same G4 instance to exchange data directly over the PCIe bus, bypassing the need to transfer data through the CPU's main memory.
-
-
-```
-To configure NCCL, before you run your workloads, set the NCCL_P2P_LEVEL on your G4 instance by:
-export NCCL_P2P_LEVEL=SYS
-```
-
-we will use the official vllm/vllm-openai:latest Docker image to run the server. 
-
-```bash
-sudo docker run \
-    --runtime nvidia \
-    --gpus all \
-    -v ~/.cache/huggingface:/root/.cache/huggingface \
-    --env "HUGGING_FACE_HUB_TOKEN=$HF_TOKEN" \
-    -p 8000:8000 \
-    --ipc=host \
-    vllm/vllm-openai:latest \
-    --model Qwen/Qwen3-32B-FP8 \
-    --kv-cache-dtype fp8 \
-    --gpu-memory-utilization 0.95 \
-    --tensor-parallel-size 8 
-```
-
-Here's a breakdown of the arguments:
--   `gpus all`: Exposes all 8 available GPUs to the Docker container.
--   `tensor-parallel-size 8`: This is the crucial setting, enabling Tensor Parallelism to split the 32B model weights and operations across all 8 GPUs.
-
-For more information on the available engine arguments, you can refer to the [official vLLM documentation](https://docs.vllm.ai/en/latest/configuration/engine_args/), which includes different parallelism strategies that can be used with multi GPU setup.
-
-After running the command, the model will be served. To run the benchmark, you will need to either run the server in the background by appending `&` to the command, or open a new terminal to run the benchmark command.
-
-## Run Benchmarks for Qwen3-32B-FP8
-
-### 1. Server Output
-
-When the server is up and running, you should see output similar to the following.
-
-```
-(APIServer pid=XXXXXX) INFO XX-XX XX:XX:XX [launcher.py:XX] Route: /metrics, Methods: GET
-(APIServer pid=XXXXXX) INFO:     Started server process [XXXXXX]
-(APIServer pid=XXXXXX) INFO:     Waiting for application startup.
-(APIServer pid=XXXXXX) INFO:     Application startup complete.
-```
-
-### 2. Run the benchmarks
-
-To run the benchmark, you can use the following command:
-
-```bash
-sudo docker run \
-    --runtime nvidia \
-    --gpus all \
-    --network="host" \
-    --entrypoint vllm \
-    vllm/vllm-openai:latest bench serve \
-    --model Qwen/Qwen3-32B-FP8 \
-    --dataset-name random \
-    --random-input-len 2048 \
-    --random-output-len 128 \
-    --request-rate inf \
-    --num-prompts 1000 \
-    --ignore-eos
-```
-Here's a breakdown of the arguments:
-- `--model Qwen/Qwen3-32B-FP8`: The model to benchmark.
-- `--dataset-name random`: The dataset to use for the benchmark. `random` will generate random prompts.
-- `--random-input-len 2048`: The length of the random input prompts.
-- `--random-output-len 128`: The length of the generated output.
-- `--request-rate inf`: The number of requests per second to send. `inf` sends requests as fast as possible.
-- `--num-prompts 1000`: The total number of prompts to send.
-- `--ignore-eos`: A flag to ignore the end-of-sequence token and generate a fixed number of tokens.
-
-### 3. Example output
-
-The output shows various performance metrics of the model, such as throughput and latency.
-
-```bash
-============ Serving Benchmark Result ============ 
-Successful requests:                     XX
-Request rate configured (RPS):           XX
-Benchmark duration (s):                  XX
-Total input tokens:                      XX
-Total generated tokens:                  XX
-Request throughput (req/s):              XX
-Output token throughput (tok/s):         XX
-Total Token throughput (tok/s):          XX
----------------Time to First Token----------------
-Mean TTFT (ms):                          XX
-Median TTFT (ms):                        XX
-P99 TTFT (ms):                           XX
------Time per Output Token (excl. 1st token)------
-Mean TPOT (ms):                          XX
-Median TPOT (ms):                        XX
-P99 TPOT (ms):                           XX
----------------Inter-token Latency----------------
-Mean ITL (ms):                           XX
-Median ITL (ms):                         XX
-P99 ITL (ms):                            XX
-==================================================
-```
-
-## High-throughput serving (8 GPUs, data-parallel)
-
-For maximum aggregate throughput on the balanced `1024/1024` workload, serve the model **data-parallel** (one replica per GPU) instead of tensor-parallel. This saturates all 8 GPUs with independent request streams:
+### FP8 (`Qwen/Qwen3-32B-FP8`)
 
 ```bash
 sudo docker run \
@@ -238,23 +95,61 @@ sudo docker run \
     --data-parallel-size 8
 ```
 
+`VLLM_USE_DEEP_GEMM=0` / `VLLM_MOE_USE_DEEP_GEMM=0` are required for block-quantized FP8
+checkpoints, which otherwise crash at startup on Blackwell (`Unknown SF transformation`).
+
+### NVFP4 (`RedHatAI/Qwen3-32B-NVFP4`)
+
+```bash
+sudo docker run \
+    --runtime nvidia \
+    --gpus all \
+    -v ~/.cache/huggingface:/root/.cache/huggingface \
+    --env "HUGGING_FACE_HUB_TOKEN=$HF_TOKEN" \
+    --env "PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True" \
+    --env "VLLM_ATTENTION_BACKEND=FLASHINFER" \
+    -p 8000:8000 \
+    --ipc=host \
+    vllm/vllm-openai:latest \
+    --model RedHatAI/Qwen3-32B-NVFP4 \
+    --kv-cache-dtype fp8 \
+    --max-model-len 2560 \
+    --gpu-memory-utilization 0.92 \
+    --max-num-seqs 512 \
+    --max-num-batched-tokens 8192 \
+    --no-enable-prefix-caching \
+    --block-size 256 \
+    --tensor-parallel-size 1 \
+    --data-parallel-size 8
+```
+
+Common flags:
+- `--kv-cache-dtype fp8` — halves the KV-cache footprint.
+- `--max-model-len 2560` — covers the 1024 + 1024 workload with a small buffer.
+- `--tensor-parallel-size 1 --data-parallel-size 8` — one independent replica per GPU.
+- `VLLM_ATTENTION_BACKEND=FLASHINFER` — attention backend used for the tuned config.
+
 ## Benchmark with inference-perf
 
-[inference-perf](https://github.com/kubernetes-sigs/inference-perf) is a model-server-agnostic benchmarking tool that reports standardized throughput and latency metrics. Install it and run against the server above:
+[inference-perf](https://github.com/kubernetes-sigs/inference-perf) is a
+model-server-agnostic benchmarking tool that reports standardized throughput and latency
+metrics. Install it and run against the server above:
 
 ```bash
 pip install inference-perf
 inference-perf --config_file inference-perf-config.yml
 ```
 
-The provided [`inference-perf-config.yml`](./inference-perf-config.yml) drives 4000 requests at concurrency 2000 with ISL/OSL 1024/1024. See the [inference-perf configuration guide](https://github.com/kubernetes-sigs/inference-perf/blob/main/docs/config.md) to sweep other shapes or concurrency levels.
-
+The provided [`inference-perf-config.yml`](./inference-perf-config.yml) drives 4000
+requests at concurrency 2000 with ISL/OSL 1024/1024 against `Qwen/Qwen3-32B-FP8`. For the
+NVFP4 server, set `server.model_name` and `tokenizer.pretrained_model_name_or_path` to
+`RedHatAI/Qwen3-32B-NVFP4`. See the
+[inference-perf configuration guide](https://github.com/kubernetes-sigs/inference-perf/blob/main/docs/config.md)
+to sweep other shapes or concurrency levels.
 
 ## Clean up
 
-### 1. Delete the VM
-
-This command will delete the GCE instance and all its disks.
+This command deletes the GCE instance and all its disks.
 
 ```bash
 gcloud compute instances delete ${VM_NAME?} --zone=${ZONE?} --project=${PROJECT_ID} --quiet --delete-disks=all
