@@ -220,6 +220,9 @@ sudo docker run \
     -v ~/.cache/huggingface:/root/.cache/huggingface \
     --env "HUGGING_FACE_HUB_TOKEN=$HF_TOKEN" \
     --env "PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True" \
+    --env "VLLM_ATTENTION_BACKEND=FLASHINFER" \
+    --env "VLLM_USE_DEEP_GEMM=0" \
+    --env "VLLM_MOE_USE_DEEP_GEMM=0" \
     -p 8000:8000 \
     --ipc=host \
     vllm/vllm-openai:latest \

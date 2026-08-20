@@ -28,6 +28,8 @@ sudo docker run \
     -v ~/.cache/huggingface:/root/.cache/huggingface \
     --env "HUGGING_FACE_HUB_TOKEN=$HF_TOKEN" \
     --env "NCCL_P2P_LEVEL=SYS" \
+    --env "PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True" \
+    --env "VLLM_ATTENTION_BACKEND=FLASHINFER" \
     --env "VLLM_USE_DEEP_GEMM=0" \
     --env "VLLM_MOE_USE_DEEP_GEMM=0" \
     -p 8000:8000 \
@@ -46,6 +48,7 @@ sudo docker run \
 
 Notes on the arguments:
 - `NCCL_P2P_LEVEL=SYS` — **required** on G4 to use the PCIe P2P fabric for TP all-reduces.
+- `VLLM_ATTENTION_BACKEND=FLASHINFER` — attention backend used for the tuned config.
 - `VLLM_USE_DEEP_GEMM=0` / `VLLM_MOE_USE_DEEP_GEMM=0` — block-quantized FP8 checkpoints
   crash at startup on Blackwell with DeepGEMM enabled (`Unknown SF transformation`);
   disabling DeepGEMM avoids the crash with no measurable throughput cost.
