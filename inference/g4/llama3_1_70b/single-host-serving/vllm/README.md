@@ -1,6 +1,6 @@
 # Serve Llama-3.1-70B-FP8 on G4 (NVIDIA RTX PRO 6000) with vLLM
 
-This recipe serves [`neuralmagic/Meta-Llama-3.1-70B-Instruct-FP8`](https://huggingface.co/neuralmagic/Meta-Llama-3.1-70B-Instruct-FP8)
+This recipe serves [`nvidia/Llama-3.1-70B-Instruct-FP8`](https://huggingface.co/nvidia/Llama-3.1-70B-Instruct-FP8)
 on a single 8-GPU G4 instance with vLLM, and benchmarks it with
 [inference-perf](https://github.com/kubernetes-sigs/inference-perf).
 
@@ -35,7 +35,7 @@ sudo docker run \
     -p 8000:8000 \
     --ipc=host \
     vllm/vllm-openai:latest \
-    --model neuralmagic/Meta-Llama-3.1-70B-Instruct-FP8 \
+    --model nvidia/Llama-3.1-70B-Instruct-FP8 \
     --kv-cache-dtype fp8 \
     --max-model-len 2560 \
     --gpu-memory-utilization 0.90 \

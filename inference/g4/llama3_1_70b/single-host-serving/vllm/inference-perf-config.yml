@@ -13,11 +13,11 @@ api:
   streaming: true
 server:
   type: vllm
-  model_name: neuralmagic/Meta-Llama-3.1-70B-Instruct-FP8
+  model_name: nvidia/Llama-3.1-70B-Instruct-FP8
   base_url: http://0.0.0.0:8000
   ignore_eos: true
 tokenizer:
-  pretrained_model_name_or_path: neuralmagic/Meta-Llama-3.1-70B-Instruct-FP8
+  pretrained_model_name_or_path: nvidia/Llama-3.1-70B-Instruct-FP8
 data:
   type: random
   input_distribution:

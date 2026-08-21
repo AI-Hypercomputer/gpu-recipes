@@ -4,7 +4,7 @@ This recipe shows how to serve and benchmark Qwen3-32B on a single 8-GPU G4 inst
 with [vLLM](https://github.com/vllm-project/vllm), using
 [inference-perf](https://github.com/kubernetes-sigs/inference-perf) for standardized
 throughput/latency measurement. Both **FP8** (`Qwen/Qwen3-32B-FP8`) and **NVFP4**
-(`RedHatAI/Qwen3-32B-NVFP4`) checkpoints are covered.
+(`nvidia/Qwen3-32B-NVFP4`) checkpoints are covered.
 
 The 32B model fits on a single 96 GB RTX PRO 6000, so for maximum aggregate throughput it
 is served **data-parallel** (one replica per GPU, `--data-parallel-size 8`).
@@ -98,7 +98,7 @@ sudo docker run \
 `VLLM_USE_DEEP_GEMM=0` / `VLLM_MOE_USE_DEEP_GEMM=0` are required for block-quantized FP8
 checkpoints, which otherwise crash at startup on Blackwell (`Unknown SF transformation`).
 
-### NVFP4 (`RedHatAI/Qwen3-32B-NVFP4`)
+### NVFP4 (`nvidia/Qwen3-32B-NVFP4`)
 
 ```bash
 sudo docker run \
@@ -111,7 +111,7 @@ sudo docker run \
     -p 8000:8000 \
     --ipc=host \
     vllm/vllm-openai:latest \
-    --model RedHatAI/Qwen3-32B-NVFP4 \
+    --model nvidia/Qwen3-32B-NVFP4 \
     --kv-cache-dtype fp8 \
     --max-model-len 2560 \
     --gpu-memory-utilization 0.92 \
@@ -143,7 +143,7 @@ inference-perf --config_file inference-perf-config.yml
 The provided [`inference-perf-config.yml`](./inference-perf-config.yml) drives 4000
 requests at concurrency 2000 with ISL/OSL 1024/1024 against `Qwen/Qwen3-32B-FP8`. For the
 NVFP4 server, set `server.model_name` and `tokenizer.pretrained_model_name_or_path` to
-`RedHatAI/Qwen3-32B-NVFP4`. See the
+`nvidia/Qwen3-32B-NVFP4`. See the
 [inference-perf configuration guide](https://github.com/kubernetes-sigs/inference-perf/blob/main/docs/config.md)
 to sweep other shapes or concurrency levels.
 
