@@ -48,7 +48,7 @@ gpuPlatformSettings:
 network:
   ncclSettings:
   - name: NCCL_DEBUG
-    value: "VERSION"
+    value: "TRACE"
   subnetworks[]:
 
 vllm:

@@ -41,14 +41,14 @@ volumes:
 
 gpuPlatformSettings:
   useHostPlugin: false
-  ncclPluginImage: "us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/nccl-plugin-gpudirecttcpx-dev:v1.0.8-1"
-  rxdmImage: "us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/tcpgpudmarxd-dev:v1.0.14"
-  ncclBuildType: 223
+  ncclPluginImage: "us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/nccl-plugin-gpudirecttcpx-dev:v1.0.15"
+  rxdmImage: "us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/tcpgpudmarxd-dev:v1.0.21"
+  ncclBuildType: 228
 
 network:
   ncclSettings:
   - name: NCCL_DEBUG
-    value: "VERSION"
+    value: "TRACE"
   subnetworks[]:
 
 vllm:
