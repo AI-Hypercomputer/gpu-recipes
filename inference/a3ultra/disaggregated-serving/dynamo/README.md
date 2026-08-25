@@ -136,7 +136,7 @@ Install the Dynamo CRDs:
 helm install dynamo-crds dynamo-crds-${RELEASE_VERSION}.tgz \
   --namespace default \
   --wait \
-  --atomic
+  --rollback-on-failure
 ```
 
 Install the Dynamo Platform:
