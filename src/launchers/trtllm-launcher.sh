@@ -213,7 +213,7 @@ run_benchmark() {
         --ep $ep_size \
         --backend "pytorch" \
         --kv_cache_free_gpu_mem_fraction $kv_cache_free_gpu_mem_fraction \
-        $extra_args $vl_args > $output_file
+        $extra_args $vl_args | tee "$output_file"
     else
         echo "Building engine"
         trtllm-bench \
@@ -234,10 +234,9 @@ run_benchmark() {
             --model_path /ssd/${model_name} throughput \
             --dataset $dataset_file \
             --engine_dir $engine_dir \
-            --kv_cache_free_gpu_mem_fraction $kv_cache_free_gpu_mem_fraction $extra_args >$output_file
+            --kv_cache_free_gpu_mem_fraction $kv_cache_free_gpu_mem_fraction $extra_args | tee $output_file
     fi
 
-    cat $output_file
     gcloud storage cp $output_file /gcs/benchmark_logs/trtllm/
 
     rm -rf $engine_dir
