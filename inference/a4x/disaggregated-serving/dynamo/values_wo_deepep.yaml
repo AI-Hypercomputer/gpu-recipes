@@ -1,4 +1,4 @@
-# Copyright 2025 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,94 +14,47 @@
 
 dynamo:
   namespace: dynamo-cloud
-  releaseVersion: "0.7.0"
-  deploymentName: dynamo-disagg1p1d
+  releaseVersion: "1.4.2"
+  deploymentName: ""
   computeDomain:
     name: a4x-domain
-    numNodes: 2
+    numNodes: 5
     resourceClaimTemplateName: a4x-channel
-  serviceAccountName:
+  serviceAccountName: default
   frontend:
-    image: nvcr.io/nvidia/ai-dynamo/sglang-runtime:0.7.0
-    replicas: 9
+    image: nvcr.io/nvidia/ai-dynamo/sglang-runtime:1.3.0-dev.1-cuda13
+    replicas: 8
+    envs:
+      - name: DYN_DISCOVERY_BACKEND
+        value: "kubernetes"
+      - name: DYN_EVENT_PLANE
+        value: "zmq"
+      - name: DYN_REQUEST_PLANE
+        value: "tcp"
+      - name: DYN_TCP_REQUEST_TIMEOUT
+        value: "600"
+      - name: POD_UID
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.uid
     livenessProbe:
-      initialDelaySeconds: 3000
+      initialDelaySeconds: 10
       periodSeconds: 60
       timeoutSeconds: 150
       failureThreshold: 100
     readinessProbe:
-      initialDelaySeconds: 3000
+      initialDelaySeconds: 10
       periodSeconds: 60
       timeoutSeconds: 300
       failureThreshold: 100
   decodeWorker:
     nodeCount: 1
-    replicas: 1
+    replicas: 4
     envs:
-    - name: HF_TOKEN
-      valueFrom:
-        secretKeyRef:
-          name: hf-token-secret
-          key: HF_TOKEN
-    - name: HF_HUB_ENABLE_HF_TRANSFER
-      value: "1"
-    - name: LD_LIBRARY_PATH
-      value: "/usr/local/ucx/lib:/usr/local/ucx/lib/ucx:/opt/nvidia/nvda_nixl/lib/aarch64-linux-gnu:/opt/nvidia/nvda_nixl/lib/aarch64-linux-gnu/plugins:/usr/local/nvidia/lib64"
-    - name: GLOO_SOCKET_IFNAME
-      value: eth0
-    - name: TP_SOCKET_IFNAME
-      value: eth0
-    - name: PYTHONUNBUFFERED
-      value: "1"
-    - name: DYN_SKIP_SGLANG_LOG_FORMATTING
-      value: "1"
-    - name: SGLANG_ENABLE_JIT_DEEPGEMM
-      value: "false"
-    - name: SGLANG_ENABLE_FLASHINFER_GEMM
-      value: "1"
-    - name: SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE
-      value: "100000"
-    - name: SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT
-      value: "100000"
-    - name: SGLANG_DISAGGREGATION_WAITING_TIMEOUT
-      value: "100000"
-    - name: SGLANG_DECODE_BOOTSTRAP_TIMEOUT
-      value: "1000"
-    - name: SGLANG_HACK_SEQ_BOOTSTRAP_ROOM
-      value: "1"
-    - name: SGLANG_MOONCAKE_CUSTOM_MEM_POOL
-      value: "True"
-    - name: SGLANG_USE_MESSAGE_QUEUE_BROADCASTER
-      value: "0"
-    - name: SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK
-      value: "1"
-    - name: MC_TE_METRIC
-      value: "true"
-    - name: MC_FORCE_MNNVL
-      value: "1"
-    - name: NCCL_MNNVL_ENABLE
-      value: "1"
-    - name: NCCL_CUMEM_ENABLE
-      value: "1"
-    livenessProbe:
-      initialDelaySeconds: 600
-      periodSeconds: 60
-      timeoutSeconds: 30
-      failureThreshold: 60
-    readinessProbe:
-      initialDelaySeconds: 60
-      periodSeconds: 60
-      timeoutSeconds: 30
-      failureThreshold: 60
-    startupProbe:
-      initialDelaySeconds: 3000
-      periodSeconds: 60
-      timeoutSeconds: 30
-      failureThreshold: 1800
-  prefillWorker:
-    nodeCount: 1
-    replicas: 1
-    envs:
+      - name: POD_UID
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.uid
       - name: HF_TOKEN
         valueFrom:
           secretKeyRef:
@@ -112,25 +65,61 @@ dynamo:
       - name: LD_LIBRARY_PATH
         value: "/usr/local/ucx/lib:/usr/local/ucx/lib/ucx:/opt/nvidia/nvda_nixl/lib/aarch64-linux-gnu:/opt/nvidia/nvda_nixl/lib/aarch64-linux-gnu/plugins:/usr/local/nvidia/lib64"
       - name: UCX_TLS
-        value: "^tcp"
+        value: "cuda_ipc,cuda_copy,rc"
+      - name: UCX_CUDA_IPC_ENABLE_MNNVL
+        value: "y"
+      - name: UCX_NET_DEVICES
+        value: "mlx5_0:1,mlx5_1:1,mlx5_2:1,mlx5_3:1"
+      - name: UCX_IB_GID_INDEX
+        value: "3"
+      - name: UCX_CUDA_COPY_DMABUF
+        value: "y"
+      - name: UCX_MEMTYPE_CACHE
+        value: "n"
+      - name: UCX_IB_PCI_RELAXED_ORDERING
+        value: "y"
+      - name: UCX_LOG_LEVEL
+        value: "info"
+      - name: NIXL_NUM_TRANSPORT_THREADS
+        value: "4"
+      - name: PYTORCH_ALLOC_CONF
+        value: "expandable_segments:False"
       - name: GLOO_SOCKET_IFNAME
         value: eth0
       - name: TP_SOCKET_IFNAME
         value: eth0
       - name: PYTHONUNBUFFERED
         value: "1"
+      - name: TORCH_DISTRIBUTED_DEFAULT_TIMEOUT
+        value: "1800"
       - name: DYN_SKIP_SGLANG_LOG_FORMATTING
         value: "1"
+      - name: DYN_DISCOVERY_BACKEND
+        value: "kubernetes"
+      - name: DYN_EVENT_PLANE
+        value: "zmq"
+      - name: DYN_REQUEST_PLANE
+        value: "tcp"
       - name: SGLANG_ENABLE_JIT_DEEPGEMM
         value: "false"
-      - name: SGLANG_ENABLE_FLASHINFER_GEMM
+      - name: SGLANG_MOE_NVFP4_DISPATCH
         value: "1"
+      - name: SGLANG_NVFP4_CKPT_FP8_GEMM_IN_ATTN
+        value: "1"
+      - name: SGLANG_PER_TOKEN_GROUP_QUANT_8BIT_V2
+        value: "1"
+      - name: SGLANG_DEEPEP_NUM_MAX_DISPATCH_TOKENS_PER_RANK
+        value: "1024"
       - name: SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE
         value: "100000"
       - name: SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT
         value: "100000"
       - name: SGLANG_DISAGGREGATION_WAITING_TIMEOUT
         value: "100000"
+      - name: SGLANG_DECODE_BOOTSTRAP_TIMEOUT
+        value: "1000"
+      - name: SGLANG_HACK_SEQ_BOOTSTRAP_ROOM
+        value: "1"
       - name: SGLANG_MOONCAKE_CUSTOM_MEM_POOL
         value: "True"
       - name: SGLANG_USE_MESSAGE_QUEUE_BROADCASTER
@@ -145,22 +134,133 @@ dynamo:
         value: "1"
       - name: NCCL_CUMEM_ENABLE
         value: "1"
+      - name: NCCL_NVLS_ENABLE
+        value: "1"
+      - name: NCCL_VMM_ENABLE
+        value: "1"
+      - name: NCCL_DEBUG
+        value: "INFO"
     livenessProbe:
-      initialDelaySeconds: 3000
+      initialDelaySeconds: 10
       periodSeconds: 60
       timeoutSeconds: 30
       failureThreshold: 60
     readinessProbe:
-      initialDelaySeconds: 3000
+      initialDelaySeconds: 10
       periodSeconds: 60
       timeoutSeconds: 30
       failureThreshold: 60
     startupProbe:
-      initialDelaySeconds: 3000
+      initialDelaySeconds: 10
       periodSeconds: 60
       timeoutSeconds: 30
       failureThreshold: 1800
- 
+  prefillWorker:
+    nodeCount: 1
+    replicas: 1
+    envs:
+      - name: POD_UID
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.uid
+      - name: HF_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: hf-token-secret
+            key: HF_TOKEN
+      - name: HF_HUB_ENABLE_HF_TRANSFER
+        value: "1"
+      - name: LD_LIBRARY_PATH
+        value: "/usr/local/ucx/lib:/usr/local/ucx/lib/ucx:/opt/nvidia/nvda_nixl/lib/aarch64-linux-gnu:/opt/nvidia/nvda_nixl/lib/aarch64-linux-gnu/plugins:/usr/local/nvidia/lib64"
+      - name: UCX_TLS
+        value: "cuda_ipc,cuda_copy,rc"
+      - name: UCX_CUDA_IPC_ENABLE_MNNVL
+        value: "y"
+      - name: UCX_NET_DEVICES
+        value: "mlx5_0:1,mlx5_1:1,mlx5_2:1,mlx5_3:1"
+      - name: UCX_IB_GID_INDEX
+        value: "3"
+      - name: UCX_CUDA_COPY_DMABUF
+        value: "y"
+      - name: UCX_MEMTYPE_CACHE
+        value: "n"
+      - name: UCX_IB_PCI_RELAXED_ORDERING
+        value: "y"
+      - name: UCX_LOG_LEVEL
+        value: "info"
+      - name: NIXL_LOG_LEVEL
+        value: "info"
+      - name: NIXL_NUM_TRANSPORT_THREADS
+        value: "4"
+      - name: PYTORCH_ALLOC_CONF
+        value: "expandable_segments:False"
+      - name: GLOO_SOCKET_IFNAME
+        value: eth0
+      - name: TP_SOCKET_IFNAME
+        value: eth0
+      - name: PYTHONUNBUFFERED
+        value: "1"
+      - name: TORCH_DISTRIBUTED_DEFAULT_TIMEOUT
+        value: "1800"
+      - name: DYN_SKIP_SGLANG_LOG_FORMATTING
+        value: "1"
+      - name: DYN_DISCOVERY_BACKEND
+        value: "kubernetes"
+      - name: DYN_EVENT_PLANE
+        value: "zmq"
+      - name: DYN_REQUEST_PLANE
+        value: "tcp"
+      - name: SGLANG_ENABLE_JIT_DEEPGEMM
+        value: "false"
+      - name: SGLANG_MOE_NVFP4_DISPATCH
+        value: "1"
+      - name: SGLANG_NVFP4_CKPT_FP8_GEMM_IN_ATTN
+        value: "1"
+      - name: SGLANG_PER_TOKEN_GROUP_QUANT_8BIT_V2
+        value: "1"
+      - name: SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE
+        value: "100000"
+      - name: SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT
+        value: "100000"
+      - name: SGLANG_DISAGGREGATION_WAITING_TIMEOUT
+        value: "100000"
+      - name: SGLANG_DECODE_BOOTSTRAP_TIMEOUT
+        value: "1000"
+      - name: SGLANG_MOONCAKE_CUSTOM_MEM_POOL
+        value: "True"
+      - name: SGLANG_USE_MESSAGE_QUEUE_BROADCASTER
+        value: "0"
+      - name: SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK
+        value: "1"
+      - name: MC_TE_METRIC
+        value: "true"
+      - name: MC_FORCE_MNNVL
+        value: "1"
+      - name: NCCL_MNNVL_ENABLE
+        value: "1"
+      - name: NCCL_CUMEM_ENABLE
+        value: "1"
+      - name: NCCL_NVLS_ENABLE
+        value: "1"
+      - name: NCCL_VMM_ENABLE
+        value: "1"
+      - name: NCCL_DEBUG
+        value: "INFO"
+    livenessProbe:
+      initialDelaySeconds: 10
+      periodSeconds: 60
+      timeoutSeconds: 30
+      failureThreshold: 60
+    readinessProbe:
+      initialDelaySeconds: 10
+      periodSeconds: 60
+      timeoutSeconds: 30
+      failureThreshold: 60
+    startupProbe:
+      initialDelaySeconds: 10
+      periodSeconds: 60
+      timeoutSeconds: 30
+      failureThreshold: 1800
 
 secrets:
   ngc:
@@ -185,8 +285,8 @@ service:
     worker: 9090
 
 workload:
-  model: deepseek-ai/DeepSeek-R1
-  image:
+  model: nvidia/DeepSeek-R1-0528-NVFP4-v2
+  image: nvcr.io/nvidia/ai-dynamo/sglang-runtime:1.3.0-dev.1-cuda13
   framework: sglang
   configFile: serving-args.yaml
   configPath: /workload/configs
@@ -199,4 +299,6 @@ network:
       value: "VERSION"
 
 quantizations:
-  - "fp8"
+  - "fp4"
+
+nodeSelector: {}

@@ -1,8 +1,8 @@
 # Disaggregated Multi-Node Inference with NVIDIA Dynamo on A4X GKE
 
-This document outlines the steps to deploy and serve Large Language Models (LLMs) using [NVIDIA Dynamo](https://github.com/ai-dynamo/dynamo) disaggregated inference platform on [A4X GKE Node pools](https://cloud.google.com/kubernetes-engine).
+This document outlines the steps to deploy and serve Large Language Models (LLMs) using [NVIDIA Dynamo](https://github.com/ai-dynamo/dynamo) disaggregated inference platform on [A4X (GB200) GKE Node pools](https://cloud.google.com/kubernetes-engine).
 
-Dynamo provides a disaggregated architecture that separates prefill and decode operations for optimized inference performance, supporting both single-node (4 GPUs) and multi-node NVL72 (72 GPUs) configurations. Dynamo also supports various inference framework backends like [vLLM](https://docs.nvidia.com/dynamo/latest/components/backends/vllm/README.html) and [SGLang](https://docs.nvidia.com/dynamo/latest/components/backends/sglang/README.html). In this recipe, we will focus on serving using the SGLang backend. 
+Dynamo provides a disaggregated architecture that separates prefill and decode operations for optimized inference performance across multi-node NVL72 domains. Dynamo supports various inference framework backends like [vLLM](https://docs.nvidia.com/dynamo/latest/components/backends/vllm/README.html) and [SGLang](https://docs.nvidia.com/dynamo/latest/components/backends/sglang/README.html). In this recipe, we focus on serving `nvidia/DeepSeek-R1-0528-NVFP4-v2` (`ISL=8192`, `OSL=1024`) using the SGLang backend.
 
 <a name="table-of-contents"></a>
 ## Table of Contents
@@ -14,11 +14,11 @@ Dynamo provides a disaggregated architecture that separates prefill and decode o
   * [2.3. Connect to your GKE Cluster](#connect-cluster)
   * [2.4. Create Secrets](#create-secrets)
   * [2.5. Install Dynamo Platform](#install-platform)
-  * [2.6. Setup GCS Bucket for GKE ](#setup-gcsfuse)
-  * [2.7. Build Dynamo Image ](#build-dyanmo-image)
+  * [2.6. Setup GCS Bucket for GKE](#setup-gcsfuse)
+  * [2.7. Configure Dynamo Image](#configure-dynamo-image)
 * [3. Deploy with SGLang Backend](#deploy-sglang)
-  * [3.1. SGLang Deployment without DeepEP(8 GPUs)](#sglang-wo-deepep)
-  * [3.2. SGLang Deployment with DeepEP(72 GPUs)](#sglang-deepep)
+  * [3.1. SGLang Deployment without DeepEP (20 GPUs, 1P4D Low Latency)](#sglang-wo-deepep)
+  * [3.2. SGLang Deployment with DeepEP (72 GPUs, 10P1D High Throughput)](#sglang-deepep)
 * [4. Inference Request](#inference-request)
 * [5. Monitoring and Troubleshooting](#monitoring)
 * [6. Cleanup](#cleanup)
@@ -31,14 +31,15 @@ Dynamo provides a disaggregated architecture that separates prefill and decode o
 This recipe has been tested with the following configuration:
 
 * **GKE Cluster**:
-    * GPU node pools with [a4x-highgpu-4g](https://docs.cloud.google.com/compute/docs/gpus#gb200-gpus) machines:
-      * For multi-node deployment: 4 machines with 4 GPUs each (16 GPUs total)
+    * GPU node pools with [a4x-highgpu-4g](https://docs.cloud.google.com/compute/docs/gpus#gb200-gpus) machines (4 GB200 GPUs per node):
+      * For `1p4d` low-latency deployment (without DeepEP): 5 machines with 4 GPUs each (20 GPUs total: 1 Prefill worker × 4 GPUs + 4 Decode workers × 4 GPUs)
+      * For `10p1d` high-throughput deployment (with DeepEP): 18 machines with 4 GPUs each (72 GPUs total: 10 Prefill workers × 4 GPUs + 1 Decode worker × 32 GPUs)
     * [Workload Identity Federation for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity) enabled
     * [Cloud Storage FUSE CSI driver for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/cloud-storage-fuse-csi-driver) enabled
 
 > [!IMPORTANT]
 > To prepare the required environment, see the [GKE environment setup guide](../../../../docs/configuring-environment-gke-a4x.md).
-    
+
 <a name="environment-setup"></a>
 ## 2. Environment Setup (One-Time)
 
@@ -64,8 +65,8 @@ export CLUSTER_NAME=<YOUR_GKE_CLUSTER_NAME>
 export NAMESPACE=dynamo-cloud
 export NGC_API_KEY=<YOUR_NGC_API_KEY>
 export HF_TOKEN=<YOUR_HF_TOKEN>
-export RELEASE_VERSION=0.7.0
-export GCS_BUCKET=<YOUR_CGS_BUCKET>
+export RELEASE_VERSION=1.4.2
+export GCS_BUCKET=<YOUR_GCS_BUCKET>
 
 # Set the project for gcloud commands
 gcloud config set project $PROJECT_ID
@@ -94,7 +95,7 @@ gcloud container clusters get-credentials $CLUSTER_NAME --region $CLUSTER_REGION
 
 Create the namespace:
 ```bash
-kubectl create namespace ${NAMESPACE}
+kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
 kubectl config set-context --current --namespace=$NAMESPACE
 ```
 
@@ -104,18 +105,23 @@ kubectl create secret docker-registry nvcr-secret \
   --namespace=${NAMESPACE} \
   --docker-server=nvcr.io \
   --docker-username='$oauthtoken' \
-  --docker-password=${NGC_API_KEY}
+  --docker-password=${NGC_API_KEY} \
+  --dry-run=client -o yaml | kubectl apply -f -
 ```
 
 Create the secret for the Hugging Face token:
 ```bash
 kubectl create secret generic hf-token-secret \
   --from-literal=HF_TOKEN=${HF_TOKEN} \
-  -n ${NAMESPACE}
+  -n ${NAMESPACE} \
+  --dry-run=client -o yaml | kubectl apply -f -
 ```
 
 <a name="install-platform"></a>
 ### 2.5. Install Dynamo Platform (One-Time Setup)
+
+> [!NOTE]
+> If you are using a shared cluster where `dynamo-platform` is already installed in `dynamo-cloud`, verify it with `helm list -n ${NAMESPACE}` and `kubectl get pods -n ${NAMESPACE}`, and skip to Step 2.6.
 
 Add the NVIDIA Helm repository:
 ```bash
@@ -124,24 +130,17 @@ helm repo add nvidia https://helm.ngc.nvidia.com/nvidia \
 helm repo update
 ```
 
-Fetch the Dynamo Helm charts:
+Fetch the Dynamo Platform Helm chart:
 ```bash
-helm fetch https://helm.ngc.nvidia.com/nvidia/ai-dynamo/charts/dynamo-crds-${RELEASE_VERSION}.tgz
 helm fetch https://helm.ngc.nvidia.com/nvidia/ai-dynamo/charts/dynamo-platform-${RELEASE_VERSION}.tgz
 ```
 
-Install the Dynamo CRDs:
-```bash
-helm install dynamo-crds dynamo-crds-${RELEASE_VERSION}.tgz \
-  --namespace default \
-  --wait \
-  --atomic
-```
-
-Install the Dynamo Platform with Grove & Kai scheduler enabled:
+Install the Dynamo Platform with Grove & KAI scheduler enabled:
 ```bash
 helm install dynamo-platform dynamo-platform-${RELEASE_VERSION}.tgz \
-  --namespace ${NAMESPACE} --set grove.enabled=true --set kai-scheduler.enabled=true
+  --namespace ${NAMESPACE} \
+  --set global.grove.install=true \
+  --set global.kai-scheduler.install=true
 ```
 
 Verify the installation:
@@ -149,19 +148,19 @@ Verify the installation:
 kubectl get pods -n ${NAMESPACE}
 ```
 
-Wait until all pods show a `Running` status before proceeding.
+Wait until all platform pods show a `Running` status before proceeding.
 
 <a name="setup-gcsfuse"></a>
 ### 2.6. Setup GCS Bucket for GKE (One-Time Setup)
 
-It is recommended to utilize [gcsfuse](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/cloud-storage-fuse-csi-driver-setup) to facilitate model access and mitigate [huggingface rate limiting](https://huggingface.co/docs/hub/en/rate-limits#hub-rate-limits) issues.
+It is recommended to utilize [gcsfuse](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/cloud-storage-fuse-csi-driver-setup) to facilitate model access and mitigate [Hugging Face rate limiting](https://huggingface.co/docs/hub/en/rate-limits#hub-rate-limits) issues.
 
 Find the service account (usually annotated to default):
 ```bash
-kubectl get serviceaccounts ${NAMESPACE} -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.annotations.iam\.gke\.io/gcp-service-account}{"\n"}{end}'
+kubectl get serviceaccounts -n ${NAMESPACE} -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.annotations.iam\.gke\.io/gcp-service-account}{"\n"}{end}'
 ```
 
-Config the service account email:
+Configure the service account email:
 ```bash
 export SERVICE_ACCOUNT_EMAIL=$(kubectl get serviceaccount/default -n ${NAMESPACE} -o jsonpath='{.metadata.annotations.iam\.gke\.io/gcp-service-account}')
 ```
@@ -170,7 +169,7 @@ Authorize the service account:
 ```bash
 gcloud iam service-accounts add-iam-policy-binding ${SERVICE_ACCOUNT_EMAIL} \
     --role roles/iam.workloadIdentityUser \
-    --member "serviceAccount:project_id.svc.id.goog[${NAMESPACE}/default]"
+    --member "serviceAccount:${PROJECT_ID}.svc.id.goog[${NAMESPACE}/default]"
 ```
 
 Grant read access to the bucket:
@@ -180,21 +179,22 @@ gcloud storage buckets add-iam-policy-binding ${GCS_BUCKET} \
     --role "roles/storage.objectViewer"
 ```
 
-Downloading model files into the gcs bucket and set your gcs bucket name in values.yaml file.
-
-<a name="build-dynamo-image"></a>
-### 2.7. Build Dynamo Image
-
-Follow the [Dynamo container guide](https://github.com/ai-dynamo/dynamo/blob/main/container/README.md) to build the image, then push it to your artifact registry. 
-
-Build the image like this:
+Label the `default` service account so the Dynamo operator grants it Kubernetes discovery RBAC permissions:
 ```bash
-docker build -f container/Dockerfile.sglang . -t dynamo-wideep --no-cache --build-arg DYNAMO_VERSION=0.7.0 --platform linux/arm64
+kubectl label serviceaccount default -n ${NAMESPACE} nvidia.com/dynamo-component-pod=true --overwrite
 ```
 
-Config the docker image:
+Download `nvidia/DeepSeek-R1-0528-NVFP4-v2` model files into your GCS bucket (under `nvidia/DeepSeek-R1-0528-NVFP4-v2`) and pass your GCS bucket name when installing the Helm release.
+
+<a name="configure-dynamo-image"></a>
+### 2.7. Configure Dynamo Image
+
+Instead of building the Dynamo container image manually, use the official pre-built SGLang runtime image.
+
+For more details, refer to the [NVIDIA Release Artifacts documentation](https://docs.nvidia.com/dynamo/dev/resources/release-artifacts#sglang-runtime).
+Set your environment to use the pre-built image:
 ```bash
-export ARTIFACT_REGISTRY=<YOUR_IMAGE_ARTIFACT_REGISTRY>
+export DYNAMO_IMAGE="nvcr.io/nvidia/ai-dynamo/sglang-runtime:1.3.0-dev.1-cuda13"
 ```
 
 <a name="deploy-sglang"></a>
@@ -202,74 +202,99 @@ export ARTIFACT_REGISTRY=<YOUR_IMAGE_ARTIFACT_REGISTRY>
 
 [Back to Top](#table-of-contents)
 
-Deploy Dynamo with SGLang backend for high-performance inference. 
+Deploy Dynamo with the SGLang backend for high-performance inference using Kubernetes service discovery (`DYN_DISCOVERY_BACKEND=kubernetes`, `DYN_EVENT_PLANE=zmq`, `DYN_REQUEST_PLANE=tcp`) and Mooncake MNNVL/UCX KV cache transfer.
 
 <a name="sglang-wo-deepep"></a>
-### 3.1. SGLang Deployment without DeepEP (8 GPUs)
+### 3.1. SGLang Deployment without DeepEP (20 GPUs, 1P4D Low Latency)
 
-Two nodes deployment uses 8 GPUs across 2 A4X machines, targeting low latency. 
+The 5-node deployment (`1p4d`) uses 20 GPUs across 5 A4X machines (1 Prefill worker × 4 GPUs TP=4 EP=1 + 4 Decode workers × 4 GPUs TP=4 EP=1 without DeepEP), targeting low latency (`ISL=8192`, `OSL=1024`, `concurrency=4`).
 
-#### DeepSeekR1 671B Model
+#### DeepSeek-R1 NVFP4 Model (`1p4d`, 20 GPUs)
 
-Deploy DeepSeekR1-671B across 2 nodes for testing and validation.  Note the use of `--set-file prefill_serving_config` and `--set-file decode_serving_config` pointing to the correct model config file.
+Deploy `nvidia/DeepSeek-R1-0528-NVFP4-v2` across 5 nodes:
 
 ```bash
 cd $RECIPE_ROOT
-helm install -f values_wo_deepep.yaml \
---set workload.image=${ARTIFACT_REGISTRY} \
---set volumes.gcsfuse.bucketName=${GCS_BUCKET} \
---set-file prefill_serving_config=$REPO_ROOT/src/frameworks/a4x/dynamo-configs/deepseekr1-fp8-1p1d-prefill.yaml \
---set-file decode_serving_config=$REPO_ROOT/src/frameworks/a4x/dynamo-configs/deepseekr1-fp8-1p1d-decode.yaml \
-$USER-dynamo-a4x-1p1d \
-$REPO_ROOT/src/helm-charts/a4x/inference-templates/dynamo-deployment
+helm install $USER-dynamo-a4x-1p4d \
+  $REPO_ROOT/src/helm-charts/a4x/inference-templates/dynamo-deployment \
+  -n ${NAMESPACE} -f values_wo_deepep.yaml \
+  --set workload.image=${DYNAMO_IMAGE} \
+  --set volumes.gcsfuse.bucketName=${GCS_BUCKET} \
+  --set-file prefill_serving_config=$REPO_ROOT/src/frameworks/a4x/dynamo-configs/deepseekr1-fp4-1p4d-prefill.yaml \
+  --set-file decode_serving_config=$REPO_ROOT/src/frameworks/a4x/dynamo-configs/deepseekr1-fp4-1p4d-decode.yaml
 ```
 
 <a name="sglang-deepep"></a>
-### 3.2. SGLang Deployment with DeepEP (72 GPUs)
+### 3.2. SGLang Deployment with DeepEP (72 GPUs, 10P1D High Throughput)
 
-Multi-node deployment uses 72 GPUs across 18 A4X machines, providing increased capacity for larger models or higher throughput. 
+The 18-node deployment (`10p1d`) uses a full 72-GPU NVL72 rack across 18 A4X machines (10 Prefill workers × 4 GPUs TP=4 EP=1 + 1 Decode worker × 32 GPUs across 8 nodes TP=32 DP=32 EP=32 with DeepEP `low_latency`) for high throughput (`ISL=8192`, `OSL=1024`, `concurrency=2048`).
 
-#### DeepSeekR1 671B Model
-
-Deploy DeepSeekR1-671B across 18 nodes for production workloads. Note the use of `--set-file prefill_serving_config` and `--set-file decode_serving_config` pointing to the correct model config file for a multi node deployment scenario: 
+#### DeepSeek-R1 NVFP4 Model (`10p1d`, 72 GPUs)
 
 ```bash
 cd $RECIPE_ROOT
-helm install -f values_deepep.yaml \
---set workload.image=${ARTIFACT_REGISTRY} \
---set volumes.gcsfuse.bucketName=${GCS_BUCKET} \
---set-file prefill_serving_config=$REPO_ROOT/src/frameworks/a4x/dynamo-configs/deepseekr1-fp8-10p8d-prefill.yaml \
---set-file decode_serving_config=$REPO_ROOT/src/frameworks/a4x/dynamo-configs/deepseekr1-fp8-10p8d-decode.yaml \
-$USER-dynamo-a4x-multi-node \
-$REPO_ROOT/src/helm-charts/a4x/inference-templates/dynamo-deployment
+helm install $USER-dynamo-a4x-10p1d \
+  $REPO_ROOT/src/helm-charts/a4x/inference-templates/dynamo-deployment \
+  -n ${NAMESPACE} -f values_deepep.yaml \
+  --set workload.image=${DYNAMO_IMAGE} \
+  --set volumes.gcsfuse.bucketName=${GCS_BUCKET} \
+  --set-file prefill_serving_config=$REPO_ROOT/src/frameworks/a4x/dynamo-configs/deepseekr1-fp4-10p1d-prefill.yaml \
+  --set-file decode_serving_config=$REPO_ROOT/src/frameworks/a4x/dynamo-configs/deepseekr1-fp4-10p1d-decode.yaml
 ```
 
 <a name="inference-request"></a>
 ## 4. Inference Request
+
 [Back to Top](#table-of-contents)
 
-Check if the pods are in `Running` status before sending inference requests. 
+Check if the pods are in `Running` status before sending inference requests:
 
 ```bash
 kubectl get pods -n ${NAMESPACE}
 ```
 
-We can then deploy the benchmark client and send benchark request.
-Deploy the benchmark client like this:
+Deploy the benchmark client and send benchmark requests:
 ```bash
 kubectl apply -f bench_client.yaml -n ${NAMESPACE}
 ```
 
-And send the request like this: 
+Send the benchmark request via `bench-client` (for `1p4d` low latency, or set `--host $USER-dynamo-a4x-10p1d-frontend` and `--max-concurrency 2048` for `10p1d`):
 
 ```bash
-kubectl exec -it bench-client -- bash -c "cd /workspace/dynamo/examples/backends/sglang/slurm_jobs/scripts/vllm && python3 -u benchmark_serving.py     --host $USER-dynamo-a4x-1p1d-frontend   --port 8000     --model deepseek-ai/DeepSeek-R1     --tokenizer deepseek-ai/DeepSeek-R1     --backend 'dynamo'     --endpoint /v1/completions     --disable-tqdm     --dataset-name random     --num-prompts 2560     --random-input-len 8192     --random-output-len 1024     --random-range-ratio 0.8     --ignore-eos     --request-rate inf     --percentile-metrics ttft,tpot,itl,e2el     --max-concurrency 512"
+kubectl exec -it bench-client -n ${NAMESPACE} -- bash -c "cd /workspace/dynamo/examples/backends/sglang/slurm_jobs/scripts/vllm && python3 -u benchmark_serving.py \
+  --host $USER-dynamo-a4x-1p4d-frontend \
+  --port 8000 \
+  --model nvidia/DeepSeek-R1-0528-NVFP4-v2 \
+  --tokenizer nvidia/DeepSeek-R1-0528-NVFP4-v2 \
+  --backend 'dynamo' \
+  --endpoint /v1/completions \
+  --disable-tqdm \
+  --dataset-name random \
+  --num-prompts 40 \
+  --random-input-len 8192 \
+  --random-output-len 1024 \
+  --random-range-ratio 0 \
+  --ignore-eos \
+  --request-rate inf \
+  --percentile-metrics ttft,tpot,itl,e2el \
+  --max-concurrency 4"
 ```
 
-Or we can send a benchmark request to a frontend pod like this:
+Or send a benchmark request directly from a frontend pod:
 
 ```bash
-kubectl exec -n ${NAMESPACE} $USER-dynamo-multi-node-serving-frontend -- python3 -u -m sglang.bench_serving    --backend sglang-oai-chat    --base-url http://localhost:8000    --model "deepseek-ai/DeepSeek-R1"    --tokenizer /data/model/deepseek-ai/DeepSeek-R1    --dataset-name random    --num-prompts 10240   --random-input-len 8192  --random-range-ratio 0.8   --random-output-len 1024   --max-concurrency 2048
+FRONTEND_POD=$(kubectl get pods -n ${NAMESPACE} -l nvidia.com/dynamo-component-type=frontend -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -n ${NAMESPACE} ${FRONTEND_POD} -- python3 -u -m sglang.bench_serving \
+  --backend sglang-oai-chat \
+  --base-url http://localhost:8000 \
+  --model "nvidia/DeepSeek-R1-0528-NVFP4-v2" \
+  --tokenizer /data/model/nvidia/DeepSeek-R1-0528-NVFP4-v2 \
+  --dataset-name random \
+  --num-prompts 20480 \
+  --random-input-len 8192 \
+  --random-range-ratio 0 \
+  --random-output-len 1024 \
+  --max-concurrency 2048
 ```
 
 <a name="monitoring"></a>
@@ -277,34 +302,33 @@ kubectl exec -n ${NAMESPACE} $USER-dynamo-multi-node-serving-frontend -- python3
 
 [Back to Top](#table-of-contents)
 
-View logs for different components (replace with your deployment name):
+View logs for different components:
 
-You can find the exact pod name by:
+Find the pod names:
 ```bash
 kubectl get pods -n ${NAMESPACE}
 ```
 
 Frontend logs:
 ```bash
-kubectl logs -f deployment/$USER-dynamo-multi-node-serving-frontend -n ${NAMESPACE}
+kubectl logs -f -l nvidia.com/dynamo-component-type=frontend -n ${NAMESPACE}
 ```
 
 Decode worker logs:
 ```bash
-kubectl logs -f deployment/$USER-dynamo-multi-node-serving-decode-worker -n ${NAMESPACE}
+kubectl logs -f -l nvidia.com/dynamo-sub-component-type=decode -n ${NAMESPACE}
 ```
 
 Prefill worker logs:
 ```bash
-kubectl logs -f deployment/$USER-dynamo-multi-node-serving-prefill-worker -n ${NAMESPACE}
+kubectl logs -f -l nvidia.com/dynamo-sub-component-type=prefill -n ${NAMESPACE}
 ```
 
 Common issues:
 
-* **Pods stuck in Pending**: Check if nodes have sufficient resources (especially for multi-node deployments)
-* **Model download slow**: Large models like DeepSeekR1 671B can take 30 minutes to download
-* **Multi-node issues**: Verify network connectivity between nodes and proper subnet configuration
-* **Deepep timeout issue**: Recompile DeepEP to patch NUM_CPU_TIMEOUT_SECS and NUM_TIMEOUT_CYCLES in csrc/kernels/configs.cuh during the image build.
+* **Pods stuck in Pending**: Check if nodes have sufficient resources (5 nodes for `1p4d`, 18 nodes for `10p1d`) and reside in the same NVL72 node pool. You can pin a specific node pool via `--set nodeSelector."cloud\.google\.com/gke-nodepool"=<NODEPOOL_NAME>`.
+* **Model download slow**: Ensure your GCS bucket is in the same region as the GKE cluster and gcsfuse file caching is enabled.
+* **Multi-node issues**: Verify network connectivity between nodes and proper RDMA/MNNVL ComputeDomain configuration.
 
 <a name="cleanup"></a>
 ## 6. Cleanup
@@ -318,23 +342,17 @@ helm list -n ${NAMESPACE} --filter $USER-dynamo-
 
 Uninstall specific deployments:
 ```bash
-helm uninstall $USER-dynamo-multi-node-serving -n ${NAMESPACE}
+helm uninstall $USER-dynamo-a4x-1p4d -n ${NAMESPACE}
+helm uninstall $USER-dynamo-a4x-10p1d -n ${NAMESPACE}
+kubectl delete -f bench_client.yaml -n ${NAMESPACE} --ignore-not-found
 ```
 
 Uninstall Dynamo platform (if no longer needed):
 ```bash
 helm uninstall dynamo-platform -n ${NAMESPACE}
-helm uninstall dynamo-crds -n default
 ```
 
 Delete namespace and secrets:
 ```bash
 kubectl delete namespace ${NAMESPACE}
 ```
-
-Clean up downloaded charts:
-```bash
-rm -f dynamo-crds-${RELEASE_VERSION}.tgz
-rm -f dynamo-platform-${RELEASE_VERSION}.tgz
-```
-
