@@ -31,17 +31,30 @@ spec:
     - |
       echo "--- STARTING SETUP ---"
 
-      # 1. Install Git
-      apt-get update && apt-get install -y git
+      # 1. Install System Dependencies
+      apt-get update && apt-get install -y git curl jq
 
-      # 2. Install Python Dependencies
-      pip install -q transformers aiohttp numpy requests tqdm pandas datasets Pillow
+      # 2. Install Python Dependencies (including AIPerf for AgentX profiling and synthetic benchmark deps)
+      pip install -q --upgrade pip
+      pip install -q aiperf transformers aiohttp numpy requests tqdm pandas datasets Pillow huggingface_hub hf_transfer
 
-      # 3. Clone the Repo (Specific Branch)
+      # 3. Create Artifact Directory for AIPerf Profiling Outputs
+      mkdir -p /logs/agentic/aiperf_artifacts
+
+      # 4. Clone the Dynamo Repo for Synthetic Benchmarking Scripts
       echo "Cloning repo..."
       git clone --single-branch --branch ishan/sa-1.1-sgl-dsr1-fp8 https://github.com/ai-dynamo/dynamo.git /workspace/dynamo
 
       echo "--- SETUP COMPLETE. POD IS READY. ---"
 
-      # 4. Keep the pod alive indefinitely
+      # 5. Keep the pod alive indefinitely
       sleep infinity
+    env:
+    - name: HF_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: hf-token-secret
+          key: HF_TOKEN
+          optional: true
+    - name: HF_HUB_ENABLE_HF_TRANSFER
+      value: "1"
