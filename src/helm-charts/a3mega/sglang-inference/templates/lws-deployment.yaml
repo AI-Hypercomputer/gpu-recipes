@@ -132,7 +132,7 @@ spec:
         {{- end }}
 
         - name: tcpxo-daemon
-          image: {{ $root.Values.gpuPlatformSettings.rxdmImage }}
+          image: "{{ $root.Values.gpuPlatformSettings.rxdmImage }}"
           imagePullPolicy: Always
           securityContext:
             capabilities:
@@ -171,7 +171,7 @@ spec:
 
         containers:
           - name: sglang-leader
-            image: {{ $root.Values.job.image.repository }}:{{ $root.Values.job.image.tag }}
+            image: "{{ $root.Values.job.image.repository }}:{{ $root.Values.job.image.tag }}"
             securityContext:
               privileged: true
               capabilities:
@@ -196,6 +196,10 @@ spec:
                     fieldPath: metadata.labels['leaderworkerset.sigs.k8s.io/worker-index']
               - name: HF_HUB_ENABLE_HF_TRANSFER
                 value: "1"
+              - name: HF_HUB_ETAG_TIMEOUT
+                value: "60"
+              - name: HF_HUB_DOWNLOAD_TIMEOUT
+                value: "60"
               - name: HF_HOME
                 value: "{{ $root.Values.volumes.ssdMountPath }}"
               - name: TORCH_DISTRIBUTED_DEBUG
@@ -304,6 +308,8 @@ spec:
 
               GLOO_SOCKET_IFNAME=eth0 python3 -m sglang.launch_server \
                 --model-path {{ $root.Values.model.name }} \
+                --host 0.0.0.0 \
+                --port {{ $root.Values.sglang.service.ports.http }} \
                 --tp {{ $root.Values.model.tp_size }} \
                 --dist-init-addr ${LWS_LEADER_ADDRESS}:6002 \
                 --nnodes ${LWS_GROUP_SIZE} \
@@ -464,7 +470,7 @@ spec:
 
 
         - name: tcpxo-daemon
-          image: {{ $root.Values.gpuPlatformSettings.rxdmImage }}
+          image: "{{ $root.Values.gpuPlatformSettings.rxdmImage }}"
           imagePullPolicy: Always
           securityContext:
             capabilities:
@@ -503,7 +509,7 @@ spec:
 
         containers:
           - name: sglang-worker
-            image: {{ $root.Values.job.image.repository }}:{{ $root.Values.job.image.tag }}
+            image: "{{ $root.Values.job.image.repository }}:{{ $root.Values.job.image.tag }}"
             securityContext:
               privileged: true
               capabilities:
@@ -528,6 +534,10 @@ spec:
                     fieldPath: metadata.labels['leaderworkerset.sigs.k8s.io/worker-index']
               - name: HF_HUB_ENABLE_HF_TRANSFER
                 value: "1"
+              - name: HF_HUB_ETAG_TIMEOUT
+                value: "60"
+              - name: HF_HUB_DOWNLOAD_TIMEOUT
+                value: "60"
               - name: HF_HOME
                 value: "{{ $root.Values.volumes.ssdMountPath }}"
               - name: TORCH_DISTRIBUTED_DEBUG
@@ -635,6 +645,8 @@ spec:
               echo "Pod on $(hostname --fqdn) is running"
               GLOO_SOCKET_IFNAME=eth0 python3 -m sglang.launch_server \
                 --model-path {{ $root.Values.model.name }} \
+                --host 0.0.0.0 \
+                --port {{ $root.Values.sglang.service.ports.http }} \
                 --tp {{ $root.Values.model.tp_size }} \
                 --dist-init-addr ${LWS_LEADER_ADDRESS}:6002 \
                 --nnodes ${LWS_GROUP_SIZE} \

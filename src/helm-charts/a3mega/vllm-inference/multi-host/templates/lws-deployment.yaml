@@ -132,7 +132,7 @@ spec:
         {{- end }}
 
         - name: tcpxo-daemon
-          image: {{ $root.Values.gpuPlatformSettings.rxdmImage }}
+          image: "{{ $root.Values.gpuPlatformSettings.rxdmImage }}"
           imagePullPolicy: Always
           securityContext:
             capabilities:
@@ -171,7 +171,7 @@ spec:
 
         containers:
           - name: vllm-leader
-            image: {{ $root.Values.job.image.repository }}:{{ $root.Values.job.image.tag }}
+            image: "{{ $root.Values.job.image.repository }}:{{ $root.Values.job.image.tag }}"
             securityContext:
               privileged: true
               capabilities:
@@ -196,6 +196,10 @@ spec:
                     fieldPath: metadata.labels['leaderworkerset.sigs.k8s.io/worker-index']
               - name: HF_HUB_ENABLE_HF_TRANSFER
                 value: "1"
+              - name: HF_HUB_ETAG_TIMEOUT
+                value: "60"
+              - name: HF_HUB_DOWNLOAD_TIMEOUT
+                value: "60"
               - name: HF_HOME
                 value: "{{ $root.Values.volumes.ssdMountPath }}"
               - name: TORCH_DISTRIBUTED_DEBUG
@@ -301,7 +305,7 @@ spec:
             - |
               # Launch the server
               echo "Pod on $(hostname --fqdn) is running"
-              /vllm-workspace/ray_init.sh leader --ray_cluster_size=${LWS_GROUP_SIZE}
+              bash /workspace/ray_init.sh leader --ray_cluster_size=${LWS_GROUP_SIZE}
 
               vllm serve {{ $root.Values.model.name }} \
                 --tokenizer {{ $root.Values.model.name }} \
@@ -463,7 +467,7 @@ spec:
 
 
         - name: tcpxo-daemon
-          image: {{ $root.Values.gpuPlatformSettings.rxdmImage }}
+          image: "{{ $root.Values.gpuPlatformSettings.rxdmImage }}"
           imagePullPolicy: Always
           securityContext:
             capabilities:
@@ -502,7 +506,7 @@ spec:
 
         containers:
           - name: vllm-worker
-            image: {{ $root.Values.job.image.repository }}:{{ $root.Values.job.image.tag }}
+            image: "{{ $root.Values.job.image.repository }}:{{ $root.Values.job.image.tag }}"
             securityContext:
               privileged: true
               capabilities:
@@ -527,6 +531,10 @@ spec:
                     fieldPath: metadata.labels['leaderworkerset.sigs.k8s.io/worker-index']
               - name: HF_HUB_ENABLE_HF_TRANSFER
                 value: "1"
+              - name: HF_HUB_ETAG_TIMEOUT
+                value: "60"
+              - name: HF_HUB_DOWNLOAD_TIMEOUT
+                value: "60"
               - name: HF_HOME
                 value: "{{ $root.Values.volumes.ssdMountPath }}"
               - name: TORCH_DISTRIBUTED_DEBUG
@@ -632,7 +640,7 @@ spec:
             - |
               # Launch the server
               echo "Pod on $(hostname --fqdn) is running"
-              /vllm-workspace/ray_init.sh worker --ray_address=${LWS_LEADER_ADDRESS}
+              bash /workspace/ray_init.sh worker --ray_address=${LWS_LEADER_ADDRESS}
 
             volumeMounts:
             - name: nvidia-dir-host

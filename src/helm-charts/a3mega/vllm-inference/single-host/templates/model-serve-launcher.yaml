@@ -136,7 +136,7 @@ spec:
       {{- end }}
 
       - name: tcpxo-daemon
-        image: {{ $root.Values.gpuPlatformSettings.rxdmImage }}
+        image: "{{ $root.Values.gpuPlatformSettings.rxdmImage }}"
         imagePullPolicy: Always
         securityContext:
           capabilities:
@@ -175,7 +175,7 @@ spec:
 
       containers:
         - name: serving
-          image: {{ $root.Values.job.image.repository }}:{{ $root.Values.job.image.tag }}
+          image: "{{ $root.Values.job.image.repository }}:{{ $root.Values.job.image.tag }}"
           securityContext:
             privileged: true
           resources:
@@ -193,6 +193,10 @@ spec:
                   key: "{{ $root.Values.huggingface.secretData.token }}"
             - name: HF_HUB_ENABLE_HF_TRANSFER
               value: "1"
+            - name: HF_HUB_ETAG_TIMEOUT
+              value: "60"
+            - name: HF_HUB_DOWNLOAD_TIMEOUT
+              value: "60"
             - name: HF_HOME
               value: "{{ $root.Values.volumes.ssdMountPath }}"
             - name: TORCH_DISTRIBUTED_DEBUG
