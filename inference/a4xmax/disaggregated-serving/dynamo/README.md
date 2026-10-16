@@ -426,13 +426,11 @@ kubectl exec -it bench-client -n ${NAMESPACE} -- bash -c "
 
 #### Expected Results: Reflection Beam High Throughput (4P4D)
 
-Measured on 8 `a4x-maxgpu-4g-metal` nodes in one node pool, with the image digest and AIPerf command above, one 3600 s run per concurrency. Your numbers will vary with cluster state and image version.
+Measured on 8 `a4x-maxgpu-4g-metal` nodes in one node pool, with the image digest and AIPerf command above, one 3600 s run at `CONCURRENCY=32`. Your numbers will vary with cluster state and image version.
 
 | Concurrency | Total tok/s (per GPU) | Output tok/s | TTFT p50 / p90 / p99 (s) | ITL p50 / p90 / p99 (ms) | Prefix cache read | Errors |
 | --- | --- | --- | --- | --- | --- | --- |
 | 32 | 194,144 (6,067) | 1,332 | 0.68 / 1.93 / 4.04 | 4.81 / 6.53 / 15.14 | 96.6% | 0 of 4,750 |
-| 96 | TBD | TBD | TBD | TBD | TBD | TBD |
-| 192 | TBD | TBD | TBD | TBD | TBD | TBD |
 
 <a name="benchmark-synthetic"></a>
 ### 4.4. Category 2: Synthetic Random-Dataset Benchmarking

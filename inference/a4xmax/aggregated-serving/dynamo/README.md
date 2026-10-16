@@ -314,13 +314,11 @@ kubectl exec -it bench-client -n ${NAMESPACE} -- bash -c "
 
 #### Expected Results
 
-Measured on 8 `a4x-maxgpu-4g-metal` nodes in one node pool, with the image digest and AIPerf command above, one 3600 s run per concurrency. Your numbers will vary with cluster state and image version.
+Measured on 8 `a4x-maxgpu-4g-metal` nodes in one node pool, with the image digest and AIPerf command above, one 3600 s run at `CONCURRENCY=32`. Your numbers will vary with cluster state and image version.
 
 | Concurrency | Total tok/s (per GPU) | Output tok/s | TTFT p50 / p90 / p99 (s) | ITL p50 / p90 / p99 (ms) | Prefix cache read | Errors |
 | --- | --- | --- | --- | --- | --- | --- |
 | 32 | 228,630 (7,145) | 1,384 | 0.80 / 2.61 / 6.07 | 2.41 / 4.28 / 16.41 | 93.0% | 0 of 4,788 |
-| 96 | TBD | TBD | TBD | TBD | TBD | TBD |
-| 192 | TBD | TBD | TBD | TBD | TBD | TBD |
 
 <a name="monitoring"></a>
 ## 5. Monitoring and Troubleshooting
