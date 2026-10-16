@@ -44,9 +44,11 @@ spec:
       # 1. Install System Dependencies
       apt-get update && apt-get install -y git curl jq
 
-      # 2. Install Python Dependencies (including AIPerf >=0.12.0 for AgentX profiling and synthetic benchmark deps)
+      # 2. Install Python Dependencies. AgentX profiling needs `--warmup-requests-per-lane`,
+      # which is not in the aiperf 0.13.0 PyPI release, so install aiperf from a pinned commit.
       pip install -q --upgrade pip
-      pip install -q aiperf transformers aiohttp numpy requests tqdm pandas datasets Pillow huggingface_hub hf_transfer
+      pip install -q "aiperf @ git+https://github.com/ai-dynamo/aiperf.git@1dfaea5fef059d32b7198b3da5325ae415be80c9"
+      pip install -q transformers aiohttp numpy requests tqdm pandas datasets Pillow huggingface_hub hf_transfer
 
       # 3. Create Artifact Directory for AIPerf Profiling Outputs
       mkdir -p /logs/agentic/aiperf_artifacts
@@ -68,8 +70,6 @@ spec:
           optional: true
     - name: HF_HUB_ENABLE_HF_TRANSFER
       value: "1"
-    - name: AIPERF_DATASET_WEKA_LIVE_ASSISTANT_RESPONSES
-      value: "0"
     - name: AIPERF_DATASET_CONFIGURATION_TIMEOUT
       value: "1800"
     - name: AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT

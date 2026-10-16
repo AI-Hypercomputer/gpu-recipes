@@ -159,7 +159,7 @@ spec:
           value: {{ .Values.workload.configPath }}/{{ .Values.workload.configFile }}
         {{- if eq .Values.volumes.useGcs true }}
         - name: MODEL_PATH
-          value: {{ .Values.volumes.gcsMounts.mountPath }}/{{ .Values.workload.model }}
+          value: {{ .Values.workload.modelPath | default (printf "%s/%s" .Values.volumes.gcsMounts.mountPath .Values.workload.model) }}
         {{- end }}
         - name: POD_UID
           valueFrom:
@@ -274,9 +274,6 @@ spec:
 
             ARGS=()
             if [ -n "$MODEL_PATH" ]; then
-              if [ ! -d "$MODEL_PATH" ] && [ -d "/data/model/huggingface_model_cache/models--reflection--Beam-1.0-501B-A23B-NVFP4-final/snapshots/81a5ab6b525d43f0a11ddd176412ee0f320ba9e0" ]; then
-                MODEL_PATH="/data/model/huggingface_model_cache/models--reflection--Beam-1.0-501B-A23B-NVFP4-final/snapshots/81a5ab6b525d43f0a11ddd176412ee0f320ba9e0"
-              fi
               echo "Adding model path from env var: $MODEL_PATH"
               ARGS+=("--model-path" "$MODEL_PATH")
             else
@@ -395,7 +392,7 @@ spec:
           value: {{ .Values.workload.configPath }}/{{ .Values.workload.configFile }}
         {{- if eq .Values.volumes.useGcs true }}
         - name: MODEL_PATH
-          value: {{ .Values.volumes.gcsMounts.mountPath }}/{{ .Values.workload.model }}
+          value: {{ .Values.workload.modelPath | default (printf "%s/%s" .Values.volumes.gcsMounts.mountPath .Values.workload.model) }}
         {{- end }}
         - name: POD_UID
           valueFrom:
@@ -510,9 +507,6 @@ spec:
 
             ARGS=()
             if [ -n "$MODEL_PATH" ]; then
-              if [ ! -d "$MODEL_PATH" ] && [ -d "/data/model/huggingface_model_cache/models--reflection--Beam-1.0-501B-A23B-NVFP4-final/snapshots/81a5ab6b525d43f0a11ddd176412ee0f320ba9e0" ]; then
-                MODEL_PATH="/data/model/huggingface_model_cache/models--reflection--Beam-1.0-501B-A23B-NVFP4-final/snapshots/81a5ab6b525d43f0a11ddd176412ee0f320ba9e0"
-              fi
               echo "Adding model path from env var: $MODEL_PATH"
               ARGS+=("--model-path" "$MODEL_PATH")
             else

@@ -210,8 +210,10 @@ This recipe is organized into deployment categories that pair a Helm topology (`
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **DeepSeek-R1 671B (FP8)** | `deepseek-ai/DeepSeek-R1` | Low-Latency / without DeepEP | 1P1D (2 nodes / 8 GPUs) | `values_wo_deepep.yaml` | `deepseek-r1-fp8-1p1d-prefill.yaml` | `deepseekr1-fp8-1p1d-decode.yaml` |
 | **DeepSeek-R1 671B (FP8)** | `deepseek-ai/DeepSeek-R1` | High-Throughput / with DeepEP | 10P8D (18 nodes / 72 GPUs) | `values_deepep.yaml` | `deepseekr1-fp8-10p8d-prefill.yaml` | `deepseekr1-fp8-10p8d-decode.yaml` |
-| **LASER_BEAM** | `reflection/Beam-1.0-501B-A23B-NVFP4` | High Interactivity (DFlash2) | 8x Aggregated (8 nodes / 32 GPUs) | `laser_beam_high_int.yaml` | `laser_beam_high_int_prefill.yaml` | `laser_beam_high_int_decode.yaml` |
-| **LASER_BEAM** | `reflection/Beam-1.0-501B-A23B-NVFP4` | High Throughput (Disaggregated) | 4P4D (8 nodes / 32 GPUs) | `laser_beam_high_throughput.yaml` | `laser_beam_high_throughput_prefill.yaml` | `laser_beam_high_throughput_decode.yaml` |
+| **LASER_BEAM** | `reflection/Beam-1.0-501B-A23B-NVFP4` | High Throughput | 4P4D (8 nodes / 32 GPUs) | `laser_beam_high_throughput.yaml` | `laser_beam_high_throughput_prefill.yaml` | `laser_beam_high_throughput_decode.yaml` |
+
+> [!NOTE]
+> The LASER_BEAM High Interactivity recipe runs 8 aggregated workers, so it lives in the [aggregated Dynamo recipe](../../aggregated-serving/dynamo/README.md).
 
 > [!TIP]
 > To add or deploy another model, stage its weights in `gs://${GCS_BUCKET}`, add its prefill and decode YAML files under `$REPO_ROOT/src/frameworks/a4xmax/dynamo-configs/`, and pass `--set workload.model=${HF_MODEL_ID}` along with `--set-file prefill_serving_config=...` and `--set-file decode_serving_config=...` to `helm install`.
@@ -231,33 +233,6 @@ export VALUES_FILE="values_wo_deepep.yaml"
 export PREFILL_CONFIG="deepseek-r1-fp8-1p1d-prefill.yaml"
 export DECODE_CONFIG="deepseekr1-fp8-1p1d-decode.yaml"
 export RELEASE_NAME="$USER-dynamo-a4xmax-1p1d"
-```
-
-2. Install the Helm release:
-
-```bash
-cd $RECIPE_ROOT
-helm install -f ${VALUES_FILE} \
-  --set workload.model=${HF_MODEL_ID} \
-  --set workload.image=${DYNAMO_IMAGE} \
-  --set volumes.gcsfuse.bucketName=${GCS_BUCKET} \
-  --set-file prefill_serving_config=$REPO_ROOT/src/frameworks/a4xmax/dynamo-configs/${PREFILL_CONFIG} \
-  --set-file decode_serving_config=$REPO_ROOT/src/frameworks/a4xmax/dynamo-configs/${DECODE_CONFIG} \
-  ${RELEASE_NAME} \
-  $REPO_ROOT/src/helm-charts/a4xmax/inference-templates/dynamo-deployment
-```
-
-#### LASER_BEAM (High Interactivity)
-
-1. Set the model and configuration variables:
-
-```bash
-export HF_MODEL_ID="reflection/Beam-1.0-501B-A23B-NVFP4"
-export DYNAMO_IMAGE="us-central1-docker.pkg.dev/supercomputer-testing/pirillo-gcr/sglang-beam:dev-cu13-d4be2f8c-arm64"
-export VALUES_FILE="laser_beam_high_int.yaml"
-export PREFILL_CONFIG="laser_beam_high_int_prefill.yaml"
-export DECODE_CONFIG="laser_beam_high_int_decode.yaml"
-export RELEASE_NAME="$USER-dynamo-a4xmax-laser-beam-high-int"
 ```
 
 2. Install the Helm release:
@@ -408,9 +383,6 @@ export CONCURRENCY=32
 
 ```bash
 kubectl exec -it bench-client -n ${NAMESPACE} -- bash -c "
-  export AIPERF_DATASET_WEKA_LIVE_ASSISTANT_RESPONSES=0
-  export AIPERF_DATASET_CONFIGURATION_TIMEOUT=1800
-  export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800
   aiperf profile \
     --scenario inferencex-agentx-mvp \
     --url http://${FRONTEND_HOST}:8000 \
