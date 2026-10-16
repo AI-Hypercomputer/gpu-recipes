@@ -162,12 +162,23 @@ gcloud storage buckets add-iam-policy-binding gs://${GCS_BUCKET} \
     --role "roles/storage.objectViewer"
 ```
 
-The bucket mounts at `/data/model` in every worker. Stage the following checkpoints:
+The bucket mounts at `/data/model` in every worker. Stage the target model and the DFlash2 drafter into the bucket:
 
-| Checkpoint | Bucket path | Path in the worker |
-| :--- | :--- | :--- |
-| Target model | `gs://${GCS_BUCKET}/<HF_MODEL_ID>/` | `/data/model/<HF_MODEL_ID>` (or set `--set workload.modelPath=<path>`) |
-| DFlash2 drafter | `gs://${GCS_BUCKET}/huggingface_model_cache/models--reflection--dflash2-drafter-preview-final/snapshots/8d26c952ec6a82a9a18825d6126c9f6948149ad9/` | Value of `speculative-draft-model-path` in the serving config |
+```bash
+pip install -U "huggingface_hub[cli]"
+
+# Target model: mounts at /data/model/<HF_MODEL_ID>
+hf download reflection/Beam-1.0-501B-A23B-NVFP4 --local-dir ./reflection/Beam-1.0-501B-A23B-NVFP4
+gcloud storage cp -r ./reflection gs://${GCS_BUCKET}/
+
+# DFlash2 drafter: mounts at the speculative-draft-model-path in laser_beam_high_int_agg.yaml
+hf download reflection/dflash2-drafter-preview-final \
+  --revision 8d26c952ec6a82a9a18825d6126c9f6948149ad9 \
+  --cache-dir ./huggingface_model_cache
+gcloud storage cp -r ./huggingface_model_cache gs://${GCS_BUCKET}/
+```
+
+The workers load the target model from `/data/model/<HF_MODEL_ID>`. If you staged it at a different path in the bucket, pass `--set workload.modelPath=/data/model/<path>` to `helm install`.
 
 <a name="configure-dynamo-image"></a>
 ### 2.7. Configure Dynamo Image
@@ -294,6 +305,16 @@ kubectl exec -it bench-client -n ${NAMESPACE} -- bash -c "
     --public-dataset semianalysis_cc_traces_weka_062126
 "
 ```
+
+3. Compare with the reference results below. Each concurrency is a separate 3,600 s `aiperf` run. We ran `CONCURRENCY=192` first and then `CONCURRENCY=96` on the same deployment, and ran `CONCURRENCY=32` on a fresh deployment. All runs completed with 0 failed requests.
+
+| Concurrency | Total tok/s (32 GPUs) | Output tok/s | TPOT p50 | TTFT p50 / p99 | Prefix-cache hit rate | Completed requests |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 32 | 231,382 | 1,459 | 2.87 ms | 0.58 s / 4.37 s | 92.4% | 4,711 |
+| 96 | 643,409 | 4,737 | 3.84 ms | 0.84 s / 7.46 s | 82.4% | 16,285 |
+| 192 | 805,244 | 6,360 | 6.20 ms | 12.45 s / 22.45 s | 76.0% | 21,933 |
+
+The prefix-cache hit rate is `overall_usage_prompt_cache_read_pct` in `profile_export_aiperf.json`: cached prompt tokens divided by total prompt tokens, as reported in the response `usage` field.
 
 <a name="monitoring"></a>
 ## 5. Monitoring and Troubleshooting

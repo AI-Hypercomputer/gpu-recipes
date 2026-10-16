@@ -185,6 +185,16 @@ gcloud storage buckets add-iam-policy-binding gs://${GCS_BUCKET} \
 
 Stage your model checkpoint files into the GCS bucket so they mount under `/data/model/<HF_MODEL_ID>` via GCS FUSE.
 
+For example, to stage LASER_BEAM:
+
+```bash
+pip install -U "huggingface_hub[cli]"
+hf download reflection/Beam-1.0-501B-A23B-NVFP4 --local-dir ./reflection/Beam-1.0-501B-A23B-NVFP4
+gcloud storage cp -r ./reflection gs://${GCS_BUCKET}/
+```
+
+If you stage a model at a different path in the bucket, pass `--set workload.modelPath=/data/model/<path>` to `helm install`.
+
 <a name="configure-dynamo-image"></a>
 ### 2.7. Configure Dynamo Image
 
@@ -401,6 +411,18 @@ kubectl exec -it bench-client -n ${NAMESPACE} -- bash -c "
     --public-dataset semianalysis_cc_traces_weka_062126
 "
 ```
+
+3. Compare with the reference results below.
+
+**LASER_BEAM High Throughput (4P4D, 32 GPUs).** Each concurrency is a separate 3,600 s `aiperf` run on a deployment that had just completed a `CONCURRENCY=192` run. All runs completed with 0 failed requests.
+
+| Concurrency | Total tok/s (32 GPUs) | Output tok/s | TPOT p50 | TTFT p50 / p99 | Prefix-cache hit rate | Completed requests |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 32 | 192,676 | 1,219 | 5.82 ms | 0.64 s / 2.63 s | 96.7% | 4,104 |
+| 96 | 476,473 | 3,822 | 11.13 ms | 0.76 s / 6.79 s | 95.0% | 13,369 |
+| 192 | 657,756 | 5,201 | 16.18 ms | 10.79 s / 34.97 s | 93.2% | 18,672 |
+
+The prefix-cache hit rate is `overall_usage_prompt_cache_read_pct` in `profile_export_aiperf.json`: cached prompt tokens divided by total prompt tokens, as reported in the response `usage` field.
 
 <a name="benchmark-synthetic"></a>
 ### 4.4. Category 2: Synthetic Random-Dataset Benchmarking
