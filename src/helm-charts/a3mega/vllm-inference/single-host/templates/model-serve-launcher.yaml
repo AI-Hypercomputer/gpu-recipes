@@ -38,8 +38,8 @@ spec:
 
         gke-gcsfuse/volumes: "true"
         gke-gcsfuse/cpu-limit: "0"
-        gke-gcsfuse/memory-limit: "0"
-        gke-gcsfuse/ephemeral-storage-limit: "0"
+        gke-gcsfuse/memory-limit: "32Gi"
+        gke-gcsfuse/ephemeral-storage-limit: "50Gi"
         devices.gke.io/container.tcpxo-daemon: |+
           - path: /dev/nvidia0
           - path: /dev/nvidia1
@@ -110,6 +110,7 @@ spec:
           driver: gcsfuse.csi.storage.gke.io
           volumeAttributes:
             bucketName: "{{ $gcs.bucketName }}"
+            mountOptions: "{{ $gcs.mountOptions | default "implicit-dirs,file-cache:max-size-mb:0,file-cache:cache-file-for-range-read:false" }}"
       {{- end}}
 
       initContainers:
@@ -119,7 +120,7 @@ spec:
         imagePullPolicy: Always
         volumeMounts:
           - name: nccl-plugin-volume
-            mountPath: /usr/local/nccl-plugin
+            mountPath: /usr/local/tcpxo
         env:
         - name: BUILD_TYPE
           value: "{{ $root.Values.gpuPlatformSettings.ncclBuildType }}"
@@ -130,7 +131,7 @@ spec:
           set -ex
           chmod 755 /scripts/container_entry.sh
           /scripts/container_entry.sh install --install-nccl --nccl-buildtype ${BUILD_TYPE}
-          cp -r /var/lib/tcpxo/* /usr/local/nccl-plugin/
+          cp -r /var/lib/tcpxo/* /usr/local/tcpxo/
 
       {{- end }}
 
@@ -192,6 +193,8 @@ spec:
                   key: "{{ $root.Values.huggingface.secretData.token }}"
             - name: HF_HUB_ENABLE_HF_TRANSFER
               value: "1"
+            - name: HF_HOME
+              value: "{{ $root.Values.volumes.ssdMountPath }}"
             - name: TORCH_DISTRIBUTED_DEBUG
               value: "INFO"
             - name: GLOO_SOCKET_IFNAME
@@ -203,9 +206,9 @@ spec:
               value: /usr/local/nvidia/lib64
             {{- else }}
             - name: LD_LIBRARY_PATH
-              value: /usr/local/nccl-plugin/lib64:/usr/local/nvidia/lib64
+              value: /usr/local/tcpxo/lib64:/usr/local/nvidia/lib64
             - name: NCCL_LIB_DIR
-              value: /usr/local/nccl-plugin/lib64
+              value: /usr/local/tcpxo/lib64
             {{- end }}
             - name: NCCL_FASTRAK_LLCM_DEVICE_DIRECTORY
               value: /dev/aperture_devices
@@ -220,7 +223,7 @@ spec:
             - name: NCCL_ALGO
               value: "Ring,Tree"
             - name: NCCL_PROTO
-              value: "Simple"
+              value: "Simple,LL128"
             - name: NCCL_MIN_NCHANNELS
               value: "4"
             - name: NCCL_DYNAMIC_CHUNK_SIZE
@@ -231,6 +234,8 @@ spec:
               value: "524288"
             - name: NCCL_P2P_NVL_CHUNKSIZE
               value: "1048576"
+            - name: NCCL_NVLSTREE_MAX_CHUNKSIZE
+              value: "131072"
             - name: NCCL_FASTRAK_NUM_FLOWS
               value: "2"
             - name: NCCL_BUFFSIZE
@@ -238,7 +243,7 @@ spec:
             - name: NCCL_NET_GDR_LEVEL
               value: "PIX"
             - name: NCCL_DEBUG_SUBSYS
-              value: "INIT,GRAPH,ENV,TUNING,NET"
+              value: "INIT,NET,ENV,COLL,GRAPH"
             - name: NCCL_FASTRAK_ENABLE_HOTPATH_LOGGING
               value: "0"
             - name: NCCL_FASTRAK_USE_SNAP
@@ -250,11 +255,11 @@ spec:
             - name: NCCL_TUNER_PLUGIN
               value: "libnccl-tuner.so"
             - name: NCCL_TUNER_CONFIG_PATH
-              value: "/usr/local/nccl-plugin/lib64/a3plus_tuner_config.textproto"
+              value: "/usr/local/tcpxo/lib64/a3plus_tuner_config.textproto"
             - name: NCCL_SHIMNET_GUEST_CONFIG_CHECKER_CONFIG_FILE
-              value: "/usr/local/nccl-plugin/lib64/a3plus_guest_config.textproto"
+              value: "/usr/local/tcpxo/lib64/a3plus_guest_config.textproto"
             - name: NCCL_NVLS_ENABLE
-              value: "0"
+              value: "1"
             - name: NCCL_FASTRAK_PLUGIN_ACCEPT_TIMEOUT_MS
               value: "600000"
             - name: CUDA_VISIBLE_DEVICES
@@ -271,6 +276,16 @@ spec:
             # NCCL settings
             - name: NCCL_P2P_PXN_LEVEL
               value: "0"
+            - name: NCCL_NET_PLUGIN_TELEMETRY_MODE
+              value: "1"
+            - name: NCCL_TELEMETRY_MODE
+              value: "1"
+            - name: NCCL_GPUVIZ_ENABLE_MILLISECOND_BANDWIDTH_OUTPUT
+              value: "1"
+            - name: NCCL_GPUVIZ_FILE_ROTATION_INTERVAL_IN_SECONDS
+              value: "300"
+            - name: NCCL_GPUVIZ_BANDWIDTH_HISTOGRAM_COLLECTION_ENABLE
+              value: "1"
 
             {{- range $environment_variable := $root.Values.network.ncclSettings }}
             - name: {{ $environment_variable.name }}
@@ -311,7 +326,7 @@ spec:
             mountPath: /dev/aperture_devices
           {{- if not $root.Values.gpuPlatformSettings.useHostPlugin }}
           - name: nccl-plugin-volume
-            mountPath: /usr/local/nccl-plugin
+            mountPath: /usr/local/tcpxo
           {{- end }}
           - name: sys
             mountPath: /hostsysfs
