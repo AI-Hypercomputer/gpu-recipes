@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+{{- if or (.Values.rdma).claimTemplateName (.Values.dynamo.rdma).claimTemplateName }}
 apiVersion: resource.k8s.io/v1
 kind: ResourceClaimTemplate
 metadata:
-  name: {{ .Values.rdma.claimTemplateName | default "all-mrdma" }}
+  name: {{ (.Values.rdma).claimTemplateName | default (.Values.dynamo.rdma).claimTemplateName | default "all-mrdma" }}
   namespace: {{ .Values.dynamo.namespace }}
 spec:
   spec:
@@ -26,3 +27,4 @@ spec:
           deviceClassName: mrdma.google.com
           allocationMode: ExactCount
           count: 8
+{{- end }}
