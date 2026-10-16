@@ -70,8 +70,8 @@ export CLUSTER_NAME=<CLUSTER_NAME>
 export NAMESPACE=llmd-inference
 export HF_TOKEN=<HF_TOKEN>
 export GCS_BUCKET=<GCS_BUCKET>
-export BEAM_HF_MODEL_ID=reflection/Beam-1.0-501B-A23B-NVFP4
-export BEAM_DRAFTER_HF_MODEL_ID=reflection/Beam-1.0-501B-A23B-DFlash2
+export HF_MODEL_ID=reflection/Beam-1.0-501B-A23B-NVFP4
+export DRAFTER_HF_MODEL_ID=reflection/Beam-1.0-501B-A23B-DFlash2
 
 # Set the project for gcloud commands
 gcloud config set project $PROJECT_ID
@@ -88,8 +88,8 @@ Replace the following values:
 | `NAMESPACE` | Kubernetes namespace for the deployment | `llmd-inference` |
 | `HF_TOKEN` | Your Hugging Face access token | `<HF_TOKEN>` |
 | `GCS_BUCKET` | Your GCS bucket name (without `gs://` prefix for Helm `bucketName`) | `<GCS_BUCKET>` |
-| `BEAM_HF_MODEL_ID` | Target model Hugging Face ID ([`reflection/Beam-1.0-501B-A23B-NVFP4`](https://huggingface.co/reflection/Beam-1.0-501B-A23B-NVFP4)) | `reflection/Beam-1.0-501B-A23B-NVFP4` |
-| `BEAM_DRAFTER_HF_MODEL_ID` | DFlash2 speculative drafter Hugging Face ID ([`reflection/Beam-1.0-501B-A23B-DFlash2`](https://huggingface.co/reflection/Beam-1.0-501B-A23B-DFlash2)) | `reflection/Beam-1.0-501B-A23B-DFlash2` |
+| `HF_MODEL_ID` | Target model Hugging Face ID ([`reflection/Beam-1.0-501B-A23B-NVFP4`](https://huggingface.co/reflection/Beam-1.0-501B-A23B-NVFP4)) | `reflection/Beam-1.0-501B-A23B-NVFP4` |
+| `DRAFTER_HF_MODEL_ID` | DFlash2 speculative drafter Hugging Face ID ([`reflection/Beam-1.0-501B-A23B-DFlash2`](https://huggingface.co/reflection/Beam-1.0-501B-A23B-DFlash2)) | `reflection/Beam-1.0-501B-A23B-DFlash2` |
 
 <a name="connect-cluster"></a>
 ### 2.3. Connect to your GKE Cluster
@@ -197,11 +197,9 @@ flowchart LR
 <a name="deploy-helm"></a>
 ### 3.3. Option A: Deploy with Helm
 
-1. Set the release and model variables:
+1. Set the release name:
 
 ```bash
-export HF_MODEL_ID="${BEAM_HF_MODEL_ID}"
-export DRAFTER_MODEL_ID="${BEAM_DRAFTER_HF_MODEL_ID}"
 export RELEASE_NAME="llmd-inference"
 ```
 
@@ -214,7 +212,7 @@ helm install ${RELEASE_NAME} \
   -f values.yaml \
   --namespace ${NAMESPACE} \
   --set workload.model.name=${HF_MODEL_ID} \
-  --set workload.model.drafterName=${DRAFTER_MODEL_ID} \
+  --set workload.model.drafterName=${DRAFTER_HF_MODEL_ID} \
   --set workload.image=${VLLM_IMAGE} \
   --set llmd.router.eppImage=${EPP_IMAGE}
 ```
@@ -284,8 +282,8 @@ Use [`aiperf`](https://github.com/ai-dynamo/aiperf) with the SemiAnalysis AgentX
 
 ```bash
 export FRONTEND_HOST="${RELEASE_NAME}-frontend"
-export MODEL_NAME="${BEAM_HF_MODEL_ID}"
-export TOKENIZER_PATH="${BEAM_HF_MODEL_ID}"
+export MODEL_NAME="${HF_MODEL_ID}"
+export TOKENIZER_PATH="${HF_MODEL_ID}"
 export CONCURRENCY=16
 
 kubectl exec -it bench-client -n ${NAMESPACE} -- bash -c "
