@@ -185,13 +185,7 @@ The workers load the target model from `/data/model/<HF_MODEL_ID>`. If you stage
 <a name="configure-dynamo-image"></a>
 ### 2.7. Configure Dynamo Image
 
-This recipe uses a model-specific SGLang runtime image with SGLang support for the model. The `beam` tag is mutable, so pin the digest that this recipe was validated with:
-
-```bash
-export DYNAMO_IMAGE="lmsysorg/sglang:beam@sha256:0ea912aadc3d7827858de9aa5a312c4d51c254e7dbe670dbbe8181895b92071d"
-```
-
-This digest contains SGLang `f7473673dd` and `ai-dynamo` `1.5.1`. In this SGLang build, `ServerArgs.get_model_config()` was replaced by `sglang.srt.server_args.model_config_of()`, which `ai-dynamo` `1.5.1` still calls. The chart's worker launch script patches that one call at startup, and only when the old method is missing.
+The runtime image comes from the Helm values file (`workload.image` and `dynamo.frontend.image`). To use a different image, add `--set workload.image=<IMAGE>` to `helm install`.
 
 The chart sets `runtimeVersionOverride` to `dynamo.releaseVersion` (`1.0.1`) because the Dynamo operator can't infer the runtime version from a custom image tag.
 
@@ -231,7 +225,6 @@ export RELEASE_NAME="$USER-dynamo-a4xmax-beam-high-int"
 cd $RECIPE_ROOT
 helm install -f ${VALUES_FILE} \
   --set workload.model=${HF_MODEL_ID} \
-  --set workload.image=${DYNAMO_IMAGE} \
   --set volumes.gcsfuse.bucketName=${GCS_BUCKET} \
   --set dynamo.namespace=${NAMESPACE} \
   --set dynamo.nodeSelector."cloud\.google\.com/gke-nodepool"=${NODE_POOL} \
@@ -312,14 +305,6 @@ kubectl exec -it bench-client -n ${NAMESPACE} -- bash -c "
 "
 ```
 
-#### Expected Results
-
-Measured on 8 `a4x-maxgpu-4g-metal` nodes in one node pool, with the image digest and AIPerf command above, one 3600 s run at `CONCURRENCY=32`. Your numbers will vary with cluster state and image version.
-
-| Concurrency | Total tok/s (per GPU) | Output tok/s | TTFT p50 / p90 / p99 (s) | ITL p50 / p90 / p99 (ms) | Prefix cache read | Errors |
-| --- | --- | --- | --- | --- | --- | --- |
-| 32 | 228,630 (7,145) | 1,384 | 0.80 / 2.61 / 6.07 | 2.41 / 4.28 / 16.41 | 93.0% | 0 of 4,788 |
-
 <a name="monitoring"></a>
 ## 5. Monitoring and Troubleshooting
 
@@ -344,7 +329,6 @@ Common issues:
 
 * **Pods stuck in Pending**: Check that 8 `a4x-maxgpu-4g-metal` nodes are free in the same NVL72 domain.
 * **Worker fails to load the drafter**: Check that the drafter checkpoint is staged at the `speculative-draft-model-path` in `beam_high_int_agg.yaml`.
-* **Worker exits with `AttributeError: 'ServerArgs' object has no attribute 'get_model_config'`**: The image's `ai-dynamo` and SGLang versions don't match. Use the chart in this repo, whose launch script patches the call, or pin the image digest from section 2.7.
 * **Slow first startup**: The first load reads the checkpoint through GCS FUSE into the local SSD file cache. Later restarts on the same node read from the cache.
 
 <a name="cleanup"></a>

@@ -304,7 +304,6 @@ helm install -f ${VALUES_FILE} \
 
 ```bash
 export HF_MODEL_ID="reflection/Beam-1.0-501B-A23B-NVFP4"
-export DYNAMO_IMAGE="lmsysorg/sglang:beam@sha256:0ea912aadc3d7827858de9aa5a312c4d51c254e7dbe670dbbe8181895b92071d"
 export VALUES_FILE="beam_high_throughput.yaml"
 export PREFILL_CONFIG="beam_high_throughput_prefill.yaml"
 export DECODE_CONFIG="beam_high_throughput_decode.yaml"
@@ -317,7 +316,6 @@ export RELEASE_NAME="$USER-dynamo-a4xmax-beam-high-throughput"
 cd $RECIPE_ROOT
 helm install -f ${VALUES_FILE} \
   --set workload.model=${HF_MODEL_ID} \
-  --set workload.image=${DYNAMO_IMAGE} \
   --set volumes.gcsfuse.bucketName=${GCS_BUCKET} \
   --set dynamo.namespace=${NAMESPACE} \
   --set dynamo.nodeSelector."cloud\.google\.com/gke-nodepool"=${NODE_POOL} \
@@ -326,8 +324,6 @@ helm install -f ${VALUES_FILE} \
   ${RELEASE_NAME} \
   $REPO_ROOT/src/helm-charts/a4xmax/inference-templates/dynamo-deployment
 ```
-
-The `lmsysorg/sglang:beam` tag is mutable. The digest above contains SGLang `f7473673dd` and `ai-dynamo` `1.5.1`. The chart's worker launch script patches the one `ServerArgs.get_model_config()` call that this SGLang build removed, and only when the method is missing.
 
 <a name="inference-request"></a>
 ## 4. Inference Request and Benchmarking
@@ -423,14 +419,6 @@ kubectl exec -it bench-client -n ${NAMESPACE} -- bash -c "
     --public-dataset semianalysis_cc_traces_weka_062126
 "
 ```
-
-#### Expected Results: Reflection Beam High Throughput (4P4D)
-
-Measured on 8 `a4x-maxgpu-4g-metal` nodes in one node pool, with the image digest and AIPerf command above, one 3600 s run at `CONCURRENCY=32`. Your numbers will vary with cluster state and image version.
-
-| Concurrency | Total tok/s (per GPU) | Output tok/s | TTFT p50 / p90 / p99 (s) | ITL p50 / p90 / p99 (ms) | Prefix cache read | Errors |
-| --- | --- | --- | --- | --- | --- | --- |
-| 32 | 194,144 (6,067) | 1,332 | 0.68 / 1.93 / 4.04 | 4.81 / 6.53 / 15.14 | 96.6% | 0 of 4,750 |
 
 <a name="benchmark-synthetic"></a>
 ### 4.4. Category 2: Synthetic Random-Dataset Benchmarking
