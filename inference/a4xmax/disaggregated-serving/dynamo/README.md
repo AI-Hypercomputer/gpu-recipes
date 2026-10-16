@@ -185,7 +185,7 @@ gcloud storage buckets add-iam-policy-binding gs://${GCS_BUCKET} \
 
 Stage your model checkpoint files into the GCS bucket so they mount under `/data/model/<HF_MODEL_ID>` via GCS FUSE.
 
-For example, to stage LASER_BEAM:
+For example, to stage Reflection Beam ([`reflection/Beam-1.0-501B-A23B-NVFP4`](https://huggingface.co/reflection/Beam-1.0-501B-A23B-NVFP4)):
 
 ```bash
 pip install -U "huggingface_hub[cli]"
@@ -220,10 +220,10 @@ This recipe is organized into deployment categories that pair a Helm topology (`
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **DeepSeek-R1 671B (FP8)** | `deepseek-ai/DeepSeek-R1` | Low-Latency / without DeepEP | 1P1D (2 nodes / 8 GPUs) | `values_wo_deepep.yaml` | `deepseek-r1-fp8-1p1d-prefill.yaml` | `deepseekr1-fp8-1p1d-decode.yaml` |
 | **DeepSeek-R1 671B (FP8)** | `deepseek-ai/DeepSeek-R1` | High-Throughput / with DeepEP | 10P8D (18 nodes / 72 GPUs) | `values_deepep.yaml` | `deepseekr1-fp8-10p8d-prefill.yaml` | `deepseekr1-fp8-10p8d-decode.yaml` |
-| **LASER_BEAM** | `reflection/Beam-1.0-501B-A23B-NVFP4` | High Throughput | 4P4D (8 nodes / 32 GPUs) | `laser_beam_high_throughput.yaml` | `laser_beam_high_throughput_prefill.yaml` | `laser_beam_high_throughput_decode.yaml` |
+| **Reflection Beam 501B (NVFP4)** | [`reflection/Beam-1.0-501B-A23B-NVFP4`](https://huggingface.co/reflection/Beam-1.0-501B-A23B-NVFP4) | High Throughput | 4P4D (8 nodes / 32 GPUs) | `beam_high_throughput.yaml` | `beam_high_throughput_prefill.yaml` | `beam_high_throughput_decode.yaml` |
 
 > [!NOTE]
-> The LASER_BEAM High Interactivity recipe runs 8 aggregated workers, so it lives in the [aggregated Dynamo recipe](../../aggregated-serving/dynamo/README.md).
+> The Reflection Beam High Interactivity recipe runs 8 aggregated workers, so it lives in the [aggregated Dynamo recipe](../../aggregated-serving/dynamo/README.md).
 
 > [!TIP]
 > To add or deploy another model, stage its weights in `gs://${GCS_BUCKET}`, add its prefill and decode YAML files under `$REPO_ROOT/src/frameworks/a4xmax/dynamo-configs/`, and pass `--set workload.model=${HF_MODEL_ID}` along with `--set-file prefill_serving_config=...` and `--set-file decode_serving_config=...` to `helm install`.
@@ -290,17 +290,17 @@ helm install -f ${VALUES_FILE} \
   $REPO_ROOT/src/helm-charts/a4xmax/inference-templates/dynamo-deployment
 ```
 
-#### LASER_BEAM (High Throughput)
+#### Reflection Beam 501B (High Throughput)
 
 1. Set the model and configuration variables:
 
 ```bash
 export HF_MODEL_ID="reflection/Beam-1.0-501B-A23B-NVFP4"
-export DYNAMO_IMAGE="us-central1-docker.pkg.dev/supercomputer-testing/pirillo-gcr/sglang-beam:dev-cu13-d4be2f8c-arm64"
-export VALUES_FILE="laser_beam_high_throughput.yaml"
-export PREFILL_CONFIG="laser_beam_high_throughput_prefill.yaml"
-export DECODE_CONFIG="laser_beam_high_throughput_decode.yaml"
-export RELEASE_NAME="$USER-dynamo-a4xmax-laser-beam-high-throughput"
+export DYNAMO_IMAGE="lmsysorg/sglang:beam"
+export VALUES_FILE="beam_high_throughput.yaml"
+export PREFILL_CONFIG="beam_high_throughput_prefill.yaml"
+export DECODE_CONFIG="beam_high_throughput_decode.yaml"
+export RELEASE_NAME="$USER-dynamo-a4xmax-beam-high-throughput"
 ```
 
 2. Install the Helm release:
@@ -411,18 +411,6 @@ kubectl exec -it bench-client -n ${NAMESPACE} -- bash -c "
     --public-dataset semianalysis_cc_traces_weka_062126
 "
 ```
-
-3. Compare with the reference results below.
-
-**LASER_BEAM High Throughput (4P4D, 32 GPUs).** Each concurrency is a separate 3,600 s `aiperf` run on a deployment that had just completed a `CONCURRENCY=192` run. All runs completed with 0 failed requests.
-
-| Concurrency | Total tok/s (32 GPUs) | Output tok/s | TPOT p50 | TTFT p50 / p99 | Prefix-cache hit rate | Completed requests |
-| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| 32 | 192,676 | 1,219 | 5.82 ms | 0.64 s / 2.63 s | 96.7% | 4,104 |
-| 96 | 476,473 | 3,822 | 11.13 ms | 0.76 s / 6.79 s | 95.0% | 13,369 |
-| 192 | 657,756 | 5,201 | 16.18 ms | 10.79 s / 34.97 s | 93.2% | 18,672 |
-
-The prefix-cache hit rate is `overall_usage_prompt_cache_read_pct` in `profile_export_aiperf.json`: cached prompt tokens divided by total prompt tokens, as reported in the response `usage` field.
 
 <a name="benchmark-synthetic"></a>
 ### 4.4. Category 2: Synthetic Random-Dataset Benchmarking

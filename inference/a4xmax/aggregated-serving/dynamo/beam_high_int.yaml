@@ -24,7 +24,7 @@ dynamo:
     claimTemplateName:
   serviceAccountName:
   frontend:
-    image: us-central1-docker.pkg.dev/supercomputer-testing/pirillo-gcr/sglang-beam:dev-cu13-d4be2f8c-arm64
+    image: lmsysorg/sglang:beam
     replicas: 1
     envs:
       - name: DYN_DISCOVERY_BACKEND
@@ -223,7 +223,7 @@ service:
 
 workload:
   model: reflection/Beam-1.0-501B-A23B-NVFP4
-  image: us-central1-docker.pkg.dev/supercomputer-testing/pirillo-gcr/sglang-beam:dev-cu13-d4be2f8c-arm64
+  image: lmsysorg/sglang:beam
   framework: sglang
   configFile: serving-args.yaml
   configPath: /workload/configs

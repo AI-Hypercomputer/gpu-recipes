@@ -162,20 +162,18 @@ gcloud storage buckets add-iam-policy-binding gs://${GCS_BUCKET} \
     --role "roles/storage.objectViewer"
 ```
 
-The bucket mounts at `/data/model` in every worker. Stage the target model and the DFlash2 drafter into the bucket:
+The bucket mounts at `/data/model` in every worker. Stage the target model ([`reflection/Beam-1.0-501B-A23B-NVFP4`](https://huggingface.co/reflection/Beam-1.0-501B-A23B-NVFP4)) and the DFlash2 drafter ([`reflection/Beam-1.0-501B-A23B-DFlash2`](https://huggingface.co/reflection/Beam-1.0-501B-A23B-DFlash2)) into the bucket:
 
 ```bash
 pip install -U "huggingface_hub[cli]"
 
 # Target model: mounts at /data/model/<HF_MODEL_ID>
 hf download reflection/Beam-1.0-501B-A23B-NVFP4 --local-dir ./reflection/Beam-1.0-501B-A23B-NVFP4
-gcloud storage cp -r ./reflection gs://${GCS_BUCKET}/
 
-# DFlash2 drafter: mounts at the speculative-draft-model-path in laser_beam_high_int_agg.yaml
-hf download reflection/dflash2-drafter-preview-final \
-  --revision 8d26c952ec6a82a9a18825d6126c9f6948149ad9 \
-  --cache-dir ./huggingface_model_cache
-gcloud storage cp -r ./huggingface_model_cache gs://${GCS_BUCKET}/
+# DFlash2 drafter: mounts at the speculative-draft-model-path in beam_high_int_agg.yaml
+hf download reflection/Beam-1.0-501B-A23B-DFlash2 --local-dir ./reflection/Beam-1.0-501B-A23B-DFlash2
+
+gcloud storage cp -r ./reflection gs://${GCS_BUCKET}/
 ```
 
 The workers load the target model from `/data/model/<HF_MODEL_ID>`. If you staged it at a different path in the bucket, pass `--set workload.modelPath=/data/model/<path>` to `helm install`.
@@ -186,7 +184,7 @@ The workers load the target model from `/data/model/<HF_MODEL_ID>`. If you stage
 This recipe uses a model-specific SGLang runtime image that includes Dynamo `1.0.1` and SGLang support for the model:
 
 ```bash
-export DYNAMO_IMAGE="us-central1-docker.pkg.dev/supercomputer-testing/pirillo-gcr/sglang-beam:dev-cu13-d4be2f8c-arm64"
+export DYNAMO_IMAGE="lmsysorg/sglang:beam"
 ```
 
 The chart sets `runtimeVersionOverride` to `dynamo.releaseVersion` (`1.0.1`) because the Dynamo operator can't infer the runtime version from a custom image tag.
@@ -203,22 +201,22 @@ This recipe reuses the Dynamo Helm chart at `$REPO_ROOT/src/helm-charts/a4xmax/i
 
 | Model Name | Hugging Face ID / Path (`HF_MODEL_ID`) | Deployment Category | Topology & GPUs | Helm Values File (`VALUES_FILE`) | Serving Config (`SERVING_CONFIG`) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **LASER_BEAM** | `reflection/Beam-1.0-501B-A23B-NVFP4` | High Interactivity (DFlash2) | 8 aggregated workers (8 nodes / 32 GPUs) | `laser_beam_high_int.yaml` | `laser_beam_high_int_agg.yaml` |
+| **Reflection Beam 501B (NVFP4)** | [`reflection/Beam-1.0-501B-A23B-NVFP4`](https://huggingface.co/reflection/Beam-1.0-501B-A23B-NVFP4) | High Interactivity (DFlash2) | 8 aggregated workers (8 nodes / 32 GPUs) | `beam_high_int.yaml` | `beam_high_int_agg.yaml` |
 
 <a name="sglang-high-interactivity"></a>
 ### 3.2. High Interactivity Deployment
 
-This category deploys 8 aggregated SGLang workers (`TP=4`, `EP=4`, one per node) behind the Dynamo KV-aware router (`DYN_ROUTER_MODE=kv`, `DYN_KV_CACHE_BLOCK_SIZE=64`). Each worker uses DFlash2 speculative decoding with 8 draft tokens to lower Time-Per-Output-Token (TPOT).
+This category deploys 8 aggregated SGLang workers (`TP=4`, `EP=4`, one per node) behind the Dynamo KV-aware router (`DYN_ROUTER_MODE=kv`, `DYN_KV_CACHE_BLOCK_SIZE=64`). Each worker uses DFlash2 speculative decoding ([`reflection/Beam-1.0-501B-A23B-DFlash2`](https://huggingface.co/reflection/Beam-1.0-501B-A23B-DFlash2)) with 8 draft tokens to lower Time-Per-Output-Token (TPOT).
 
-#### LASER_BEAM (High Interactivity)
+#### Reflection Beam 501B (High Interactivity)
 
 1. Set the model and configuration variables:
 
 ```bash
 export HF_MODEL_ID="reflection/Beam-1.0-501B-A23B-NVFP4"
-export VALUES_FILE="laser_beam_high_int.yaml"
-export SERVING_CONFIG="laser_beam_high_int_agg.yaml"
-export RELEASE_NAME="$USER-dynamo-a4xmax-laser-beam-high-int"
+export VALUES_FILE="beam_high_int.yaml"
+export SERVING_CONFIG="beam_high_int_agg.yaml"
+export RELEASE_NAME="$USER-dynamo-a4xmax-beam-high-int"
 ```
 
 2. Install the Helm release:
@@ -306,16 +304,6 @@ kubectl exec -it bench-client -n ${NAMESPACE} -- bash -c "
 "
 ```
 
-3. Compare with the reference results below. Each concurrency is a separate 3,600 s `aiperf` run. We ran `CONCURRENCY=192` first and then `CONCURRENCY=96` on the same deployment, and ran `CONCURRENCY=32` on a fresh deployment. All runs completed with 0 failed requests.
-
-| Concurrency | Total tok/s (32 GPUs) | Output tok/s | TPOT p50 | TTFT p50 / p99 | Prefix-cache hit rate | Completed requests |
-| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| 32 | 231,382 | 1,459 | 2.87 ms | 0.58 s / 4.37 s | 92.4% | 4,711 |
-| 96 | 643,409 | 4,737 | 3.84 ms | 0.84 s / 7.46 s | 82.4% | 16,285 |
-| 192 | 805,244 | 6,360 | 6.20 ms | 12.45 s / 22.45 s | 76.0% | 21,933 |
-
-The prefix-cache hit rate is `overall_usage_prompt_cache_read_pct` in `profile_export_aiperf.json`: cached prompt tokens divided by total prompt tokens, as reported in the response `usage` field.
-
 <a name="monitoring"></a>
 ## 5. Monitoring and Troubleshooting
 
@@ -339,7 +327,7 @@ kubectl logs -f <decode-worker-pod-name> -n ${NAMESPACE}
 Common issues:
 
 * **Pods stuck in Pending**: Check that 8 `a4x-maxgpu-4g-metal` nodes are free in the same NVL72 domain.
-* **Worker fails to load the drafter**: Check that the drafter checkpoint is staged at the `speculative-draft-model-path` in `laser_beam_high_int_agg.yaml`.
+* **Worker fails to load the drafter**: Check that the drafter checkpoint is staged at the `speculative-draft-model-path` in `beam_high_int_agg.yaml`.
 * **Slow first startup**: The first load reads the checkpoint through GCS FUSE into the local SSD file cache. Later restarts on the same node read from the cache.
 
 <a name="cleanup"></a>

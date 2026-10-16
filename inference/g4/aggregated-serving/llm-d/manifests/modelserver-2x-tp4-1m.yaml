@@ -89,7 +89,7 @@ spec:
         operator: "Exists"
       containers:
       - name: vllm
-        image: us-central1-docker.pkg.dev/gpu-launchpad-playground/vllm/vllm-beam:lin-tracking-cu13-8e0922e8-sm120-x86_64
+        image: vllm/vllm-openai:reflection-beam
         imagePullPolicy: IfNotPresent
         command: ["/bin/bash", "-lc"]
         args:
@@ -312,7 +312,7 @@ spec:
         operator: "Exists"
       containers:
       - name: vllm
-        image: us-central1-docker.pkg.dev/gpu-launchpad-playground/vllm/vllm-beam:lin-tracking-cu13-8e0922e8-sm120-x86_64
+        image: vllm/vllm-openai:reflection-beam
         imagePullPolicy: IfNotPresent
         command: ["/bin/bash", "-lc"]
         args:
