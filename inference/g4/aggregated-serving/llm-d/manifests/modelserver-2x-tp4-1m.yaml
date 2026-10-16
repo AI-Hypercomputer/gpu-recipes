@@ -1,0 +1,502 @@
+---
+# Source: llm-d-inference/templates/configmaps.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "llmd-inference-vllm-config"
+  labels:
+    app.kubernetes.io/name: llm-d-inference
+    app.kubernetes.io/instance: "llmd-inference"
+    app.kubernetes.io/component: model-server
+data:
+  serving-configuration: |-
+    host: "0.0.0.0"
+    port: "8000"
+    tensor-parallel-size: "4"
+    enable-expert-parallel: true
+    trust-remote-code: true
+    max-model-len: "1.048576e+06"
+    gpu-memory-utilization: "0.90"
+    kv-cache-dtype: "fp8"
+    block-size: "64"
+    max-num-batched-tokens: "16384"
+    max-num-seqs: "16"
+    speculative-config: '{"method":"dflash","model":"${DRAFTER_MODEL_ID}","num_speculative_tokens":8,"draft_tensor_parallel_size":4}'
+    compilation-config: '{"cudagraph_capture_sizes":[1,2,4,8,16,32,48,64,96,128,192,256,384,512,640,768,896,1024,1152],"cudagraph_mode":"FULL_AND_PIECEWISE","pass_config":{"fuse_allreduce_rms":false}}'
+    enable-prefix-caching: true
+    no-disable-hybrid-kv-cache-manager: true
+    swa-bounded-replay: true
+    enable-auto-tool-choice: true
+    tool-call-parser: "beam"
+    reasoning-parser: "beam"
+    default-chat-template-kwargs: '{"allow_missing_thinking":true,"reasoning_effort":"max"}'
+    override-generation-config: '{"temperature":1.0,"top_k":40,"top_p":0.95}'
+    moe-backend: "flashinfer_cutlass"
+    kv-transfer-config: '{"kv_connector":"OffloadingConnector","kv_role":"kv_both","engine_id":"w1_0","kv_connector_extra_config":{"spec_name":"CPUOffloadingSpec","cpu_bytes_to_use":68719476736,"blocks_per_chunk":16,"offload_prompt_only":true}}'
+    kv-events-config: '{"enable_kv_cache_events":true,"publisher":"zmq","endpoint":"tcp://*:${ZMQ_PUB_PORT}","replay_endpoint":"tcp://*:${ZMQ_REPLAY_PORT}","topic":"kv@${POD_IP}:${VLLM_HTTP_PORT}@${SERVED_MODEL_NAME}"}'
+---
+# Source: llm-d-inference/templates/configmaps.yaml
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+# Source: llm-d-inference/templates/vllm-deployments.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "llmd-inference-vllm-0"
+  labels:
+    app.kubernetes.io/name: llm-d-inference
+    app.kubernetes.io/instance: "llmd-inference"
+    app.kubernetes.io/component: model-server
+    app.kubernetes.io/part-of: "replica-0"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: llm-d-inference
+      app.kubernetes.io/instance: "llmd-inference"
+      app.kubernetes.io/component: model-server
+      app.kubernetes.io/part-of: "replica-0"
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: llm-d-inference
+        app.kubernetes.io/instance: "llmd-inference"
+        app.kubernetes.io/component: model-server
+        app.kubernetes.io/part-of: "replica-0"
+      annotations:
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-accelerator: nvidia-rtx-pro-6000
+      tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "cloud.google.com/impending-node-termination"
+        operator: "Exists"
+      containers:
+      - name: vllm
+        image: us-central1-docker.pkg.dev/gpu-launchpad-playground/vllm/vllm-beam:lin-tracking-cu13-8e0922e8-sm120-x86_64
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/bash", "-lc"]
+        args:
+        - |
+          set -euo pipefail
+          unset PYTORCH_CUDA_ALLOC_CONF
+          nvidia-smi
+          python3 - << 'PYEOF'
+          import json, os, shutil, sys, yaml
+
+          model_id = os.environ["MODEL_ID"]
+          served_model = os.environ.get("SERVED_MODEL_NAME") or model_id
+          os.environ["SERVED_MODEL_NAME"] = served_model
+
+          mount_dir = os.environ.get("MODEL_MOUNT_DIR", "")
+          if mount_dir and os.path.isdir(mount_dir):
+              model_target = mount_dir
+          else:
+              model_target = model_id
+
+          drafter_mount = os.environ.get("DRAFTER_MOUNT_DIR", "")
+          if drafter_mount and os.path.isdir(drafter_mount):
+              os.environ["DRAFTER_MODEL_ID"] = drafter_mount
+
+          numa_node = os.environ.get("NUMA_NODE", "0")
+          if shutil.which("numactl"):
+              cmd = [
+                  "numactl",
+                  f"--cpunodebind={numa_node}",
+                  f"--membind={numa_node}",
+                  "vllm",
+                  "serve",
+                  model_target,
+                  "--served-model-name",
+                  served_model,
+              ]
+          else:
+              cmd = ["vllm", "serve", model_target, "--served-model-name", served_model]
+
+          cfg_path = os.environ.get("SERVER_ARGS_FILE", "")
+          if cfg_path and os.path.exists(cfg_path):
+              with open(cfg_path, "r") as f:
+                  cfg = yaml.safe_load(f) or {}
+              for k, v in cfg.items():
+                  if k in ("model", "served-model-name") or v is None or v is False:
+                      continue
+                  flag = f"--{k}"
+                  if v is True:
+                      cmd.append(flag)
+                  elif isinstance(v, (dict, list)):
+                      cmd.extend([flag, os.path.expandvars(json.dumps(v))])
+                  else:
+                      cmd.extend([flag, os.path.expandvars(str(v))])
+
+          print("Launching vLLM with NUMA pinning:", " ".join(cmd), flush=True)
+          os.execvp(cmd[0], cmd)
+          PYEOF
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: VLLM_HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: VLLM_HTTP_PORT
+          value: "8000"
+        - name: ZMQ_PUB_PORT
+          value: "5556"
+        - name: ZMQ_REPLAY_PORT
+          value: "5559"
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0,1,2,3"
+        - name: NUMA_NODE
+          value: "0"
+        - name: MODEL_ID
+          value: "reflection/Beam-1.0-501B-A23B-NVFP4"
+        - name: DRAFTER_MODEL_ID
+          value: "reflection/Beam-1.0-501B-A23B-DFlash2"
+        - name: SERVED_MODEL_NAME
+          value: "reflection/Beam-1.0-501B-A23B-NVFP4"
+        - name: HF_HOME
+          value: "/ssd"
+        - name: SERVER_ARGS_FILE
+          value: "/workload/configs/serving-configuration"
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: hf-token-secret
+              key: HF_TOKEN
+              optional: true
+        - name: HF_HUB_ENABLE_HF_TRANSFER
+          value: "1"
+        - name: VLLM_ENGINE_READY_TIMEOUT_S
+          value: "3600"
+        - name: VLLM_RPC_TIMEOUT
+          value: "600000"
+        - name: VLLM_HTTP_TIMEOUT_KEEP_ALIVE
+          value: "900"
+        - name: VLLM_CHAT_TEMPLATE_RENDER_TIMEOUT
+          value: "300"
+        - name: VLLM_USE_V2_MODEL_RUNNER
+          value: "1"
+        - name: VLLM_FUSED_MOE_CHUNK_SIZE
+          value: "32768"
+        - name: VLLM_SWA_DECODER_REPLAY_MAX_BS
+          value: "4096"
+        - name: VLLM_ENFORCE_STRICT_TOOL_CALLING
+          value: "0"
+        - name: VLLM_BEAM_ALWAYS_CONSTRAIN_OUTPUT
+          value: "0"
+        - name: NCCL_IB_DISABLE
+          value: "1"
+        - name: NCCL_P2P_LEVEL
+          value: NVL
+        - name: NCCL_NET_GDR_LEVEL
+          value: "0"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        ports:
+        - name: http
+          containerPort: 8000
+        - name: render
+          containerPort: 6100
+        - name: kv-events
+          containerPort: 5556
+        - name: kv-replay
+          containerPort: 5559
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 60
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 300
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 10
+        resources:
+          limits:
+            cpu: "160"
+            memory: 1200Gi
+            nvidia.com/gpu: "4"
+          requests:
+            cpu: "64"
+            memory: 512Gi
+            nvidia.com/gpu: "4"
+        volumeMounts:
+        - name: dshm
+          mountPath: /dev/shm
+        - name: serving-configuration
+          mountPath: /workload/configs
+          readOnly: true
+        - name: local-ssd
+          mountPath: /ssd
+      volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 256Gi
+      - name: serving-configuration
+        configMap:
+          name: "llmd-inference-vllm-config"
+      - name: local-ssd
+        emptyDir: {}
+---
+# Source: llm-d-inference/templates/vllm-deployments.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "llmd-inference-vllm-1"
+  labels:
+    app.kubernetes.io/name: llm-d-inference
+    app.kubernetes.io/instance: "llmd-inference"
+    app.kubernetes.io/component: model-server
+    app.kubernetes.io/part-of: "replica-1"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: llm-d-inference
+      app.kubernetes.io/instance: "llmd-inference"
+      app.kubernetes.io/component: model-server
+      app.kubernetes.io/part-of: "replica-1"
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: llm-d-inference
+        app.kubernetes.io/instance: "llmd-inference"
+        app.kubernetes.io/component: model-server
+        app.kubernetes.io/part-of: "replica-1"
+      annotations:
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-accelerator: nvidia-rtx-pro-6000
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: llm-d-inference
+                app.kubernetes.io/instance: "llmd-inference"
+                app.kubernetes.io/component: model-server
+                app.kubernetes.io/part-of: "replica-0"
+            topologyKey: kubernetes.io/hostname
+      tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "cloud.google.com/impending-node-termination"
+        operator: "Exists"
+      containers:
+      - name: vllm
+        image: us-central1-docker.pkg.dev/gpu-launchpad-playground/vllm/vllm-beam:lin-tracking-cu13-8e0922e8-sm120-x86_64
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/bash", "-lc"]
+        args:
+        - |
+          set -euo pipefail
+          unset PYTORCH_CUDA_ALLOC_CONF
+          nvidia-smi
+          python3 - << 'PYEOF'
+          import json, os, shutil, sys, yaml
+
+          model_id = os.environ["MODEL_ID"]
+          served_model = os.environ.get("SERVED_MODEL_NAME") or model_id
+          os.environ["SERVED_MODEL_NAME"] = served_model
+
+          mount_dir = os.environ.get("MODEL_MOUNT_DIR", "")
+          if mount_dir and os.path.isdir(mount_dir):
+              model_target = mount_dir
+          else:
+              model_target = model_id
+
+          drafter_mount = os.environ.get("DRAFTER_MOUNT_DIR", "")
+          if drafter_mount and os.path.isdir(drafter_mount):
+              os.environ["DRAFTER_MODEL_ID"] = drafter_mount
+
+          numa_node = os.environ.get("NUMA_NODE", "0")
+          if shutil.which("numactl"):
+              cmd = [
+                  "numactl",
+                  f"--cpunodebind={numa_node}",
+                  f"--membind={numa_node}",
+                  "vllm",
+                  "serve",
+                  model_target,
+                  "--served-model-name",
+                  served_model,
+              ]
+          else:
+              cmd = ["vllm", "serve", model_target, "--served-model-name", served_model]
+
+          cfg_path = os.environ.get("SERVER_ARGS_FILE", "")
+          if cfg_path and os.path.exists(cfg_path):
+              with open(cfg_path, "r") as f:
+                  cfg = yaml.safe_load(f) or {}
+              for k, v in cfg.items():
+                  if k in ("model", "served-model-name") or v is None or v is False:
+                      continue
+                  flag = f"--{k}"
+                  if v is True:
+                      cmd.append(flag)
+                  elif isinstance(v, (dict, list)):
+                      cmd.extend([flag, os.path.expandvars(json.dumps(v))])
+                  else:
+                      cmd.extend([flag, os.path.expandvars(str(v))])
+
+          print("Launching vLLM with NUMA pinning:", " ".join(cmd), flush=True)
+          os.execvp(cmd[0], cmd)
+          PYEOF
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: VLLM_HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: VLLM_HTTP_PORT
+          value: "8000"
+        - name: ZMQ_PUB_PORT
+          value: "5556"
+        - name: ZMQ_REPLAY_PORT
+          value: "5559"
+        - name: CUDA_VISIBLE_DEVICES
+          value: "4,5,6,7"
+        - name: NUMA_NODE
+          value: "1"
+        - name: MODEL_ID
+          value: "reflection/Beam-1.0-501B-A23B-NVFP4"
+        - name: DRAFTER_MODEL_ID
+          value: "reflection/Beam-1.0-501B-A23B-DFlash2"
+        - name: SERVED_MODEL_NAME
+          value: "reflection/Beam-1.0-501B-A23B-NVFP4"
+        - name: HF_HOME
+          value: "/ssd"
+        - name: SERVER_ARGS_FILE
+          value: "/workload/configs/serving-configuration"
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: hf-token-secret
+              key: HF_TOKEN
+              optional: true
+        - name: HF_HUB_ENABLE_HF_TRANSFER
+          value: "1"
+        - name: VLLM_ENGINE_READY_TIMEOUT_S
+          value: "3600"
+        - name: VLLM_RPC_TIMEOUT
+          value: "600000"
+        - name: VLLM_HTTP_TIMEOUT_KEEP_ALIVE
+          value: "900"
+        - name: VLLM_CHAT_TEMPLATE_RENDER_TIMEOUT
+          value: "300"
+        - name: VLLM_USE_V2_MODEL_RUNNER
+          value: "1"
+        - name: VLLM_FUSED_MOE_CHUNK_SIZE
+          value: "32768"
+        - name: VLLM_SWA_DECODER_REPLAY_MAX_BS
+          value: "4096"
+        - name: VLLM_ENFORCE_STRICT_TOOL_CALLING
+          value: "0"
+        - name: VLLM_BEAM_ALWAYS_CONSTRAIN_OUTPUT
+          value: "0"
+        - name: NCCL_IB_DISABLE
+          value: "1"
+        - name: NCCL_P2P_LEVEL
+          value: NVL
+        - name: NCCL_NET_GDR_LEVEL
+          value: "0"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        ports:
+        - name: http
+          containerPort: 8000
+        - name: render
+          containerPort: 6100
+        - name: kv-events
+          containerPort: 5556
+        - name: kv-replay
+          containerPort: 5559
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 60
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 300
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 10
+        resources:
+          limits:
+            cpu: "160"
+            memory: 1200Gi
+            nvidia.com/gpu: "4"
+          requests:
+            cpu: "64"
+            memory: 512Gi
+            nvidia.com/gpu: "4"
+        volumeMounts:
+        - name: dshm
+          mountPath: /dev/shm
+        - name: serving-configuration
+          mountPath: /workload/configs
+          readOnly: true
+        - name: local-ssd
+          mountPath: /ssd
+      volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 256Gi
+      - name: serving-configuration
+        configMap:
+          name: "llmd-inference-vllm-config"
+      - name: local-ssd
+        emptyDir: {}
+---
+# Source: llm-d-inference/templates/vllm-deployments.yaml
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.

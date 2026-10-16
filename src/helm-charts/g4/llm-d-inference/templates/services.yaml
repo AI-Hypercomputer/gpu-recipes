@@ -1,0 +1,100 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+{{- $routerEnabled := .Values.llmd.router.enabled -}}
+{{- if hasKey .Values "router" -}}
+  {{- if hasKey .Values.router "enabled" -}}
+    {{- $routerEnabled = .Values.router.enabled -}}
+  {{- end -}}
+{{- end -}}
+{{- $ns := .Release.Namespace -}}
+{{- if $routerEnabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ .Release.Name }}-frontend"
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/name: llm-d-inference
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+    app.kubernetes.io/component: router
+spec:
+  type: {{ .Values.service.type | default "ClusterIP" }}
+  selector:
+    app.kubernetes.io/name: llm-d-inference
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+    app.kubernetes.io/component: router
+  ports:
+  - name: http
+    port: 80
+    targetPort: {{ .Values.service.ports.envoyHttp | default 8081 }}
+  - name: http-openai
+    port: {{ .Values.service.ports.frontend | default 8000 }}
+    targetPort: {{ .Values.service.ports.envoyHttp | default 8081 }}
+  - name: grpc-ext-proc
+    port: {{ .Values.service.ports.eppGrpc | default 9002 }}
+    targetPort: {{ .Values.service.ports.eppGrpc | default 9002 }}
+  - name: epp-metrics
+    port: {{ .Values.service.ports.eppMetrics | default 9090 }}
+    targetPort: {{ .Values.service.ports.eppMetrics | default 9090 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ .Release.Name }}-backends"
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/name: llm-d-inference
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+    app.kubernetes.io/component: model-server
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: llm-d-inference
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+    app.kubernetes.io/component: model-server
+  ports:
+  - name: http
+    port: {{ .Values.service.ports.vllmHttp | default 8000 }}
+    targetPort: {{ .Values.service.ports.vllmHttp | default 8000 }}
+  - name: http-render
+    port: {{ .Values.service.ports.tokenProducer | default 6100 }}
+    targetPort: {{ .Values.service.ports.tokenProducer | default 6100 }}
+  - name: zmq-kv-events
+    port: {{ .Values.service.ports.vllmZmq | default 5556 }}
+    targetPort: {{ .Values.service.ports.vllmZmq | default 5556 }}
+  - name: zmq-kv-replay
+    port: {{ .Values.service.ports.vllmZmqReplay | default 5559 }}
+    targetPort: {{ .Values.service.ports.vllmZmqReplay | default 5559 }}
+{{- else }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ .Release.Name }}-frontend"
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/name: llm-d-inference
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+    app.kubernetes.io/component: model-server
+spec:
+  type: {{ .Values.service.type | default "ClusterIP" }}
+  selector:
+    app.kubernetes.io/name: llm-d-inference
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+    app.kubernetes.io/component: model-server
+  ports:
+  - name: http-openai
+    port: {{ .Values.service.ports.frontend | default 8000 }}
+    targetPort: {{ .Values.service.ports.vllmHttp | default 8000 }}
+{{- end }}

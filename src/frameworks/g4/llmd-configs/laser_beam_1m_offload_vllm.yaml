@@ -1,0 +1,42 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Post-optimization vLLM serving config for 1M-context AgentX + Host DRAM KV Offload
+# Note on CPUOffloadingSpec cpu_bytes_to_use:
+#   - 68719476736 (64 GiB per TP4 replica when running 2x TP4 per node = 128 GiB/node)
+#   - 137438953472 (128 GiB per TP4 replica when running 1x TP4 per node)
+host: "0.0.0.0"
+port: "8000"
+tensor-parallel-size: "4"
+enable-expert-parallel: true
+trust-remote-code: true
+max-model-len: "1048576"
+gpu-memory-utilization: "0.90"
+kv-cache-dtype: "fp8"
+block-size: "64"
+max-num-batched-tokens: "16384"
+max-num-seqs: "16"
+speculative-config: '{"method":"dflash","model":"${DRAFTER_MODEL_ID}","num_speculative_tokens":8,"draft_tensor_parallel_size":4}'
+compilation-config: '{"cudagraph_capture_sizes":[1,2,4,8,16,32,48,64,96,128,192,256,384,512,640,768,896,1024,1152],"cudagraph_mode":"FULL_AND_PIECEWISE","pass_config":{"fuse_allreduce_rms":false}}'
+enable-prefix-caching: true
+no-disable-hybrid-kv-cache-manager: true
+swa-bounded-replay: true
+enable-auto-tool-choice: true
+tool-call-parser: "beam"
+reasoning-parser: "beam"
+default-chat-template-kwargs: '{"allow_missing_thinking":true,"reasoning_effort":"max"}'
+override-generation-config: '{"temperature":1.0,"top_k":40,"top_p":0.95}'
+moe-backend: "flashinfer_cutlass"
+kv-transfer-config: '{"kv_connector":"OffloadingConnector","kv_role":"kv_both","engine_id":"w1_0","kv_connector_extra_config":{"spec_name":"CPUOffloadingSpec","cpu_bytes_to_use":68719476736,"blocks_per_chunk":16,"offload_prompt_only":true}}'
+kv-events-config: '{"enable_kv_cache_events":true,"publisher":"zmq","endpoint":"tcp://*:${ZMQ_PUB_PORT}","replay_endpoint":"tcp://*:${ZMQ_REPLAY_PORT}","topic":"kv@${POD_IP}:${VLLM_HTTP_PORT}@${SERVED_MODEL_NAME}"}'
