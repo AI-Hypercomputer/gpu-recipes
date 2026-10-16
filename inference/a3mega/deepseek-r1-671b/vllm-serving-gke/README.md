@@ -366,5 +366,5 @@ helm  install -f values.yaml \
     --set network.subnetworks[8]=rdma-6 \
     --set network.subnetworks[9]=rdma-7 \
     $USER-serving-deepseek-r1-model \
-    $REPO_ROOT/src/helm-charts/a3mega/vllm-inference
+    $REPO_ROOT/src/helm-charts/a3mega/vllm-inference/multi-host
 ```

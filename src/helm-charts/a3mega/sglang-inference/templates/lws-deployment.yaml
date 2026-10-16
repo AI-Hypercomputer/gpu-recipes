@@ -22,9 +22,9 @@ kind: LeaderWorkerSet
 metadata:
   name: {{ .Release.Name }}
 spec:
-  replicas: {{ .Values.sglang.replicaCount }}
+  replicas: {{ $root.Values.sglang.replicaCount }}
   leaderWorkerTemplate:
-    size: {{ div (mul .Values.model.tp_size .Values.model.pp_size) $gpusPerNode }}
+    size: {{ div (mul $root.Values.model.tp_size $root.Values.model.pp_size) $gpusPerNode }}
     restartPolicy: RecreateGroupOnPodRestart
     leaderTemplate:
       metadata:
@@ -34,8 +34,8 @@ spec:
         annotations:
           gke-gcsfuse/volumes: "true"
           gke-gcsfuse/cpu-limit: "0"
-          gke-gcsfuse/memory-limit: "0"
-          gke-gcsfuse/ephemeral-storage-limit: "0"
+          gke-gcsfuse/memory-limit: "32Gi"
+          gke-gcsfuse/ephemeral-storage-limit: "50Gi"
           devices.gke.io/container.tcpxo-daemon: |+
             - path: /dev/nvidia0
             - path: /dev/nvidia1
@@ -49,24 +49,11 @@ spec:
             - path: /dev/nvidia-uvm
             - path: /dev/dmabuf_import_helper
           networking.gke.io/default-interface: "eth0"
-          networking.gke.io/interfaces: |
-          {{- if $root.Values.network.subnetworks }}
-            [
-              {{- range $i, $subnetwork := $root.Values.network.subnetworks }}
-              {"interfaceName":"eth{{ $i }}","network":"{{ $subnetwork }}"}{{ eq $i 8 | ternary "" ","}}
-              {{- end }}
-            ]
-          {{- else }}
-            [
-              {"interfaceName":"eth0","network":"default"},
-              {{- range  $i := until 8 }}
-              {"interfaceName":"eth{{ add 1 $i }}","network":"{{ $root.Values.clusterName }}-gpunet-{{ $i }}-subnet"}{{ eq $i 7 | ternary "" ","}}
-              {{- end }}
-            ]
-          {{- end}}
       spec:
         subdomain: "{{.Release.Name}}"
         restartPolicy: Always
+        hostNetwork: true
+        dnsPolicy: ClusterFirstWithHostNet
         {{ if $root.Values.targetNodes }}
         affinity:
           nodeAffinity:
@@ -119,6 +106,7 @@ spec:
             driver: gcsfuse.csi.storage.gke.io
             volumeAttributes:
               bucketName: "{{ $gcs.bucketName }}"
+              mountOptions: "{{ $gcs.mountOptions | default "implicit-dirs,file-cache:max-size-mb:0,file-cache:cache-file-for-range-read:false" }}"
         {{- end}}
 
         initContainers:
@@ -128,7 +116,7 @@ spec:
           imagePullPolicy: Always
           volumeMounts:
             - name: nccl-plugin-volume
-              mountPath: /usr/local/nccl-plugin
+              mountPath: /usr/local/tcpxo
           env:
           - name: BUILD_TYPE
             value: "{{ $root.Values.gpuPlatformSettings.ncclBuildType }}"
@@ -139,12 +127,12 @@ spec:
             set -ex
             chmod 755 /scripts/container_entry.sh
             /scripts/container_entry.sh install --install-nccl --nccl-buildtype ${BUILD_TYPE}
-            cp -r /var/lib/tcpxo/* /usr/local/nccl-plugin/
+            cp -r /var/lib/tcpxo/* /usr/local/tcpxo/
 
         {{- end }}
 
         - name: tcpxo-daemon
-          image: {{ $root.Values.gpuPlatformSettings.rxdmImage }}
+          image: "{{ $root.Values.gpuPlatformSettings.rxdmImage }}"
           imagePullPolicy: Always
           securityContext:
             capabilities:
@@ -183,7 +171,7 @@ spec:
 
         containers:
           - name: sglang-leader
-            image: {{ .Values.job.image.repository }}:{{ .Values.job.image.tag }}
+            image: "{{ $root.Values.job.image.repository }}:{{ $root.Values.job.image.tag }}"
             securityContext:
               privileged: true
               capabilities:
@@ -200,16 +188,24 @@ spec:
               - name: HF_TOKEN
                 valueFrom:
                   secretKeyRef:
-                    name: "{{ .Values.huggingface.secretName }}"
-                    key: "{{ .Values.huggingface.secretData.token }}"
+                    name: "{{ $root.Values.huggingface.secretName }}"
+                    key: "{{ $root.Values.huggingface.secretData.token }}"
               - name: LWS_WORKER_INDEX
                 valueFrom:
                   fieldRef:
                     fieldPath: metadata.labels['leaderworkerset.sigs.k8s.io/worker-index']
               - name: HF_HUB_ENABLE_HF_TRANSFER
                 value: "1"
+              - name: HF_HUB_ETAG_TIMEOUT
+                value: "60"
+              - name: HF_HUB_DOWNLOAD_TIMEOUT
+                value: "60"
+              - name: HF_HOME
+                value: "{{ $root.Values.volumes.ssdMountPath }}"
               - name: TORCH_DISTRIBUTED_DEBUG
                 value: "INFO"
+              - name: GLOO_SOCKET_IFNAME
+                value: "eth0"
               {{- if  $root.Values.gpuPlatformSettings.useHostPlugin }}
               - name: LD_LIBRARY_PATH
                 value: /usr/local/nvidia/lib64
@@ -217,9 +213,9 @@ spec:
                 value: /usr/local/nvidia/lib64
               {{- else }}
               - name: LD_LIBRARY_PATH
-                value: /usr/local/nccl-plugin/lib64:/usr/local/nvidia/lib64
+                value: /usr/local/tcpxo/lib64:/usr/local/nvidia/lib64
               - name: NCCL_LIB_DIR
-                value: /usr/local/nccl-plugin/lib64
+                value: /usr/local/tcpxo/lib64
               {{- end }}
               - name: NCCL_FASTRAK_LLCM_DEVICE_DIRECTORY
                 value: /dev/aperture_devices
@@ -234,7 +230,7 @@ spec:
               - name: NCCL_ALGO
                 value: "Ring,Tree"
               - name: NCCL_PROTO
-                value: "Simple"
+                value: "Simple,LL128"
               - name: NCCL_MIN_NCHANNELS
                 value: "4"
               - name: NCCL_DYNAMIC_CHUNK_SIZE
@@ -245,6 +241,8 @@ spec:
                 value: "524288"
               - name: NCCL_P2P_NVL_CHUNKSIZE
                 value: "1048576"
+              - name: NCCL_NVLSTREE_MAX_CHUNKSIZE
+                value: "131072"
               - name: NCCL_FASTRAK_NUM_FLOWS
                 value: "2"
               - name: NCCL_BUFFSIZE
@@ -252,7 +250,7 @@ spec:
               - name: NCCL_NET_GDR_LEVEL
                 value: "PIX"
               - name: NCCL_DEBUG_SUBSYS
-                value: "INIT,GRAPH,ENV,TUNING,NET"
+                value: "INIT,NET,ENV,COLL,GRAPH"
               - name: NCCL_FASTRAK_ENABLE_HOTPATH_LOGGING
                 value: "0"
               - name: NCCL_FASTRAK_USE_SNAP
@@ -264,11 +262,11 @@ spec:
               - name: NCCL_TUNER_PLUGIN
                 value: "libnccl-tuner.so"
               - name: NCCL_TUNER_CONFIG_PATH
-                value: "/usr/local/nccl-plugin/lib64/a3plus_tuner_config.textproto"
+                value: "/usr/local/tcpxo/lib64/a3plus_tuner_config.textproto"
               - name: NCCL_SHIMNET_GUEST_CONFIG_CHECKER_CONFIG_FILE
-                value: "/usr/local/nccl-plugin/lib64/a3plus_guest_config.textproto"
+                value: "/usr/local/tcpxo/lib64/a3plus_guest_config.textproto"
               - name: NCCL_NVLS_ENABLE
-                value: "0"
+                value: "1"
               - name: NCCL_FASTRAK_PLUGIN_ACCEPT_TIMEOUT_MS
                 value: "600000"
               - name: CUDA_VISIBLE_DEVICES
@@ -285,6 +283,16 @@ spec:
               # NCCL settings
               - name: NCCL_P2P_PXN_LEVEL
                 value: "0"
+              - name: NCCL_NET_PLUGIN_TELEMETRY_MODE
+                value: "1"
+              - name: NCCL_TELEMETRY_MODE
+                value: "1"
+              - name: NCCL_GPUVIZ_ENABLE_MILLISECOND_BANDWIDTH_OUTPUT
+                value: "1"
+              - name: NCCL_GPUVIZ_FILE_ROTATION_INTERVAL_IN_SECONDS
+                value: "300"
+              - name: NCCL_GPUVIZ_BANDWIDTH_HISTOGRAM_COLLECTION_ENABLE
+                value: "1"
 
               {{- range $environment_variable := $root.Values.network.ncclSettings }}
               - name: {{ $environment_variable.name }}
@@ -300,6 +308,8 @@ spec:
 
               GLOO_SOCKET_IFNAME=eth0 python3 -m sglang.launch_server \
                 --model-path {{ $root.Values.model.name }} \
+                --host 0.0.0.0 \
+                --port {{ $root.Values.sglang.service.ports.http }} \
                 --tp {{ $root.Values.model.tp_size }} \
                 --dist-init-addr ${LWS_LEADER_ADDRESS}:6002 \
                 --nnodes ${LWS_GROUP_SIZE} \
@@ -333,7 +343,7 @@ spec:
               mountPath: /dev/aperture_devices
             {{- if not $root.Values.gpuPlatformSettings.useHostPlugin }}
             - name: nccl-plugin-volume
-              mountPath: /usr/local/nccl-plugin
+              mountPath: /usr/local/tcpxo
             {{- end }}
             - name: sys
               mountPath: /hostsysfs
@@ -359,8 +369,8 @@ spec:
         annotations:
           gke-gcsfuse/volumes: "true"
           gke-gcsfuse/cpu-limit: "0"
-          gke-gcsfuse/memory-limit: "0"
-          gke-gcsfuse/ephemeral-storage-limit: "0"
+          gke-gcsfuse/memory-limit: "32Gi"
+          gke-gcsfuse/ephemeral-storage-limit: "50Gi"
           devices.gke.io/container.tcpxo-daemon: |+
             - path: /dev/nvidia0
             - path: /dev/nvidia1
@@ -374,24 +384,11 @@ spec:
             - path: /dev/nvidia-uvm
             - path: /dev/dmabuf_import_helper
           networking.gke.io/default-interface: "eth0"
-          networking.gke.io/interfaces: |
-          {{- if $root.Values.network.subnetworks }}
-            [
-              {{- range $i, $subnetwork := $root.Values.network.subnetworks }}
-              {"interfaceName":"eth{{ $i }}","network":"{{ $subnetwork }}"}{{ eq $i 8 | ternary "" ","}}
-              {{- end }}
-            ]
-          {{- else }}
-            [
-              {"interfaceName":"eth0","network":"default"},
-              {{- range  $i := until 8 }}
-              {"interfaceName":"eth{{ add 1 $i }}","network":"{{ $root.Values.clusterName }}-gpunet-{{ $i }}-subnet"}{{ eq $i 7 | ternary "" ","}}
-              {{- end }}
-            ]
-          {{- end}}
       spec:
         subdomain: "{{.Release.Name}}"
         restartPolicy: Always
+        hostNetwork: true
+        dnsPolicy: ClusterFirstWithHostNet
         {{ if $root.Values.targetNodes }}
         affinity:
           nodeAffinity:
@@ -446,6 +443,7 @@ spec:
             driver: gcsfuse.csi.storage.gke.io
             volumeAttributes:
               bucketName: "{{ $gcs.bucketName }}"
+              mountOptions: "{{ $gcs.mountOptions | default "implicit-dirs,file-cache:max-size-mb:0,file-cache:cache-file-for-range-read:false" }}"
         {{- end}}
 
         initContainers:
@@ -455,7 +453,7 @@ spec:
           imagePullPolicy: Always
           volumeMounts:
             - name: nccl-plugin-volume
-              mountPath: /usr/local/nccl-plugin
+              mountPath: /usr/local/tcpxo
           env:
           - name: BUILD_TYPE
             value: "{{ $root.Values.gpuPlatformSettings.ncclBuildType }}"
@@ -466,13 +464,13 @@ spec:
             set -ex
             chmod 755 /scripts/container_entry.sh
             /scripts/container_entry.sh install --install-nccl --nccl-buildtype ${BUILD_TYPE}
-            cp -r /var/lib/tcpxo/* /usr/local/nccl-plugin/
+            cp -r /var/lib/tcpxo/* /usr/local/tcpxo/
 
         {{- end }}
 
 
         - name: tcpxo-daemon
-          image: {{ $root.Values.gpuPlatformSettings.rxdmImage }}
+          image: "{{ $root.Values.gpuPlatformSettings.rxdmImage }}"
           imagePullPolicy: Always
           securityContext:
             capabilities:
@@ -511,7 +509,7 @@ spec:
 
         containers:
           - name: sglang-worker
-            image: {{ .Values.job.image.repository }}:{{ .Values.job.image.tag }}
+            image: "{{ $root.Values.job.image.repository }}:{{ $root.Values.job.image.tag }}"
             securityContext:
               privileged: true
               capabilities:
@@ -528,16 +526,24 @@ spec:
               - name: HF_TOKEN
                 valueFrom:
                   secretKeyRef:
-                    name: "{{ .Values.huggingface.secretName }}"
-                    key: "{{ .Values.huggingface.secretData.token }}"
+                    name: "{{ $root.Values.huggingface.secretName }}"
+                    key: "{{ $root.Values.huggingface.secretData.token }}"
               - name: LWS_WORKER_INDEX
                 valueFrom:
                   fieldRef:
                     fieldPath: metadata.labels['leaderworkerset.sigs.k8s.io/worker-index']
               - name: HF_HUB_ENABLE_HF_TRANSFER
                 value: "1"
+              - name: HF_HUB_ETAG_TIMEOUT
+                value: "60"
+              - name: HF_HUB_DOWNLOAD_TIMEOUT
+                value: "60"
+              - name: HF_HOME
+                value: "{{ $root.Values.volumes.ssdMountPath }}"
               - name: TORCH_DISTRIBUTED_DEBUG
                 value: "INFO"
+              - name: GLOO_SOCKET_IFNAME
+                value: "eth0"
               {{- if  $root.Values.gpuPlatformSettings.useHostPlugin }}
               - name: LD_LIBRARY_PATH
                 value: /usr/local/nvidia/lib64
@@ -545,9 +551,9 @@ spec:
                 value: /usr/local/nvidia/lib64
               {{- else }}
               - name: LD_LIBRARY_PATH
-                value: /usr/local/nccl-plugin/lib64:/usr/local/nvidia/lib64
+                value: /usr/local/tcpxo/lib64:/usr/local/nvidia/lib64
               - name: NCCL_LIB_DIR
-                value: /usr/local/nccl-plugin/lib64
+                value: /usr/local/tcpxo/lib64
               {{- end }}
               - name: NCCL_FASTRAK_LLCM_DEVICE_DIRECTORY
                 value: /dev/aperture_devices
@@ -562,7 +568,7 @@ spec:
               - name: NCCL_ALGO
                 value: "Ring,Tree"
               - name: NCCL_PROTO
-                value: "Simple"
+                value: "Simple,LL128"
               - name: NCCL_MIN_NCHANNELS
                 value: "4"
               - name: NCCL_DYNAMIC_CHUNK_SIZE
@@ -573,6 +579,8 @@ spec:
                 value: "524288"
               - name: NCCL_P2P_NVL_CHUNKSIZE
                 value: "1048576"
+              - name: NCCL_NVLSTREE_MAX_CHUNKSIZE
+                value: "131072"
               - name: NCCL_FASTRAK_NUM_FLOWS
                 value: "2"
               - name: NCCL_BUFFSIZE
@@ -580,7 +588,7 @@ spec:
               - name: NCCL_NET_GDR_LEVEL
                 value: "PIX"
               - name: NCCL_DEBUG_SUBSYS
-                value: "INIT,GRAPH,ENV,TUNING,NET"
+                value: "INIT,NET,ENV,COLL,GRAPH"
               - name: NCCL_FASTRAK_ENABLE_HOTPATH_LOGGING
                 value: "0"
               - name: NCCL_FASTRAK_USE_SNAP
@@ -592,11 +600,11 @@ spec:
               - name: NCCL_TUNER_PLUGIN
                 value: "libnccl-tuner.so"
               - name: NCCL_TUNER_CONFIG_PATH
-                value: "/usr/local/nccl-plugin/lib64/a3plus_tuner_config.textproto"
+                value: "/usr/local/tcpxo/lib64/a3plus_tuner_config.textproto"
               - name: NCCL_SHIMNET_GUEST_CONFIG_CHECKER_CONFIG_FILE
-                value: "/usr/local/nccl-plugin/lib64/a3plus_guest_config.textproto"
+                value: "/usr/local/tcpxo/lib64/a3plus_guest_config.textproto"
               - name: NCCL_NVLS_ENABLE
-                value: "0"
+                value: "1"
               - name: NCCL_FASTRAK_PLUGIN_ACCEPT_TIMEOUT_MS
                 value: "600000"
               - name: CUDA_VISIBLE_DEVICES
@@ -613,6 +621,16 @@ spec:
               # NCCL settings
               - name: NCCL_P2P_PXN_LEVEL
                 value: "0"
+              - name: NCCL_NET_PLUGIN_TELEMETRY_MODE
+                value: "1"
+              - name: NCCL_TELEMETRY_MODE
+                value: "1"
+              - name: NCCL_GPUVIZ_ENABLE_MILLISECOND_BANDWIDTH_OUTPUT
+                value: "1"
+              - name: NCCL_GPUVIZ_FILE_ROTATION_INTERVAL_IN_SECONDS
+                value: "300"
+              - name: NCCL_GPUVIZ_BANDWIDTH_HISTOGRAM_COLLECTION_ENABLE
+                value: "1"
 
               {{- range $environment_variable := $root.Values.network.ncclSettings }}
               - name: {{ $environment_variable.name }}
@@ -626,15 +644,17 @@ spec:
               # Launch the server
               echo "Pod on $(hostname --fqdn) is running"
               GLOO_SOCKET_IFNAME=eth0 python3 -m sglang.launch_server \
-                --model-path {{ .Values.model.name }} \
-                --tp {{ .Values.model.tp_size }} \
+                --model-path {{ $root.Values.model.name }} \
+                --host 0.0.0.0 \
+                --port {{ $root.Values.sglang.service.ports.http }} \
+                --tp {{ $root.Values.model.tp_size }} \
                 --dist-init-addr ${LWS_LEADER_ADDRESS}:6002 \
                 --nnodes ${LWS_GROUP_SIZE} \
                 --node-rank ${LWS_WORKER_INDEX} \
-                --trust-remote-code{{- if .Values.sglang.serverArgs }} \ {{- end }}
-              {{- if .Values.sglang.serverArgs }}
+                --trust-remote-code{{- if $root.Values.sglang.serverArgs }} \ {{- end }}
+              {{- if $root.Values.sglang.serverArgs }}
                 {{- $first := true }}
-                {{- range $key, $value := .Values.sglang.serverArgs }}
+                {{- range $key, $value := $root.Values.sglang.serverArgs }}
                   {{- if not $first }} \ {{- end }}
                   {{- $first = false }}
                 {{- if kindIs "bool" $value }}
@@ -652,7 +672,7 @@ spec:
               mountPath: /dev/aperture_devices
             {{- if not $root.Values.gpuPlatformSettings.useHostPlugin }}
             - name: nccl-plugin-volume
-              mountPath: /usr/local/nccl-plugin
+              mountPath: /usr/local/tcpxo
             {{- end }}
             - name: sys
               mountPath: /hostsysfs
@@ -669,4 +689,3 @@ spec:
             - name: "{{ $gcs.bucketName }}"
               mountPath: "{{ $gcs.mountPath }}"
             {{- end }}
-
