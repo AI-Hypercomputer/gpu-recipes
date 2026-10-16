@@ -1,15 +1,14 @@
 # Aggregated 1M-Context Multi-Turn Inference with llm-d and vLLM on G4 GKE
 
-This document outlines the steps to deploy and benchmark `reflection/Beam-1.0-501B-A23B-NVFP4` (`LASER_BEAM`) at **1,048,576 (`1M`) context length** using the [llm-d](https://github.com/llm-d/llm-d) intelligent inference scheduling stack with the [vLLM](https://docs.vllm.ai/en/latest/) backend on [G4 (`g4-standard-384`, NVIDIA RTX PRO 6000 Blackwell Server Edition) GKE Node pools](https://cloud.google.com/compute/docs/gpus#rtx-6000-gpus).
+This document outlines the steps to deploy and benchmark Reflection Beam ([`reflection/Beam-1.0-501B-A23B-NVFP4`](https://huggingface.co/reflection/Beam-1.0-501B-A23B-NVFP4)) with the DFlash2 drafter ([`reflection/Beam-1.0-501B-A23B-DFlash2`](https://huggingface.co/reflection/Beam-1.0-501B-A23B-DFlash2)) at **1,048,576 (`1M`) context length** using the [llm-d](https://github.com/llm-d/llm-d) intelligent inference scheduling stack with the [vLLM](https://docs.vllm.ai/en/latest/) backend on [G4 (`g4-standard-384`, NVIDIA RTX PRO 6000 Blackwell Server Edition) GKE Node pools](https://cloud.google.com/compute/docs/gpus#rtx-6000-gpus).
 
 `llm-d` pairs an Envoy proxy and an `ext_proc` Endpoint Picker (`EPP`) router with vLLM workers to provide real-time ZMQ KV-cache event tracking (`precise-prefix-cache-producer` on `:5556` / `:5559`), multi-tier prefix-affinity routing (`prefix-cache-affinity-filter` across GPU HBM and host DRAM), `program-aware-fairness` multi-turn scheduling (`strategy: turn-priority`), and queue/KV saturation flow control (`utilization-detector`). On `g4-standard-384` nodes (8x RTX PRO 6000 Blackwell Server Edition GPUs with 96 GB GDDR7 each + 1.44 TB host DRAM), this recipe deploys **`2x TP4 / EP4` (`8` GPUs total)** with **host DRAM KV-cache offloading (`OffloadingConnector` / `CPUOffloadingSpec`, `64 GiB` per TP4 replica / `128 GiB` per node)**, socket-local PCIe Gen5 **NUMA pinning (`numactl`)**, and **DFlash2 speculative decoding**.
 
 <a name="table-of-contents"></a>
 ## Table of Contents
 
-* [1. Test Environment & Benchmark Results](#test-environment)
+* [1. Test Environment](#test-environment)
   * [1.1. Hardware & Software Configuration](#hardware-config)
-  * [1.2. Verified 60-Minute 1M-Context AgentX Benchmark Results](#benchmark-results)
 * [2. Environment Setup (One-Time)](#environment-setup)
   * [2.1. Clone the Repository](#clone-repo)
   * [2.2. Configure Environment Variables](#configure-vars)
@@ -30,33 +29,20 @@ This document outlines the steps to deploy and benchmark `reflection/Beam-1.0-50
 * [6. Cleanup](#cleanup)
 
 <a name="test-environment"></a>
-## 1. Test Environment & Benchmark Results
+## 1. Test Environment
 
 [Back to Top](#table-of-contents)
 
 <a name="hardware-config"></a>
 ### 1.1. Hardware & Software Configuration
 
-This recipe has been tested and benchmarked with the following configuration:
+This recipe has been tested with the following configuration:
 
 * **GKE Cluster**:
     * GPU node pools with [g4-standard-384](https://cloud.google.com/compute/docs/gpus#rtx-6000-gpus) machines (`cloud.google.com/gke-accelerator: nvidia-rtx-pro-6000`, 8x NVIDIA RTX PRO 6000 Blackwell Server Edition `SM120` GPUs with 96 GB GDDR7 each = 768 GB GPU memory per node, 384 vCPUs across 2 NUMA sockets, 1,440 GB host DRAM).
     * **Serving Topology**: `2x TP4 / EP4` (`8` GPUs total across 2 four-GPU instances, NUMA-pinned per 4-GPU PCIe socket via `numactl --cpunodebind={0|1} --membind={0|1}`).
     * [Workload Identity Federation for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity) enabled.
     * [Cloud Storage FUSE CSI driver for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/cloud-storage-fuse-csi-driver) enabled.
-
-<a name="benchmark-results"></a>
-### 1.2. Verified 60-Minute 1M-Context AgentX Benchmark Results
-
-Evaluated using [`aiperf`](https://github.com/ai-dynamo/aiperf) (`--scenario agentx --benchmark-duration 3600`) with the SemiAnalysis AgentX multi-turn coding trajectory dataset (`semianalysis_cc_traces_weka_062126`, up to `1M` context length) across `8` RTX PRO 6000 Blackwell GPUs (`2x TP4`):
-
-| Concurrency | Stack Configuration | Output Throughput (`tok/s/GPU`) | Prefix KV-Cache Hit Rate (`%`) | P90 TTFT (`s`) | Speedup / Improvement (`llm-d` vs. Baseline) |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **`c=8`** | **llm-d + vLLM (DRAM Offload)** | **`39.7 tok/s/GPU`** | **`95.9%`** | — | **+13.4% Throughput**, **+3.5% KV Hit Rate** |
-| **`c=8`** | Standalone vLLM Baseline | `35.0 tok/s/GPU` | `92.4%` | — | *(Reference)* |
-| **`c=16`** | **llm-d + vLLM (DRAM Offload)** | **`51.3 tok/s/GPU`** | **`88.5%`** | **`10.26s`** | **+95.8% (1.96x) Throughput**, **+34.4% KV Hit**, **11.3x Lower P90 TTFT** |
-| **`c=16`** | Standalone vLLM Baseline | `26.2 tok/s/GPU` | `54.1%` | `115.70s` | *(Reference — severe HBM KV eviction & recomputation)* |
-| **`c=32`** | **llm-d + vLLM (DRAM Offload)** | **`25.5 tok/s/GPU`** | **`59.1%`** | **`195.98s`** | Sustains `59.1%` KV hit rate under `32` concurrent 1M-context sessions |
 
 <a name="environment-setup"></a>
 ## 2. Environment Setup (One-Time)
@@ -84,8 +70,8 @@ export CLUSTER_NAME=<CLUSTER_NAME>
 export NAMESPACE=llmd-inference
 export HF_TOKEN=<HF_TOKEN>
 export GCS_BUCKET=<GCS_BUCKET>
-export LASER_BEAM_HF_MODEL_ID=reflection/Beam-1.0-501B-A23B-NVFP4
-export LASER_BEAM_DRAFTER_HF_MODEL_ID=reflection/Beam-1.0-501B-A23B-DFlash2
+export BEAM_HF_MODEL_ID=reflection/Beam-1.0-501B-A23B-NVFP4
+export BEAM_DRAFTER_HF_MODEL_ID=reflection/Beam-1.0-501B-A23B-DFlash2
 
 # Set the project for gcloud commands
 gcloud config set project $PROJECT_ID
@@ -102,8 +88,8 @@ Replace the following values:
 | `NAMESPACE` | Kubernetes namespace for the deployment | `llmd-inference` |
 | `HF_TOKEN` | Your Hugging Face access token | `<HF_TOKEN>` |
 | `GCS_BUCKET` | Your GCS bucket name (without `gs://` prefix for Helm `bucketName`) | `<GCS_BUCKET>` |
-| `LASER_BEAM_HF_MODEL_ID` | Target model Hugging Face ID | `reflection/Beam-1.0-501B-A23B-NVFP4` |
-| `LASER_BEAM_DRAFTER_HF_MODEL_ID` | DFlash2 speculative drafter Hugging Face ID | `reflection/Beam-1.0-501B-A23B-DFlash2` |
+| `BEAM_HF_MODEL_ID` | Target model Hugging Face ID ([`reflection/Beam-1.0-501B-A23B-NVFP4`](https://huggingface.co/reflection/Beam-1.0-501B-A23B-NVFP4)) | `reflection/Beam-1.0-501B-A23B-NVFP4` |
+| `BEAM_DRAFTER_HF_MODEL_ID` | DFlash2 speculative drafter Hugging Face ID ([`reflection/Beam-1.0-501B-A23B-DFlash2`](https://huggingface.co/reflection/Beam-1.0-501B-A23B-DFlash2)) | `reflection/Beam-1.0-501B-A23B-DFlash2` |
 
 <a name="connect-cluster"></a>
 ### 2.3. Connect to your GKE Cluster
@@ -151,7 +137,7 @@ gcloud storage buckets add-iam-policy-binding gs://${GCS_BUCKET} \
 Set your environment variables for the vLLM engine image (built with `SM120` Blackwell support, `flashinfer_cutlass` MoE kernels, DFlash2 speculative decoding, and `OffloadingConnector` KV-cache CPU offloading) and the `llm-d` Endpoint Picker (`EPP`) router image:
 
 ```bash
-export VLLM_IMAGE="us-central1-docker.pkg.dev/gpu-launchpad-playground/vllm/vllm-beam:lin-tracking-cu13-8e0922e8-sm120-x86_64"
+export VLLM_IMAGE="vllm/vllm-openai:reflection-beam"
 export EPP_IMAGE="ghcr.io/llm-d/llm-d-router-endpoint-picker:main"
 ```
 
@@ -206,7 +192,7 @@ flowchart LR
 | **#2 Host DRAM KV-Cache Offloading (`OffloadingConnector` / `CPUOffloadingSpec`)** | `cpu_bytes_to_use: 68719476736` (`64 GiB` per TP4 replica = `128 GiB/node` for 2x TP4/node; or `137438953472` = `128 GiB/replica` for 1x TP4/node), `blocks_per_chunk: 16`, `offload_prompt_only: true` | Extends effective KV-cache capacity into `g4-standard-384` host DRAM and publishes ZMQ tier events (`:5556` / `:5559`, `gpu: 1.0`, `cpu: 0.4`) so evicted multi-turn prefixes are reloaded via PCIe DMA instead of recomputed. |
 | **#3 Engine Batching & CUDA Graphs** | `--max-num-batched-tokens 16384`, `--max-num-seqs 16`, `--block-size 64`, `FULL_AND_PIECEWISE` CUDA graphs `1..1152` (`fuse_allreduce_rms: false`) | Cuts 100K–700K prefill chunks in half (updated from `8192` to `16384`), bounds concurrent active sequences (`16`), and captures CUDA graphs up to `1152` tokens for speculative decoding. |
 | **#4 DFlash2 Speculative Decoding** | `num_speculative_tokens: 8`, `draft_tensor_parallel_size: 4`, `--no-disable-hybrid-kv-cache-manager`, `--swa-bounded-replay`, `--moe-backend flashinfer_cutlass` | Accelerates decode interactivity (TPOT/ITL) using block-diffusion speculative decoding with bounded sliding-window attention replay. |
-| **#5 `llm-d` EPP Routing & Flow Control (`EndpointPickerConfig`)** | `prefix-cache-affinity-filter` (`affinityThreshold: 0.75`, `peakPrefillThroughput: 16444`), `utilization-detector` (`queueDepthThreshold: 6`, `kvCacheUtilThreshold: 0.80`), `program-aware-fairness` (`turn-priority`), `speculativeIndexing: true` | Directs multi-turn agentic sessions to the pod holding their GPU/DRAM prefix (`88.5%` KV hit at `c=16` vs. `54.1%` without `llm-d`, yielding **1.96x higher throughput** and **11.3x lower P90 TTFT**). |
+| **#5 `llm-d` EPP Routing & Flow Control (`EndpointPickerConfig`)** | `prefix-cache-affinity-filter` (`affinityThreshold: 0.75`, `peakPrefillThroughput: 16444`), `utilization-detector` (`queueDepthThreshold: 6`, `kvCacheUtilThreshold: 0.80`), `program-aware-fairness` (`turn-priority`), `speculativeIndexing: true` | Directs multi-turn agentic sessions to the pod holding their GPU or host DRAM prefix while balancing in-flight prefill and queue load. |
 
 <a name="deploy-helm"></a>
 ### 3.3. Option A: Deploy with Helm
@@ -214,8 +200,8 @@ flowchart LR
 1. Set the release and model variables:
 
 ```bash
-export HF_MODEL_ID="${LASER_BEAM_HF_MODEL_ID}"
-export DRAFTER_MODEL_ID="${LASER_BEAM_DRAFTER_HF_MODEL_ID}"
+export HF_MODEL_ID="${BEAM_HF_MODEL_ID}"
+export DRAFTER_MODEL_ID="${BEAM_DRAFTER_HF_MODEL_ID}"
 export RELEASE_NAME="llmd-inference"
 ```
 
@@ -298,8 +284,8 @@ Use [`aiperf`](https://github.com/ai-dynamo/aiperf) with the SemiAnalysis AgentX
 
 ```bash
 export FRONTEND_HOST="${RELEASE_NAME}-frontend"
-export MODEL_NAME="${LASER_BEAM_HF_MODEL_ID}"
-export TOKENIZER_PATH="${LASER_BEAM_HF_MODEL_ID}"
+export MODEL_NAME="${BEAM_HF_MODEL_ID}"
+export TOKENIZER_PATH="${BEAM_HF_MODEL_ID}"
 export CONCURRENCY=16
 
 kubectl exec -it bench-client -n ${NAMESPACE} -- bash -c "
