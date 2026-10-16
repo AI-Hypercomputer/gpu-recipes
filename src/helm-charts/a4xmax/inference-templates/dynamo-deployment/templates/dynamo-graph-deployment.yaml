@@ -75,6 +75,9 @@ spec:
         {{- end }}
         nodeSelector:
           kubernetes.io/arch: arm64
+          {{- with .Values.dynamo.nodeSelector }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
         tolerations:
         - key: "kubernetes.io/arch"
           operator: "Equal"
@@ -223,6 +226,9 @@ spec:
           cloud.google.com/gke-accelerator: nvidia-gb300
           cloud.google.com/gke-gpu: "true"
           kubernetes.io/arch: arm64
+          {{- with .Values.dynamo.nodeSelector }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
         mainContainer:
           securityContext:
             privileged: true
@@ -271,6 +277,18 @@ spec:
             env | grep NCCL_
             echo "--- END VERIFICATION ---"
             pip install hf_transfer --break-system-packages || true
+            # Repro fix: SGLang f7473673dd replaced ServerArgs.get_model_config()
+            # with sglang.srt.server_args.model_config_of(); ai-dynamo 1.5.1 still
+            # calls the old method. Patch only when the old method is missing.
+            if ! python3 -c "from sglang.srt.server_args import ServerArgs; assert hasattr(ServerArgs, 'get_model_config')" 2>/dev/null; then
+              DYN_ARGS_PY=$(python3 -c "import importlib.util; spec = importlib.util.find_spec('dynamo.sglang.args'); print(spec.origin if spec and spec.origin else '')" 2>/dev/null || true)
+              if [ -n "$DYN_ARGS_PY" ] && [ -f "$DYN_ARGS_PY" ]; then
+                sed -i 's/server_args\.get_model_config()\.is_multimodal/__import__("sglang.srt.server_args", fromlist=["model_config_of"]).model_config_of(server_args).is_multimodal/' "$DYN_ARGS_PY"
+                echo "Patched $DYN_ARGS_PY for model_config_of"; grep -n "model_config_of" "$DYN_ARGS_PY" || true
+              else
+                echo "Warning: dynamo.sglang.args not found, skipping model_config_of patch"
+              fi
+            fi
 
             ARGS=()
             if [ -n "$MODEL_PATH" ]; then
@@ -456,6 +474,9 @@ spec:
           cloud.google.com/gke-accelerator: nvidia-gb300
           cloud.google.com/gke-gpu: "true"
           kubernetes.io/arch: arm64
+          {{- with .Values.dynamo.nodeSelector }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
         mainContainer:
           securityContext:
             privileged: true
@@ -504,6 +525,18 @@ spec:
             env | grep NCCL_
             echo "--- END VERIFICATION ---"
             pip install hf_transfer --break-system-packages || true
+            # Repro fix: SGLang f7473673dd replaced ServerArgs.get_model_config()
+            # with sglang.srt.server_args.model_config_of(); ai-dynamo 1.5.1 still
+            # calls the old method. Patch only when the old method is missing.
+            if ! python3 -c "from sglang.srt.server_args import ServerArgs; assert hasattr(ServerArgs, 'get_model_config')" 2>/dev/null; then
+              DYN_ARGS_PY=$(python3 -c "import importlib.util; spec = importlib.util.find_spec('dynamo.sglang.args'); print(spec.origin if spec and spec.origin else '')" 2>/dev/null || true)
+              if [ -n "$DYN_ARGS_PY" ] && [ -f "$DYN_ARGS_PY" ]; then
+                sed -i 's/server_args\.get_model_config()\.is_multimodal/__import__("sglang.srt.server_args", fromlist=["model_config_of"]).model_config_of(server_args).is_multimodal/' "$DYN_ARGS_PY"
+                echo "Patched $DYN_ARGS_PY for model_config_of"; grep -n "model_config_of" "$DYN_ARGS_PY" || true
+              else
+                echo "Warning: dynamo.sglang.args not found, skipping model_config_of patch"
+              fi
+            fi
 
             ARGS=()
             if [ -n "$MODEL_PATH" ]; then

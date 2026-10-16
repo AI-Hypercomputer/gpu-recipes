@@ -69,6 +69,7 @@ export NGC_API_KEY=<YOUR_NGC_API_KEY>
 export HF_TOKEN=<YOUR_HF_TOKEN>
 export RELEASE_VERSION=1.0.1
 export GCS_BUCKET=<YOUR_GCS_BUCKET>
+export NODE_POOL=<YOUR_GB300_NODE_POOL>
 
 # Set the project for gcloud commands
 gcloud config set project $PROJECT_ID
@@ -84,6 +85,9 @@ Replace the following values:
 | `NGC_API_KEY` | Your NVIDIA NGC API key (get from [NGC](https://ngc.nvidia.com)) | `nvapi-xxx...` |
 | `HF_TOKEN` | Your Hugging Face access token | `hf_xxx...` |
 | `GCS_BUCKET` | Your GCS bucket name (without `gs://` prefix for Helm `bucketName`) | `my-model-bucket` |
+| `NODE_POOL` | The GB300 node pool to run every worker in. All workers must share one NVLink domain | `a4xmax-np-1` |
+
+The Helm chart deploys into `dynamo.namespace` from the values file (`dynamo-cloud`). The install commands below pass `--set dynamo.namespace=${NAMESPACE}` so the release follows `NAMESPACE`. Resource names (ComputeDomain, deployment, `bench-client`) are fixed, so use a separate namespace for each release that runs at the same time.
 
 <a name="connect-cluster"></a>
 ### 2.3. Connect to your GKE Cluster
@@ -119,6 +123,8 @@ kubectl create secret generic hf-token-secret \
 
 <a name="install-platform"></a>
 ### 2.5. Install Dynamo Platform (One-Time Setup)
+
+Skip this step if the Dynamo Platform is already installed in the cluster. The operator watches all namespaces, and its CRDs are cluster-scoped, so don't install a second, older platform release on a shared cluster. The Reflection Beam recipe was reproduced on an existing `dynamo-platform` `1.4.2` install.
 
 Add the NVIDIA Helm repository:
 ```bash
@@ -253,6 +259,7 @@ helm install -f ${VALUES_FILE} \
   --set workload.model=${HF_MODEL_ID} \
   --set workload.image=${DYNAMO_IMAGE} \
   --set volumes.gcsfuse.bucketName=${GCS_BUCKET} \
+  --set dynamo.namespace=${NAMESPACE} \
   --set-file prefill_serving_config=$REPO_ROOT/src/frameworks/a4xmax/dynamo-configs/${PREFILL_CONFIG} \
   --set-file decode_serving_config=$REPO_ROOT/src/frameworks/a4xmax/dynamo-configs/${DECODE_CONFIG} \
   ${RELEASE_NAME} \
@@ -284,6 +291,7 @@ helm install -f ${VALUES_FILE} \
   --set workload.model=${HF_MODEL_ID} \
   --set workload.image=${DYNAMO_IMAGE} \
   --set volumes.gcsfuse.bucketName=${GCS_BUCKET} \
+  --set dynamo.namespace=${NAMESPACE} \
   --set-file prefill_serving_config=$REPO_ROOT/src/frameworks/a4xmax/dynamo-configs/${PREFILL_CONFIG} \
   --set-file decode_serving_config=$REPO_ROOT/src/frameworks/a4xmax/dynamo-configs/${DECODE_CONFIG} \
   ${RELEASE_NAME} \
@@ -296,7 +304,6 @@ helm install -f ${VALUES_FILE} \
 
 ```bash
 export HF_MODEL_ID="reflection/Beam-1.0-501B-A23B-NVFP4"
-export DYNAMO_IMAGE="lmsysorg/sglang:beam"
 export VALUES_FILE="beam_high_throughput.yaml"
 export PREFILL_CONFIG="beam_high_throughput_prefill.yaml"
 export DECODE_CONFIG="beam_high_throughput_decode.yaml"
@@ -309,8 +316,9 @@ export RELEASE_NAME="$USER-dynamo-a4xmax-beam-high-throughput"
 cd $RECIPE_ROOT
 helm install -f ${VALUES_FILE} \
   --set workload.model=${HF_MODEL_ID} \
-  --set workload.image=${DYNAMO_IMAGE} \
   --set volumes.gcsfuse.bucketName=${GCS_BUCKET} \
+  --set dynamo.namespace=${NAMESPACE} \
+  --set dynamo.nodeSelector."cloud\.google\.com/gke-nodepool"=${NODE_POOL} \
   --set-file prefill_serving_config=$REPO_ROOT/src/frameworks/a4xmax/dynamo-configs/${PREFILL_CONFIG} \
   --set-file decode_serving_config=$REPO_ROOT/src/frameworks/a4xmax/dynamo-configs/${DECODE_CONFIG} \
   ${RELEASE_NAME} \
@@ -473,17 +481,17 @@ kubectl get pods -n ${NAMESPACE}
 
 Frontend logs:
 ```bash
-kubectl logs -f deployment/$USER-dynamo-multi-node-serving-frontend -n ${NAMESPACE}
+kubectl logs -f <frontend-pod-name> -c main -n ${NAMESPACE}
 ```
 
 Decode worker logs:
 ```bash
-kubectl logs -f deployment/$USER-dynamo-multi-node-serving-decode-worker -n ${NAMESPACE}
+kubectl logs -f <decode-worker-pod-name> -c main -n ${NAMESPACE}
 ```
 
 Prefill worker logs:
 ```bash
-kubectl logs -f deployment/$USER-dynamo-multi-node-serving-prefill-worker -n ${NAMESPACE}
+kubectl logs -f <prefill-worker-pod-name> -c main -n ${NAMESPACE}
 ```
 
 Common issues:

@@ -66,6 +66,7 @@ export NGC_API_KEY=<YOUR_NGC_API_KEY>
 export HF_TOKEN=<YOUR_HF_TOKEN>
 export RELEASE_VERSION=1.0.1
 export GCS_BUCKET=<YOUR_GCS_BUCKET>
+export NODE_POOL=<YOUR_GB300_NODE_POOL>
 
 # Set the project for gcloud commands
 gcloud config set project $PROJECT_ID
@@ -81,6 +82,9 @@ Replace the following values:
 | `NGC_API_KEY` | Your NVIDIA NGC API key (get from [NGC](https://ngc.nvidia.com)) | `nvapi-xxx...` |
 | `HF_TOKEN` | Your Hugging Face access token | `hf_xxx...` |
 | `GCS_BUCKET` | Your GCS bucket name (without `gs://` prefix for Helm `bucketName`) | `my-model-bucket` |
+| `NODE_POOL` | The GB300 node pool to run every worker in. All workers must share one NVLink domain | `a4xmax-np-1` |
+
+The Helm chart deploys into `dynamo.namespace` from the values file (`dynamo-cloud`). The install commands below pass `--set dynamo.namespace=${NAMESPACE}` so the release follows `NAMESPACE`. Resource names (ComputeDomain, deployment, `bench-client`) are fixed, so use a separate namespace for each release that runs at the same time.
 
 <a name="connect-cluster"></a>
 ### 2.3. Connect to your GKE Cluster
@@ -117,7 +121,7 @@ kubectl create secret generic hf-token-secret \
 <a name="install-platform"></a>
 ### 2.5. Install Dynamo Platform (One-Time Setup)
 
-Skip this step if the Dynamo Platform is already installed in `${NAMESPACE}`.
+Skip this step if the Dynamo Platform is already installed in the cluster. The operator watches all namespaces, and its CRDs are cluster-scoped, so don't install a second, older platform release on a shared cluster. This recipe was reproduced on an existing `dynamo-platform` `1.4.2` install.
 
 Add the NVIDIA Helm repository:
 ```bash
@@ -181,11 +185,7 @@ The workers load the target model from `/data/model/<HF_MODEL_ID>`. If you stage
 <a name="configure-dynamo-image"></a>
 ### 2.7. Configure Dynamo Image
 
-This recipe uses a model-specific SGLang runtime image that includes Dynamo `1.0.1` and SGLang support for the model:
-
-```bash
-export DYNAMO_IMAGE="lmsysorg/sglang:beam"
-```
+The runtime image comes from the Helm values file (`workload.image` and `dynamo.frontend.image`). To use a different image, add `--set workload.image=<IMAGE>` to `helm install`.
 
 The chart sets `runtimeVersionOverride` to `dynamo.releaseVersion` (`1.0.1`) because the Dynamo operator can't infer the runtime version from a custom image tag.
 
@@ -225,8 +225,9 @@ export RELEASE_NAME="$USER-dynamo-a4xmax-beam-high-int"
 cd $RECIPE_ROOT
 helm install -f ${VALUES_FILE} \
   --set workload.model=${HF_MODEL_ID} \
-  --set workload.image=${DYNAMO_IMAGE} \
   --set volumes.gcsfuse.bucketName=${GCS_BUCKET} \
+  --set dynamo.namespace=${NAMESPACE} \
+  --set dynamo.nodeSelector."cloud\.google\.com/gke-nodepool"=${NODE_POOL} \
   --set-file decode_serving_config=$REPO_ROOT/src/frameworks/a4xmax/dynamo-configs/${SERVING_CONFIG} \
   ${RELEASE_NAME} \
   $REPO_ROOT/src/helm-charts/a4xmax/inference-templates/dynamo-deployment
