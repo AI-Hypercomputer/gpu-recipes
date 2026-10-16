@@ -1,0 +1,347 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+{{- $routerEnabled := .Values.llmd.router.enabled -}}
+{{- if hasKey .Values "router" -}}
+  {{- if hasKey .Values.router "enabled" -}}
+    {{- $routerEnabled = .Values.router.enabled -}}
+  {{- end -}}
+{{- end -}}
+{{- $vllmEnabled := true -}}
+{{- if hasKey .Values "vllm" -}}
+  {{- if hasKey .Values.vllm "enabled" -}}
+    {{- $vllmEnabled = .Values.vllm.enabled -}}
+  {{- end -}}
+{{- end -}}
+{{- $modelName := "reflection/Beam-1.0-501B-A23B-NVFP4" -}}
+{{- $drafterName := "reflection/Beam-1.0-501B-A23B-DFlash2" -}}
+{{- $maxModelLen := 1048576 -}}
+{{- if kindIs "map" .Values.workload.model -}}
+  {{- $modelName = .Values.workload.model.name | default $modelName -}}
+  {{- $drafterName = .Values.workload.model.drafterName | default $drafterName -}}
+  {{- $maxModelLen = .Values.workload.model.maxModelLen | default $maxModelLen -}}
+{{- else if .Values.workload.model -}}
+  {{- $modelName = .Values.workload.model -}}
+{{- end -}}
+{{- if .Values.workload.drafterModel -}}
+  {{- $drafterName = .Values.workload.drafterModel -}}
+{{- end -}}
+{{- $ns := .Release.Namespace -}}
+{{- if $routerEnabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Release.Name }}-epp-config"
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/name: llm-d-inference
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+    app.kubernetes.io/component: router
+data:
+  plugins-config.yaml: |-
+{{- if .Values.epp_config }}
+{{ .Values.epp_config | nindent 4 }}
+{{- else }}
+    apiVersion: llm-d.ai/v1alpha1
+    kind: EndpointPickerConfig
+    featureGates:
+    - flowControl
+    plugins:
+    - name: program-aware-fairness
+      type: program-aware-fairness
+      parameters:
+        strategy: turn-priority
+    - name: token-producer
+      type: token-producer
+      parameters:
+        modelName: {{ $modelName | quote }}
+        vllm:
+          url: {{ .Values.llmd.router.tokenProducerUrl | default (printf "http://%s-backends.%s.svc.cluster.local:%v" .Release.Name $ns (.Values.service.ports.tokenProducer | default 6100)) | quote }}
+    - name: endpoint-notification-source
+      type: endpoint-notification-source
+    - name: precise-prefix-cache-producer
+      type: precise-prefix-cache-producer
+      parameters:
+        tokenProcessorConfig:
+          blockSizeTokens: 64
+        kvEventsConfig:
+          topicFilter: "kv@"
+          concurrency: 8
+          discoverPods: true
+          podDiscoveryConfig:
+            socketPort: {{ .Values.service.ports.vllmZmq | default 5556 }}
+            replaySocketPort: {{ .Values.service.ports.vllmZmqReplay | default 5559 }}
+        indexerConfig:
+          kvBlockIndexConfig:
+            enableMetrics: true
+            inMemoryConfig:
+              podCacheSize: 128
+          kvCacheBackendConfigs:
+          - name: gpu
+            weight: 1.0
+          - name: cpu
+            weight: 0.4
+        speculativeIndexing: true
+    - name: inflight-load-producer
+      type: inflight-load-producer
+      parameters:
+        prefixMatchInfoProducerName: precise-prefix-cache-producer
+    - name: prefix-cache-affinity-filter
+      type: prefix-cache-affinity-filter
+      parameters:
+        peakPrefillThroughput: 16444
+        inFlightLoadProducerName: inflight-load-producer
+        prefixMatchInfoProducerName: precise-prefix-cache-producer
+        affinityThreshold: 0.75
+    - name: utilization-detector
+      type: utilization-detector
+      parameters:
+        queueDepthThreshold: {{ .Values.llmd.router.queueDepthThreshold | default 6 }}
+        kvCacheUtilThreshold: {{ .Values.llmd.router.kvCacheUtilThreshold | default 0.80 }}
+    - name: token-load-scorer
+      type: token-load-scorer
+    schedulingProfiles:
+    - name: default
+      plugins:
+      - pluginRef: prefix-cache-affinity-filter
+      - pluginRef: utilization-detector
+      - pluginRef: token-load-scorer
+    dataLayer:
+      sources:
+      - pluginRef: endpoint-notification-source
+        extractors:
+        - pluginRef: precise-prefix-cache-producer
+    flowControl:
+      maxBytes: "10Gi"
+      maxRequests: "1k"
+      defaultRequestTTL: "1800s"
+      saturationDetector:
+        pluginRef: utilization-detector
+      defaultPriorityBand:
+        fairnessPolicyRef: program-aware-fairness
+{{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Release.Name }}-envoy-config"
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/name: llm-d-inference
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+    app.kubernetes.io/component: router
+data:
+  envoy.yaml: |-
+    static_resources:
+      listeners:
+      - name: envoy-proxy-ready
+        address:
+          socket_address:
+            address: 0.0.0.0
+            port_value: 19001
+        filter_chains:
+        - filters:
+          - name: envoy.filters.network.http_connection_manager
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+              stat_prefix: envoy-ready-http
+              route_config:
+                name: local_route
+                virtual_hosts:
+                - name: ready_host
+                  domains: ["*"]
+                  routes:
+                  - match:
+                      prefix: "/ready"
+                    direct_response:
+                      status: 200
+                      body:
+                        inline_string: "OK"
+              http_filters:
+              - name: envoy.filters.http.router
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+      - name: vllm
+        address:
+          socket_address:
+            address: 0.0.0.0
+            port_value: {{ .Values.service.ports.envoyHttp | default 8081 }}
+        filter_chains:
+        - filters:
+          - name: envoy.filters.network.http_connection_manager
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+              stat_prefix: http-8081
+              stream_idle_timeout: 3600s
+              route_config:
+                name: vllm
+                virtual_hosts:
+                - name: vllm-default
+                  domains: ["*"]
+                  routes:
+                  - match:
+                      prefix: "/metrics"
+                    route:
+                      cluster: model_server_service_cluster
+                    typed_per_filter_config:
+                      envoy.filters.http.ext_proc:
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                        disabled: true
+                  - match:
+                      prefix: "/ping"
+                    route:
+                      cluster: model_server_service_cluster
+                    typed_per_filter_config:
+                      envoy.filters.http.ext_proc:
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                        disabled: true
+                  - match:
+                      prefix: "/health"
+                    route:
+                      cluster: model_server_service_cluster
+                    typed_per_filter_config:
+                      envoy.filters.http.ext_proc:
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                        disabled: true
+                  - match:
+                      prefix: "/v1/models"
+                    route:
+                      cluster: model_server_service_cluster
+                    typed_per_filter_config:
+                      envoy.filters.http.ext_proc:
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                        disabled: true
+                  - match:
+                      prefix: "/version"
+                    route:
+                      cluster: model_server_service_cluster
+                    typed_per_filter_config:
+                      envoy.filters.http.ext_proc:
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                        disabled: true
+                  - match:
+                      prefix: "/"
+                    route:
+                      cluster: original_destination_cluster
+                      timeout: 86400s
+              http_filters:
+              - name: envoy.filters.http.ext_proc
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
+                  failure_mode_allow: false
+                  grpc_service:
+                    envoy_grpc:
+                      cluster_name: ext_proc
+                      authority: localhost:9002
+                    timeout: 86400s
+                  processing_mode:
+                    request_header_mode: SEND
+                    response_header_mode: SEND
+                    request_body_mode: FULL_DUPLEX_STREAMED
+                    response_body_mode: FULL_DUPLEX_STREAMED
+                    request_trailer_mode: SEND
+                    response_trailer_mode: SEND
+                  message_timeout: 1000s
+              - name: envoy.filters.http.router
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+      clusters:
+      - name: model_server_service_cluster
+        type: STRICT_DNS
+        connect_timeout: 5s
+        lb_policy: ROUND_ROBIN
+        load_assignment:
+          cluster_name: model_server_service_cluster
+          endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: "{{ .Release.Name }}-backends.{{ $ns }}.svc.cluster.local"
+                    port_value: {{ .Values.service.ports.vllmHttp | default 8000 }}
+      - name: original_destination_cluster
+        type: ORIGINAL_DST
+        connect_timeout: 1000s
+        lb_policy: CLUSTER_PROVIDED
+        original_dst_lb_config:
+          use_http_header: true
+          http_header_name: x-gateway-destination-endpoint
+      - name: ext_proc
+        type: STATIC
+        connect_timeout: 86400s
+        lb_policy: LEAST_REQUEST
+        transport_socket:
+          name: "envoy.transport_sockets.tls"
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+            common_tls_context:
+              alpn_protocols: ["h2"]
+              validation_context: {}
+        typed_extension_protocol_options:
+          envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+            "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+            explicit_http_config:
+              http2_protocol_options: {}
+        load_assignment:
+          cluster_name: ext_proc
+          endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: {{ .Values.service.ports.eppGrpc | default 9002 }}
+{{- end }}
+---
+{{- if and $vllmEnabled (gt (int .Values.workload.replicas) 0) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Release.Name }}-vllm-config"
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/name: llm-d-inference
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
+    app.kubernetes.io/component: model-server
+data:
+  {{ .Values.workload.configFile | default "serving-configuration" }}: |-
+{{- if .Values.vllm_serving_config }}
+{{ .Values.vllm_serving_config | nindent 4 }}
+{{- else }}
+    host: "0.0.0.0"
+    port: "{{ .Values.service.ports.vllmHttp | default 8000 }}"
+    tensor-parallel-size: "{{ .Values.workload.gpusPerReplica | default 4 }}"
+    enable-expert-parallel: true
+    trust-remote-code: true
+    max-model-len: "{{ $maxModelLen }}"
+    gpu-memory-utilization: "0.90"
+    kv-cache-dtype: "fp8"
+    block-size: "64"
+    max-num-batched-tokens: "16384"
+    max-num-seqs: "16"
+    speculative-config: '{"method":"dflash","model":"${DRAFTER_MODEL_ID}","num_speculative_tokens":8,"draft_tensor_parallel_size":{{ .Values.workload.gpusPerReplica | default 4 }}}'
+    compilation-config: '{"cudagraph_capture_sizes":[1,2,4,8,16,32,48,64,96,128,192,256,384,512,640,768,896,1024,1152],"cudagraph_mode":"FULL_AND_PIECEWISE","pass_config":{"fuse_allreduce_rms":false}}'
+    enable-prefix-caching: true
+    no-disable-hybrid-kv-cache-manager: true
+    swa-bounded-replay: true
+    enable-auto-tool-choice: true
+    tool-call-parser: "beam"
+    reasoning-parser: "beam"
+    default-chat-template-kwargs: '{"allow_missing_thinking":true,"reasoning_effort":"max"}'
+    override-generation-config: '{"temperature":1.0,"top_k":40,"top_p":0.95}'
+    moe-backend: "flashinfer_cutlass"
+    kv-transfer-config: '{"kv_connector":"OffloadingConnector","kv_role":"kv_both","engine_id":"w1_0","kv_connector_extra_config":{"spec_name":"CPUOffloadingSpec","cpu_bytes_to_use":68719476736,"blocks_per_chunk":16,"offload_prompt_only":true}}'
+    kv-events-config: '{"enable_kv_cache_events":true,"publisher":"zmq","endpoint":"tcp://*:${ZMQ_PUB_PORT}","replay_endpoint":"tcp://*:${ZMQ_REPLAY_PORT}","topic":"kv@${POD_IP}:${VLLM_HTTP_PORT}@${SERVED_MODEL_NAME}"}'
+{{- end }}
+{{- end }}

@@ -24,14 +24,39 @@ spec:
   services:
     Frontend:
       dynamoNamespace: {{ .Values.dynamo.namespace }}
+      runtimeVersionOverride: {{ .Values.dynamo.releaseVersion | default "1.0.1" | quote }}
       componentType: frontend
       replicas: {{ .Values.dynamo.frontend.replicas }}
+      {{- if .Values.dynamo.frontend.envs }}
+      envs:
+      {{- toYaml .Values.dynamo.frontend.envs | nindent 8 }}
+      {{- end }}
+      {{- if .Values.dynamo.frontend.livenessProbe }}
+      livenessProbe:
+        httpGet:
+          path: /live
+          port: 8000
+        initialDelaySeconds: {{ .Values.dynamo.frontend.livenessProbe.initialDelaySeconds }}
+        periodSeconds: {{ .Values.dynamo.frontend.livenessProbe.periodSeconds }}
+        timeoutSeconds: {{ .Values.dynamo.frontend.livenessProbe.timeoutSeconds }}
+        failureThreshold: {{ .Values.dynamo.frontend.livenessProbe.failureThreshold }}
+      {{- end }}
+      {{- if .Values.dynamo.frontend.readinessProbe }}
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: 8000
+        initialDelaySeconds: {{ .Values.dynamo.frontend.readinessProbe.initialDelaySeconds }}
+        periodSeconds: {{ .Values.dynamo.frontend.readinessProbe.periodSeconds }}
+        timeoutSeconds: {{ .Values.dynamo.frontend.readinessProbe.timeoutSeconds }}
+        failureThreshold: {{ .Values.dynamo.frontend.readinessProbe.failureThreshold }}
+      {{- end }}
       resources:
         requests:
-          cpu: "5"
+          cpu: "16"
           memory: "50Gi"
         limits:
-          cpu: "5"
+          cpu: "16"
           memory: "50Gi"
       extraPodMetadata:
         annotations:
@@ -44,6 +69,12 @@ spec:
           gke-gcsfuse/cache-path: "/gcs-cache"
           {{- end }}
       extraPodSpec:
+        automountServiceAccountToken: true
+        {{- if .Values.dynamo.serviceAccountName }}
+        serviceAccountName: {{ .Values.dynamo.serviceAccountName }}
+        {{- end }}
+        nodeSelector:
+          kubernetes.io/arch: arm64
         tolerations:
         - key: "kubernetes.io/arch"
           operator: "Equal"
@@ -54,7 +85,9 @@ spec:
           effect: "NoSchedule"
         volumes:
         - name: local-ssd
-          emptyDir: {}
+          hostPath:
+            path: /mnt/disks/gke-local-ssd/gcsfuse-cache
+            type: DirectoryOrCreate
         {{- if eq .Values.volumes.useGcs true }}
         - name: gcs-model-volume
           csi:
@@ -64,6 +97,9 @@ spec:
               mountOptions: "implicit-dirs,file-cache:enable-parallel-downloads:true,file-cache:parallel-downloads-per-file:100,file-cache:max-parallel-downloads:-1,file-cache:download-chunk-size-mb:50,file-cache:max-size-mb:-1"
         {{- end }}
         mainContainer:
+          securityContext:
+            privileged: true
+            runAsUser: 0
           image: {{ .Values.dynamo.frontend.image }}
           {{- if eq .Values.volumes.useGcs true }}
           volumeMounts:
@@ -85,9 +121,12 @@ spec:
         nodeCount:  {{ .Values.dynamo.decodeWorker.nodeCount }}
       {{- end }}
       dynamoNamespace: {{ .Values.dynamo.namespace }}
+      runtimeVersionOverride: {{ .Values.dynamo.releaseVersion | default "1.0.1" | quote }}
       envFromSecret: {{ .Values.secrets.huggingface.secretName }}
       componentType: worker
+      {{- if gt (int .Values.dynamo.prefillWorker.replicas) 0 }}
       subComponentType: decode
+      {{- end }}
       replicas: {{ .Values.dynamo.decodeWorker.replicas }}
       livenessProbe:
         httpGet:
@@ -112,14 +151,20 @@ spec:
           gpu: "4"
         claims:
           - name: compute-domain-channel
+          {{- if (.Values.dynamo.rdma).claimTemplateName }}
           - name: rdma
+          {{- end }}
       envs:
         - name: SERVER_ARGS_FILE
           value: {{ .Values.workload.configPath }}/{{ .Values.workload.configFile }}
         {{- if eq .Values.volumes.useGcs true }}
         - name: MODEL_PATH
-          value: {{ .Values.volumes.gcsMounts.mountPath }}/{{ .Values.workload.model }}
+          value: {{ .Values.workload.modelPath | default (printf "%s/%s" .Values.volumes.gcsMounts.mountPath .Values.workload.model) }}
         {{- end }}
+        - name: POD_UID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.uid
         {{- if .Values.dynamo.decodeWorker.envs }}
         {{- toYaml .Values.dynamo.decodeWorker.envs | nindent 8 }}
         {{- end }}
@@ -132,14 +177,21 @@ spec:
           gke-gcsfuse/volumes: "true"
           {{- end }}
       extraPodSpec:
+        {{- if not (.Values.dynamo.rdma).claimTemplateName }}
+        hostNetwork: true
+        dnsPolicy: ClusterFirstWithHostNet
+        {{- end }}
+        automountServiceAccountToken: true
         {{- if .Values.dynamo.serviceAccountName }}
         serviceAccountName: {{ .Values.dynamo.serviceAccountName }}
         {{- end }}
         resourceClaims:
           - name: compute-domain-channel
             resourceClaimTemplateName: {{ .Values.dynamo.computeDomain.resourceClaimTemplateName }}
+          {{- if (.Values.dynamo.rdma).claimTemplateName }}
           - name: rdma
-            resourceClaimTemplateName: all-mrdma
+            resourceClaimTemplateName: {{ .Values.dynamo.rdma.claimTemplateName }}
+          {{- end }}
         tolerations:
           - key: "kubernetes.io/arch"
             operator: "Equal"
@@ -157,14 +209,28 @@ spec:
                   operator: In
                   values:
                   - arm64
+          podAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  labelSelector:
+                    matchExpressions:
+                      - key: nvidia.com/dynamo-component-type
+                        operator: In
+                        values: ["worker"]
+                  topologyKey: cloud.google.com/gce-topology-subblock
+        nodeSelector:
+          cloud.google.com/gke-accelerator: nvidia-gb300
+          cloud.google.com/gke-gpu: "true"
+          kubernetes.io/arch: arm64
         mainContainer:
           securityContext:
-              privileged: true
-              runAsUser: 0
-              capabilities:
-                add: ["IPC_LOCK"]
+            privileged: true
+            runAsUser: 0
+            capabilities:
+              add: ["IPC_LOCK"]
           image: {{ .Values.workload.image }}
-          workingDir: /sgl-workspace/dynamo/components/backends/sglang
+          workingDir: /tmp
           startupProbe:
             failureThreshold: {{ .Values.dynamo.decodeWorker.startupProbe.failureThreshold }}
             httpGet:
@@ -179,13 +245,32 @@ spec:
           args:
           - |
             set -e
+            echo "precedence ::ffff:0:0/96  100" >> /etc/gai.conf 2>/dev/null || true
             nvidia-smi
             export TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
             echo "Using ptxas: $TRITON_PTXAS_PATH"
+            [ -f /usr/local/gib/scripts/set_nccl_env.sh ] && . /usr/local/gib/scripts/set_nccl_env.sh || true
+            export NCCL_SOCKET_IFNAME=${NCCL_SOCKET_IFNAME:-eth0}
+            export NCCL_IB_DISABLE=${NCCL_IB_DISABLE:-1}
+            export NCCL_CROSS_NIC=${NCCL_CROSS_NIC:-1}
+            export NCCL_NET_GDR_LEVEL=${NCCL_NET_GDR_LEVEL:-PIX}
+            export GLOO_SOCKET_IFNAME=${GLOO_SOCKET_IFNAME:-eth0}
+            export TP_SOCKET_IFNAME=${TP_SOCKET_IFNAME:-eth0}
+            export NCCL_DEBUG=${NCCL_DEBUG:-INFO}
+            export SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE=${SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE:-100000}
+            export SGLANG_DISAGGREGATION_HEARTBEAT_INTERVAL=${SGLANG_DISAGGREGATION_HEARTBEAT_INTERVAL:-10.0}
+            export SGLANG_DISAGGREGATION_QUEUE_SIZE=${SGLANG_DISAGGREGATION_QUEUE_SIZE:-1024}
+            export SGLANG_DISAGGREGATION_THREAD_POOL_SIZE=${SGLANG_DISAGGREGATION_THREAD_POOL_SIZE:-1024}
+            export SGLANG_MOONCAKE_CUSTOM_MEM_POOL=${SGLANG_MOONCAKE_CUSTOM_MEM_POOL:-NVLINK}
+            export MOONCAKE_PROTOCOL=${MOONCAKE_PROTOCOL:-tcp}
+            if [ "${MC_FORCE_MNNVL:-}" = "0" ] || [ "${MC_FORCE_MNNVL:-}" = "false" ]; then
+              unset MC_FORCE_MNNVL
+            fi
 
             echo "--- VERIFYING NCCL ENV VARS IN SHELL ---"
             env | grep NCCL_
             echo "--- END VERIFICATION ---"
+            pip install hf_transfer --break-system-packages || true
 
             ARGS=()
             if [ -n "$MODEL_PATH" ]; then
@@ -200,15 +285,23 @@ spec:
               while IFS=': ' read -r key value || [ -n "$key" ]; do
                 [[ -z "$key" || "$key" == \#* ]] && continue
                 key=$(echo "$key" | xargs)
-                value=$(echo "$value" | xargs)
+                value=$(echo "$value" | sed -e 's/^[[:space:]'\''"]*//' -e 's/[[:space:]'\''"]*$//')
 
                 if [ -n "$key" ]; then
                   if [[ "$value" == "true" ]]; then
                     ARGS+=("--$key")
                   elif [[ "$value" == "false" ]]; then
-                    ARGS+=("--$key" "false")
+                    :
                   elif [ -n "$value" ]; then
-                    ARGS+=("--$key" "$value")
+                    if [[ "$value" =~ ^\[.*\]$ ]]; then
+                      clean_value=$(echo "$value" | tr -d '[],')
+                      ARGS+=("--$key")
+                      for val in $clean_value; do
+                        ARGS+=("$val")
+                      done
+                    else
+                      ARGS+=("--$key" "$value")
+                    fi
                   else
                     ARGS+=("--$key")
                   fi
@@ -226,6 +319,8 @@ spec:
           {{- end }}
             - name: library-dir-host
               mountPath: /usr/local/nvidia
+            - name: gib
+              mountPath: /usr/local/gib
             - name: serving-configuration
               mountPath: {{ .Values.workload.configPath | default "/workload/configs" }}
         volumes:
@@ -236,10 +331,15 @@ spec:
             volumeAttributes:
               bucketName: {{ .Values.volumes.gcsfuse.bucketName }}
               mountOptions: implicit-dirs,file-cache:enable-parallel-downloads:true,file-cache:parallel-downloads-per-file:100,file-cache:max-parallel-downloads:-1,file-cache:download-chunk-size-mb:10,file-cache:max-size-mb:-1
+              fileCachePath: "/ssd/gcsfuse-cache"
+              fileCacheCapacityInBytes: "150000000000"
         {{- end }}
         - name: library-dir-host
           hostPath:
             path: /home/kubernetes/bin/nvidia
+        - name: gib
+          hostPath:
+            path: /home/kubernetes/bin/gib
         - name: serving-configuration
           configMap:
             name: "{{ .Release.Name }}-decode-config"
@@ -247,12 +347,14 @@ spec:
             - key: serving-configuration
               path: {{ .Values.workload.configFile | default "serving-args.yaml" }}
 
+    {{- if gt (int .Values.dynamo.prefillWorker.replicas) 0 }}
     Prefill:
       {{- if gt (int .Values.dynamo.prefillWorker.nodeCount) 1 }}
       multinode:
           nodeCount: {{ .Values.dynamo.prefillWorker.nodeCount }}
       {{- end }}
       dynamoNamespace: {{ .Values.dynamo.namespace }}
+      runtimeVersionOverride: {{ .Values.dynamo.releaseVersion | default "1.0.1" | quote }}
       envFromSecret: {{ .Values.secrets.huggingface.secretName }}
       componentType: worker
       subComponentType: prefill
@@ -282,14 +384,20 @@ spec:
           gpu: "4"
         claims:
           - name: compute-domain-channel
+          {{- if (.Values.dynamo.rdma).claimTemplateName }}
           - name: rdma
+          {{- end }}
       envs:
         - name: SERVER_ARGS_FILE
           value: {{ .Values.workload.configPath }}/{{ .Values.workload.configFile }}
         {{- if eq .Values.volumes.useGcs true }}
         - name: MODEL_PATH
-          value: {{ .Values.volumes.gcsMounts.mountPath }}/{{ .Values.workload.model }}
+          value: {{ .Values.workload.modelPath | default (printf "%s/%s" .Values.volumes.gcsMounts.mountPath .Values.workload.model) }}
         {{- end }}
+        - name: POD_UID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.uid
         {{- if .Values.dynamo.prefillWorker.envs }}
         {{- toYaml .Values.dynamo.prefillWorker.envs | nindent 8 }}
         {{- end }}
@@ -302,14 +410,21 @@ spec:
           gke-gcsfuse/volumes: "true"
           {{- end }}
       extraPodSpec:
+        {{- if not (.Values.dynamo.rdma).claimTemplateName }}
+        hostNetwork: true
+        dnsPolicy: ClusterFirstWithHostNet
+        {{- end }}
+        automountServiceAccountToken: true
         {{- if .Values.dynamo.serviceAccountName }}
         serviceAccountName: {{ .Values.dynamo.serviceAccountName }}
         {{- end }}
         resourceClaims:
           - name: compute-domain-channel
             resourceClaimTemplateName: {{ .Values.dynamo.computeDomain.resourceClaimTemplateName }}
+          {{- if (.Values.dynamo.rdma).claimTemplateName }}
           - name: rdma
-            resourceClaimTemplateName: all-mrdma
+            resourceClaimTemplateName: {{ .Values.dynamo.rdma.claimTemplateName }}
+          {{- end }}
         tolerations:
           - key: "kubernetes.io/arch"
             operator: "Equal"
@@ -327,16 +442,30 @@ spec:
                   operator: In
                   values:
                   - arm64
+          podAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  labelSelector:
+                    matchExpressions:
+                      - key: nvidia.com/dynamo-component-type
+                        operator: In
+                        values: ["worker"]
+                  topologyKey: cloud.google.com/gce-topology-subblock
+        nodeSelector:
+          cloud.google.com/gke-accelerator: nvidia-gb300
+          cloud.google.com/gke-gpu: "true"
+          kubernetes.io/arch: arm64
         mainContainer:
           securityContext:
-              privileged: true
-              runAsUser: 0
-              capabilities:
-                add: ["IPC_LOCK"]
+            privileged: true
+            runAsUser: 0
+            capabilities:
+              add: ["IPC_LOCK"]
           stdin: true
           tty: true
           image: {{ .Values.workload.image }}
-          workingDir: /sgl-workspace/dynamo/components/backends/sglang
+          workingDir: /tmp
           startupProbe:
             failureThreshold: {{ .Values.dynamo.prefillWorker.startupProbe.failureThreshold }}
             httpGet:
@@ -349,13 +478,32 @@ spec:
           args:
           - |
             set -e
+            echo "precedence ::ffff:0:0/96  100" >> /etc/gai.conf 2>/dev/null || true
             nvidia-smi
             export TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
             echo "Using ptxas: $TRITON_PTXAS_PATH"
+            [ -f /usr/local/gib/scripts/set_nccl_env.sh ] && . /usr/local/gib/scripts/set_nccl_env.sh || true
+            export NCCL_SOCKET_IFNAME=${NCCL_SOCKET_IFNAME:-eth0}
+            export NCCL_IB_DISABLE=${NCCL_IB_DISABLE:-1}
+            export NCCL_CROSS_NIC=${NCCL_CROSS_NIC:-1}
+            export NCCL_NET_GDR_LEVEL=${NCCL_NET_GDR_LEVEL:-PIX}
+            export GLOO_SOCKET_IFNAME=${GLOO_SOCKET_IFNAME:-eth0}
+            export TP_SOCKET_IFNAME=${TP_SOCKET_IFNAME:-eth0}
+            export NCCL_DEBUG=${NCCL_DEBUG:-INFO}
+            export SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE=${SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE:-100000}
+            export SGLANG_DISAGGREGATION_HEARTBEAT_INTERVAL=${SGLANG_DISAGGREGATION_HEARTBEAT_INTERVAL:-10.0}
+            export SGLANG_DISAGGREGATION_QUEUE_SIZE=${SGLANG_DISAGGREGATION_QUEUE_SIZE:-1024}
+            export SGLANG_DISAGGREGATION_THREAD_POOL_SIZE=${SGLANG_DISAGGREGATION_THREAD_POOL_SIZE:-1024}
+            export SGLANG_MOONCAKE_CUSTOM_MEM_POOL=${SGLANG_MOONCAKE_CUSTOM_MEM_POOL:-NVLINK}
+            export MOONCAKE_PROTOCOL=${MOONCAKE_PROTOCOL:-tcp}
+            if [ "${MC_FORCE_MNNVL:-}" = "0" ] || [ "${MC_FORCE_MNNVL:-}" = "false" ]; then
+              unset MC_FORCE_MNNVL
+            fi
 
             echo "--- VERIFYING NCCL ENV VARS IN SHELL ---"
             env | grep NCCL_
             echo "--- END VERIFICATION ---"
+            pip install hf_transfer --break-system-packages || true
 
             ARGS=()
             if [ -n "$MODEL_PATH" ]; then
@@ -370,15 +518,23 @@ spec:
               while IFS=': ' read -r key value || [ -n "$key" ]; do
                 [[ -z "$key" || "$key" == \#* ]] && continue
                 key=$(echo "$key" | xargs)
-                value=$(echo "$value" | xargs)
+                value=$(echo "$value" | sed -e 's/^[[:space:]'\''"]*//' -e 's/[[:space:]'\''"]*$//')
 
                 if [ -n "$key" ]; then
                   if [[ "$value" == "true" ]]; then
                     ARGS+=("--$key")
                   elif [[ "$value" == "false" ]]; then
-                    ARGS+=("--$key" "false")
+                    :
                   elif [ -n "$value" ]; then
-                    ARGS+=("--$key" "$value")
+                    if [[ "$value" =~ ^\[.*\]$ ]]; then
+                      clean_value=$(echo "$value" | tr -d '[],')
+                      ARGS+=("--$key")
+                      for val in $clean_value; do
+                        ARGS+=("$val")
+                      done
+                    else
+                      ARGS+=("--$key" "$value")
+                    fi
                   else
                     ARGS+=("--$key")
                   fi
@@ -396,6 +552,8 @@ spec:
           {{- end }}
             - name: library-dir-host
               mountPath: /usr/local/nvidia
+            - name: gib
+              mountPath: /usr/local/gib
             - name: serving-configuration
               mountPath: {{ .Values.workload.configPath | default "/workload/configs" }}
         volumes:
@@ -406,13 +564,19 @@ spec:
             volumeAttributes:
               bucketName: {{ .Values.volumes.gcsfuse.bucketName }}
               mountOptions: implicit-dirs,file-cache:enable-parallel-downloads:true,file-cache:parallel-downloads-per-file:100,file-cache:max-parallel-downloads:-1,file-cache:download-chunk-size-mb:10,file-cache:max-size-mb:-1
+              fileCachePath: "/ssd/gcsfuse-cache"
+              fileCacheCapacityInBytes: "150000000000"
         {{- end }}
         - name: library-dir-host
           hostPath:
             path: /home/kubernetes/bin/nvidia
+        - name: gib
+          hostPath:
+            path: /home/kubernetes/bin/gib
         - name: serving-configuration
           configMap:
             name: "{{ .Release.Name }}-prefill-config"
             items:
             - key: serving-configuration
               path: {{ .Values.workload.configFile | default "serving-args.yaml" }}
+    {{- end }}

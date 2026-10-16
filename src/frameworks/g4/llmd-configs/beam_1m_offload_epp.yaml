@@ -1,0 +1,91 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: llm-d.ai/v1alpha1
+kind: EndpointPickerConfig
+featureGates:
+- flowControl
+plugins:
+- name: program-aware-fairness
+  type: program-aware-fairness
+  parameters:
+    strategy: turn-priority
+- name: token-producer
+  type: token-producer
+  parameters:
+    modelName: "reflection/Beam-1.0-501B-A23B-NVFP4"
+    vllm:
+      url: "http://llmd-inference-backends:6100"
+- name: endpoint-notification-source
+  type: endpoint-notification-source
+- name: precise-prefix-cache-producer
+  type: precise-prefix-cache-producer
+  parameters:
+    tokenProcessorConfig:
+      blockSizeTokens: 64
+    kvEventsConfig:
+      topicFilter: "kv@"
+      concurrency: 8
+      discoverPods: true
+      podDiscoveryConfig:
+        socketPort: 5556
+        replaySocketPort: 5559
+    indexerConfig:
+      kvBlockIndexConfig:
+        enableMetrics: true
+        inMemoryConfig:
+          podCacheSize: 128
+      kvCacheBackendConfigs:
+      - name: gpu
+        weight: 1.0
+      - name: cpu
+        weight: 0.4
+    speculativeIndexing: true
+- name: inflight-load-producer
+  type: inflight-load-producer
+  parameters:
+    prefixMatchInfoProducerName: precise-prefix-cache-producer
+- name: prefix-cache-affinity-filter
+  type: prefix-cache-affinity-filter
+  parameters:
+    peakPrefillThroughput: 16444
+    inFlightLoadProducerName: inflight-load-producer
+    prefixMatchInfoProducerName: precise-prefix-cache-producer
+    affinityThreshold: 0.75
+- name: utilization-detector
+  type: utilization-detector
+  parameters:
+    queueDepthThreshold: 6
+    kvCacheUtilThreshold: 0.80
+- name: token-load-scorer
+  type: token-load-scorer
+schedulingProfiles:
+- name: default
+  plugins:
+  - pluginRef: prefix-cache-affinity-filter
+  - pluginRef: utilization-detector
+  - pluginRef: token-load-scorer
+dataLayer:
+  sources:
+  - pluginRef: endpoint-notification-source
+    extractors:
+    - pluginRef: precise-prefix-cache-producer
+flowControl:
+  maxBytes: "10Gi"
+  maxRequests: "1k"
+  defaultRequestTTL: "1800s"
+  saturationDetector:
+    pluginRef: utilization-detector
+  defaultPriorityBand:
+    fairnessPolicyRef: program-aware-fairness

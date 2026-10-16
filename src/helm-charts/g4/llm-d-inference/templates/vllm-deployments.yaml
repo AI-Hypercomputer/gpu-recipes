@@ -1,0 +1,319 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+{{- $vllmEnabled := true -}}
+{{- if hasKey .Values "vllm" -}}
+  {{- if hasKey .Values.vllm "enabled" -}}
+    {{- $vllmEnabled = .Values.vllm.enabled -}}
+  {{- end -}}
+{{- end -}}
+{{- $routerEnabled := .Values.llmd.router.enabled -}}
+{{- if hasKey .Values "router" -}}
+  {{- if hasKey .Values.router "enabled" -}}
+    {{- $routerEnabled = .Values.router.enabled -}}
+  {{- end -}}
+{{- end -}}
+{{- $modelName := "reflection/Beam-1.0-501B-A23B-NVFP4" -}}
+{{- $drafterName := "reflection/Beam-1.0-501B-A23B-DFlash2" -}}
+{{- $servedModelName := "" -}}
+{{- $maxModelLen := 1048576 -}}
+{{- if kindIs "map" .Values.workload.model -}}
+  {{- $modelName = .Values.workload.model.name | default $modelName -}}
+  {{- $drafterName = .Values.workload.model.drafterName | default $drafterName -}}
+  {{- $servedModelName = .Values.workload.model.servedModelName | default "" -}}
+  {{- $maxModelLen = .Values.workload.model.maxModelLen | default $maxModelLen -}}
+{{- else if .Values.workload.model -}}
+  {{- $modelName = .Values.workload.model -}}
+{{- end -}}
+{{- if .Values.workload.drafterModel -}}
+  {{- $drafterName = .Values.workload.drafterModel -}}
+{{- end -}}
+{{- if .Values.workload.servedModelName -}}
+  {{- $servedModelName = .Values.workload.servedModelName -}}
+{{- end -}}
+{{- $ns := .Release.Namespace -}}
+{{- $root := . -}}
+{{- if and $vllmEnabled (gt (int .Values.workload.replicas) 0) }}
+{{- range $i := until (int .Values.workload.replicas) }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ $root.Release.Name }}-vllm-{{ $i }}"
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/name: llm-d-inference
+    app.kubernetes.io/instance: "{{ $root.Release.Name }}"
+    app.kubernetes.io/component: model-server
+    app.kubernetes.io/part-of: "replica-{{ $i }}"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: llm-d-inference
+      app.kubernetes.io/instance: "{{ $root.Release.Name }}"
+      app.kubernetes.io/component: model-server
+      app.kubernetes.io/part-of: "replica-{{ $i }}"
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: llm-d-inference
+        app.kubernetes.io/instance: "{{ $root.Release.Name }}"
+        app.kubernetes.io/component: model-server
+        app.kubernetes.io/part-of: "replica-{{ $i }}"
+      annotations:
+        {{- if and $root.Values.volumes.useGcs $root.Values.volumes.gcsfuse.bucketName }}
+        gke-gcsfuse/volumes: "true"
+        gke-gcsfuse/cpu-limit: "0"
+        gke-gcsfuse/memory-limit: "0"
+        gke-gcsfuse/ephemeral-storage-limit: "0"
+        {{- end }}
+    spec:
+      {{- with $root.Values.workload.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      {{- if and $root.Values.workload.pinSingleNode (gt $i 0) }}
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: llm-d-inference
+                app.kubernetes.io/instance: "{{ $root.Release.Name }}"
+                app.kubernetes.io/component: model-server
+                app.kubernetes.io/part-of: "replica-0"
+            topologyKey: kubernetes.io/hostname
+      {{- else if not $root.Values.workload.pinSingleNode }}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: llm-d-inference
+                app.kubernetes.io/instance: "{{ $root.Release.Name }}"
+                app.kubernetes.io/component: model-server
+            topologyKey: kubernetes.io/hostname
+      {{- end }}
+      tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "cloud.google.com/impending-node-termination"
+        operator: "Exists"
+      containers:
+      - name: vllm
+        image: {{ $root.Values.workload.image }}
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/bash", "-lc"]
+        args:
+        - |
+          set -euo pipefail
+          unset PYTORCH_CUDA_ALLOC_CONF
+          nvidia-smi
+          {{- if $routerEnabled }}
+          CUDA_VISIBLE_DEVICES="" nohup vllm launch render \
+            "${MODEL_MOUNT_DIR:-${MODEL_ID}}" \
+            --served-model-name "${SERVED_MODEL_NAME}" \
+            --host 0.0.0.0 \
+            --port {{ $root.Values.service.ports.tokenProducer | default 6100 }} \
+            --trust-remote-code \
+            --max-model-len {{ $maxModelLen }} \
+            --enable-auto-tool-choice \
+            --tool-call-parser beam \
+            --reasoning-parser beam \
+            --default-chat-template-kwargs '{"allow_missing_thinking":true,"reasoning_effort":"max"}' > /tmp/vllm-render.log 2>&1 &
+          {{- end }}
+          python3 - << 'PYEOF'
+          import json, os, shutil, sys, yaml
+
+          model_id = os.environ["MODEL_ID"]
+          served_model = os.environ.get("SERVED_MODEL_NAME") or model_id
+          os.environ["SERVED_MODEL_NAME"] = served_model
+
+          mount_dir = os.environ.get("MODEL_MOUNT_DIR", "")
+          if mount_dir and os.path.isdir(mount_dir):
+              model_target = mount_dir
+          else:
+              model_target = model_id
+
+          drafter_mount = os.environ.get("DRAFTER_MOUNT_DIR", "")
+          if drafter_mount and os.path.isdir(drafter_mount):
+              os.environ["DRAFTER_MODEL_ID"] = drafter_mount
+
+          numa_node = os.environ.get("NUMA_NODE", "0")
+          if shutil.which("numactl"):
+              cmd = [
+                  "numactl",
+                  f"--cpunodebind={numa_node}",
+                  f"--membind={numa_node}",
+                  "vllm",
+                  "serve",
+                  model_target,
+                  "--served-model-name",
+                  served_model,
+              ]
+          else:
+              cmd = ["vllm", "serve", model_target, "--served-model-name", served_model]
+
+          cfg_path = os.environ.get("SERVER_ARGS_FILE", "")
+          if cfg_path and os.path.exists(cfg_path):
+              with open(cfg_path, "r") as f:
+                  cfg = yaml.safe_load(f) or {}
+              for k, v in cfg.items():
+                  if k in ("model", "served-model-name") or v is None or v is False:
+                      continue
+                  flag = f"--{k}"
+                  if v is True:
+                      cmd.append(flag)
+                  elif isinstance(v, (dict, list)):
+                      cmd.extend([flag, os.path.expandvars(json.dumps(v))])
+                  else:
+                      cmd.extend([flag, os.path.expandvars(str(v))])
+
+          print("Launching vLLM with NUMA pinning:", " ".join(cmd), flush=True)
+          os.execvp(cmd[0], cmd)
+          PYEOF
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: VLLM_HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: VLLM_HTTP_PORT
+          value: "{{ $root.Values.service.ports.vllmHttp | default 8000 }}"
+        - name: ZMQ_PUB_PORT
+          value: "{{ $root.Values.service.ports.vllmZmq | default 5556 }}"
+        - name: ZMQ_REPLAY_PORT
+          value: "{{ $root.Values.service.ports.vllmZmqReplay | default 5559 }}"
+        - name: CUDA_VISIBLE_DEVICES
+          value: {{ index $root.Values.workload.cudaVisibleDevices $i | quote }}
+        - name: NUMA_NODE
+          value: {{ index $root.Values.workload.numaNodes $i | default "0" | quote }}
+        - name: MODEL_ID
+          value: {{ $modelName | quote }}
+        - name: DRAFTER_MODEL_ID
+          value: {{ $drafterName | quote }}
+        - name: SERVED_MODEL_NAME
+          value: {{ default $modelName $servedModelName | quote }}
+        - name: HF_HOME
+          value: {{ $root.Values.volumes.hfHome | default "/ssd" | quote }}
+        - name: SERVER_ARGS_FILE
+          value: "{{ $root.Values.workload.configPath | default "/workload/configs" }}/{{ $root.Values.workload.configFile | default "serving-configuration" }}"
+        {{- if and $root.Values.volumes.useGcs $root.Values.volumes.gcsfuse.bucketName }}
+        - name: MODEL_MOUNT_DIR
+          value: "{{ $root.Values.volumes.gcsfuse.mountPath | default "/data/model" }}/{{ $modelName }}"
+        - name: DRAFTER_MOUNT_DIR
+          value: "{{ $root.Values.volumes.gcsfuse.mountPath | default "/data/model" }}/{{ $drafterName }}"
+        {{- else if and $root.Values.volumes.pvc $root.Values.volumes.pvc.enabled $root.Values.volumes.pvc.claimName }}
+        - name: MODEL_MOUNT_DIR
+          value: "{{ $root.Values.volumes.pvc.mountPath | default "/models" }}/{{ $modelName }}"
+        - name: DRAFTER_MOUNT_DIR
+          value: "{{ $root.Values.volumes.pvc.mountPath | default "/models" }}/{{ $drafterName }}"
+        {{- end }}
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ $root.Values.secrets.huggingface.secretName }}
+              key: {{ $root.Values.secrets.huggingface.secretKey | default "HF_TOKEN" }}
+              optional: true
+        {{- if $root.Values.workload.envs }}
+{{ toYaml $root.Values.workload.envs | indent 8 }}
+        {{- end }}
+        ports:
+        - name: http
+          containerPort: {{ $root.Values.service.ports.vllmHttp | default 8000 }}
+        - name: render
+          containerPort: {{ $root.Values.service.ports.tokenProducer | default 6100 }}
+        - name: kv-events
+          containerPort: {{ $root.Values.service.ports.vllmZmq | default 5556 }}
+        - name: kv-replay
+          containerPort: {{ $root.Values.service.ports.vllmZmqReplay | default 5559 }}
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: {{ $root.Values.service.ports.vllmHttp | default 8000 }}
+          initialDelaySeconds: {{ $root.Values.workload.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ $root.Values.workload.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ $root.Values.workload.readinessProbe.timeoutSeconds }}
+          failureThreshold: {{ $root.Values.workload.readinessProbe.failureThreshold }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{ $root.Values.service.ports.vllmHttp | default 8000 }}
+          initialDelaySeconds: {{ $root.Values.workload.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ $root.Values.workload.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ $root.Values.workload.livenessProbe.timeoutSeconds }}
+          failureThreshold: {{ $root.Values.workload.livenessProbe.failureThreshold }}
+        resources:
+{{ toYaml $root.Values.workload.resources | indent 10 }}
+        volumeMounts:
+        - name: dshm
+          mountPath: /dev/shm
+        - name: serving-configuration
+          mountPath: {{ $root.Values.workload.configPath | default "/workload/configs" }}
+          readOnly: true
+        {{- if $root.Values.volumes.ssdMountPath }}
+        - name: local-ssd
+          mountPath: {{ $root.Values.volumes.ssdMountPath }}
+        {{- end }}
+        {{- if and $root.Values.volumes.useGcs $root.Values.volumes.gcsfuse.bucketName }}
+        - name: gcs-model-volume
+          mountPath: {{ $root.Values.volumes.gcsfuse.mountPath | default "/data/model" }}
+          readOnly: true
+        {{- end }}
+        {{- if and $root.Values.volumes.pvc $root.Values.volumes.pvc.enabled $root.Values.volumes.pvc.claimName }}
+        - name: pvc-model-volume
+          mountPath: {{ $root.Values.volumes.pvc.mountPath | default "/models" }}
+          readOnly: true
+        {{- end }}
+      volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: {{ $root.Values.workload.shmSize | default "256Gi" }}
+      - name: serving-configuration
+        configMap:
+          name: "{{ $root.Release.Name }}-vllm-config"
+      {{- if $root.Values.volumes.ssdMountPath }}
+      - name: local-ssd
+        {{- if $root.Values.volumes.useHostPathSsd }}
+        hostPath:
+          path: /mnt/stateful_partition/kube-ephemeral-ssd
+          type: DirectoryOrCreate
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
+      {{- end }}
+      {{- if and $root.Values.volumes.useGcs $root.Values.volumes.gcsfuse.bucketName }}
+      - name: gcs-model-volume
+        csi:
+          driver: gcsfuse.csi.storage.gke.io
+          volumeAttributes:
+            bucketName: {{ $root.Values.volumes.gcsfuse.bucketName }}
+            mountOptions: "implicit-dirs,file-cache:enable-parallel-downloads:true,file-cache:parallel-downloads-per-file:100,file-cache:max-parallel-downloads:-1,file-cache:download-chunk-size-mb:50,file-cache:max-size-mb:-1"
+      {{- end }}
+      {{- if and $root.Values.volumes.pvc $root.Values.volumes.pvc.enabled $root.Values.volumes.pvc.claimName }}
+      - name: pvc-model-volume
+        persistentVolumeClaim:
+          claimName: {{ $root.Values.volumes.pvc.claimName }}
+          readOnly: true
+      {{- end }}
+{{- end }}
+{{- end }}

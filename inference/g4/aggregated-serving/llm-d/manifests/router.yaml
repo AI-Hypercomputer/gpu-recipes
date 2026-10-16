@@ -1,0 +1,491 @@
+---
+# Source: llm-d-inference/templates/configmaps.yaml
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "llmd-inference-epp-config"
+  labels:
+    app.kubernetes.io/name: llm-d-inference
+    app.kubernetes.io/instance: "llmd-inference"
+    app.kubernetes.io/component: router
+data:
+  plugins-config.yaml: |-
+    apiVersion: llm-d.ai/v1alpha1
+    kind: EndpointPickerConfig
+    featureGates:
+    - flowControl
+    plugins:
+    - name: program-aware-fairness
+      type: program-aware-fairness
+      parameters:
+        strategy: turn-priority
+    - name: token-producer
+      type: token-producer
+      parameters:
+        modelName: "reflection/Beam-1.0-501B-A23B-NVFP4"
+        vllm:
+          url: "http://llmd-inference-backends:6100"
+    - name: endpoint-notification-source
+      type: endpoint-notification-source
+    - name: precise-prefix-cache-producer
+      type: precise-prefix-cache-producer
+      parameters:
+        tokenProcessorConfig:
+          blockSizeTokens: 64
+        kvEventsConfig:
+          topicFilter: "kv@"
+          concurrency: 8
+          discoverPods: true
+          podDiscoveryConfig:
+            socketPort: 5556
+            replaySocketPort: 5559
+        indexerConfig:
+          kvBlockIndexConfig:
+            enableMetrics: true
+            inMemoryConfig:
+              podCacheSize: 128
+          kvCacheBackendConfigs:
+          - name: gpu
+            weight: 1.0
+          - name: cpu
+            weight: 0.4
+        speculativeIndexing: true
+    - name: inflight-load-producer
+      type: inflight-load-producer
+      parameters:
+        prefixMatchInfoProducerName: precise-prefix-cache-producer
+    - name: prefix-cache-affinity-filter
+      type: prefix-cache-affinity-filter
+      parameters:
+        peakPrefillThroughput: 16444
+        inFlightLoadProducerName: inflight-load-producer
+        prefixMatchInfoProducerName: precise-prefix-cache-producer
+        affinityThreshold: 0.75
+    - name: utilization-detector
+      type: utilization-detector
+      parameters:
+        queueDepthThreshold: 6
+        kvCacheUtilThreshold: 0.8
+    - name: token-load-scorer
+      type: token-load-scorer
+    schedulingProfiles:
+    - name: default
+      plugins:
+      - pluginRef: prefix-cache-affinity-filter
+      - pluginRef: utilization-detector
+      - pluginRef: token-load-scorer
+    dataLayer:
+      sources:
+      - pluginRef: endpoint-notification-source
+        extractors:
+        - pluginRef: precise-prefix-cache-producer
+    flowControl:
+      maxBytes: "10Gi"
+      maxRequests: "1k"
+      defaultRequestTTL: "1800s"
+      saturationDetector:
+        pluginRef: utilization-detector
+      defaultPriorityBand:
+        fairnessPolicyRef: program-aware-fairness
+---
+# Source: llm-d-inference/templates/configmaps.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "llmd-inference-envoy-config"
+  labels:
+    app.kubernetes.io/name: llm-d-inference
+    app.kubernetes.io/instance: "llmd-inference"
+    app.kubernetes.io/component: router
+data:
+  envoy.yaml: |-
+    static_resources:
+      listeners:
+      - name: envoy-proxy-ready
+        address:
+          socket_address:
+            address: 0.0.0.0
+            port_value: 19001
+        filter_chains:
+        - filters:
+          - name: envoy.filters.network.http_connection_manager
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+              stat_prefix: envoy-ready-http
+              route_config:
+                name: local_route
+                virtual_hosts:
+                - name: ready_host
+                  domains: ["*"]
+                  routes:
+                  - match:
+                      prefix: "/ready"
+                    direct_response:
+                      status: 200
+                      body:
+                        inline_string: "OK"
+              http_filters:
+              - name: envoy.filters.http.router
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+      - name: vllm
+        address:
+          socket_address:
+            address: 0.0.0.0
+            port_value: 8081
+        filter_chains:
+        - filters:
+          - name: envoy.filters.network.http_connection_manager
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+              stat_prefix: http-8081
+              stream_idle_timeout: 3600s
+              route_config:
+                name: vllm
+                virtual_hosts:
+                - name: vllm-default
+                  domains: ["*"]
+                  routes:
+                  - match:
+                      prefix: "/metrics"
+                    route:
+                      cluster: model_server_service_cluster
+                    typed_per_filter_config:
+                      envoy.filters.http.ext_proc:
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                        disabled: true
+                  - match:
+                      prefix: "/ping"
+                    route:
+                      cluster: model_server_service_cluster
+                    typed_per_filter_config:
+                      envoy.filters.http.ext_proc:
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                        disabled: true
+                  - match:
+                      prefix: "/health"
+                    route:
+                      cluster: model_server_service_cluster
+                    typed_per_filter_config:
+                      envoy.filters.http.ext_proc:
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                        disabled: true
+                  - match:
+                      prefix: "/v1/models"
+                    route:
+                      cluster: model_server_service_cluster
+                    typed_per_filter_config:
+                      envoy.filters.http.ext_proc:
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                        disabled: true
+                  - match:
+                      prefix: "/version"
+                    route:
+                      cluster: model_server_service_cluster
+                    typed_per_filter_config:
+                      envoy.filters.http.ext_proc:
+                        "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                        disabled: true
+                  - match:
+                      prefix: "/"
+                    route:
+                      cluster: original_destination_cluster
+                      timeout: 86400s
+              http_filters:
+              - name: envoy.filters.http.ext_proc
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
+                  failure_mode_allow: false
+                  grpc_service:
+                    envoy_grpc:
+                      cluster_name: ext_proc
+                      authority: localhost:9002
+                    timeout: 86400s
+                  processing_mode:
+                    request_header_mode: SEND
+                    response_header_mode: SEND
+                    request_body_mode: FULL_DUPLEX_STREAMED
+                    response_body_mode: FULL_DUPLEX_STREAMED
+                    request_trailer_mode: SEND
+                    response_trailer_mode: SEND
+                  message_timeout: 1000s
+              - name: envoy.filters.http.router
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+      clusters:
+      - name: model_server_service_cluster
+        type: STRICT_DNS
+        connect_timeout: 5s
+        lb_policy: ROUND_ROBIN
+        load_assignment:
+          cluster_name: model_server_service_cluster
+          endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: "llmd-inference-backends"
+                    port_value: 8000
+      - name: original_destination_cluster
+        type: ORIGINAL_DST
+        connect_timeout: 1000s
+        lb_policy: CLUSTER_PROVIDED
+        original_dst_lb_config:
+          use_http_header: true
+          http_header_name: x-gateway-destination-endpoint
+      - name: ext_proc
+        type: STATIC
+        connect_timeout: 86400s
+        lb_policy: LEAST_REQUEST
+        transport_socket:
+          name: "envoy.transport_sockets.tls"
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+            common_tls_context:
+              alpn_protocols: ["h2"]
+              validation_context: {}
+        typed_extension_protocol_options:
+          envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+            "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+            explicit_http_config:
+              http2_protocol_options: {}
+        load_assignment:
+          cluster_name: ext_proc
+          endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 9002
+---
+# Source: llm-d-inference/templates/services.yaml
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+apiVersion: v1
+kind: Service
+metadata:
+  name: "llmd-inference-frontend"
+  labels:
+    app.kubernetes.io/name: llm-d-inference
+    app.kubernetes.io/instance: "llmd-inference"
+    app.kubernetes.io/component: router
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: llm-d-inference
+    app.kubernetes.io/instance: "llmd-inference"
+    app.kubernetes.io/component: router
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8081
+  - name: http-openai
+    port: 8000
+    targetPort: 8081
+  - name: grpc-ext-proc
+    port: 9002
+    targetPort: 9002
+  - name: epp-metrics
+    port: 9090
+    targetPort: 9090
+---
+# Source: llm-d-inference/templates/services.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: "llmd-inference-backends"
+  labels:
+    app.kubernetes.io/name: llm-d-inference
+    app.kubernetes.io/instance: "llmd-inference"
+    app.kubernetes.io/component: model-server
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: llm-d-inference
+    app.kubernetes.io/instance: "llmd-inference"
+    app.kubernetes.io/component: model-server
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
+  - name: http-render
+    port: 6100
+    targetPort: 6100
+  - name: zmq-kv-events
+    port: 5556
+    targetPort: 5556
+  - name: zmq-kv-replay
+    port: 5559
+    targetPort: 5559
+---
+# Source: llm-d-inference/templates/router.yaml
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "llmd-inference-router"
+  labels:
+    app.kubernetes.io/name: llm-d-inference
+    app.kubernetes.io/instance: "llmd-inference"
+    app.kubernetes.io/component: router
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: llm-d-inference
+      app.kubernetes.io/instance: "llmd-inference"
+      app.kubernetes.io/component: router
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: llm-d-inference
+        app.kubernetes.io/instance: "llmd-inference"
+        app.kubernetes.io/component: router
+    spec:
+      automountServiceAccountToken: true
+      serviceAccountName: default
+      containers:
+      - name: envoy-proxy
+        image: docker.io/envoyproxy/envoy:distroless-v1.33.2
+        imagePullPolicy: IfNotPresent
+        command: ["envoy"]
+        args:
+        - "--service-node"
+        - "envoy-proxy"
+        - "--log-level"
+        - "warn"
+        - "-c"
+        - "/etc/envoy/envoy.yaml"
+        ports:
+        - name: http-8081
+          containerPort: 8081
+          protocol: TCP
+        - name: ready-19001
+          containerPort: 19001
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 19001
+            scheme: HTTP
+          periodSeconds: 5
+          timeoutSeconds: 1
+        resources:
+          limits:
+            cpu: "8"
+            memory: 16Gi
+          requests:
+            cpu: "2"
+            memory: 4Gi
+        volumeMounts:
+        - name: envoy-config
+          mountPath: /etc/envoy
+          readOnly: true
+      - name: router
+        image: ghcr.io/llm-d/llm-d-router-endpoint-picker:main
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        ports:
+        - name: grpc
+          containerPort: 9002
+          protocol: TCP
+        - name: grpc-health
+          containerPort: 9003
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        args:
+        - "--endpoint-selector=app.kubernetes.io/instance=llmd-inference,app.kubernetes.io/name=llm-d-inference,app.kubernetes.io/component=model-server"
+        - "--endpoint-target-ports=8000"
+        - "--config-file=/etc/epp/plugins-config.yaml"
+        - "--grpc-health-port=9003"
+        - "--tracing=false"
+        - "--metrics-endpoint-auth=false"
+        - "--allow-experimental-plugins=true"
+        readinessProbe:
+          grpc:
+            port: 9003
+            service: inference-extension
+          periodSeconds: 5
+          timeoutSeconds: 1
+        resources:
+          limits:
+            cpu: "8"
+            memory: 16Gi
+          requests:
+            cpu: "2"
+            memory: 4Gi
+        volumeMounts:
+        - name: epp-config
+          mountPath: /etc/epp
+          readOnly: true
+      volumes:
+      - name: envoy-config
+        configMap:
+          name: "llmd-inference-envoy-config"
+      - name: epp-config
+        configMap:
+          name: "llmd-inference-epp-config"
+---
+# Source: llm-d-inference/templates/vllm-deployments.yaml
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.

@@ -176,10 +176,20 @@ Models             | GPU Machine Type                                           
 | **Qwen 3 4B**      | [A4X (NVIDIA GB200)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms)    | TensorRT-LLM (1.3.0rc5)   | Inference   | GKE          | [Link](./inference/a4x/single-host-serving/tensorrt-llm/README.md)
 
 
+### Inference benchmarks A4X MAX
+
+| Models           | GPU Machine Type | Framework | Workload Type       | Orchestrator | Link to the recipe |
+| ---------------- | ---------------- | --------- | ------------------- | ------------ | ------------------ |
+| **Reflection Beam 501B** | [A4X MAX (NVIDIA GB300)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Dynamo + SGLang | Aggregated Inference | GKE | [Link](./inference/a4xmax/aggregated-serving/dynamo/README.md) |
+| **Reflection Beam 501B** | [A4X MAX (NVIDIA GB300)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Dynamo + SGLang | Disaggregated Inference | GKE | [Link](./inference/a4xmax/disaggregated-serving/dynamo/README.md) |
+| **DeepSeek R1 671B** | [A4X MAX (NVIDIA GB300)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Dynamo + SGLang | Disaggregated Inference | GKE | [Link](./inference/a4xmax/disaggregated-serving/dynamo/README.md) |
+
+
 ### Inference benchmarks G4
 
 | Models           | GPU Machine Type | Framework | Workload Type       | Orchestrator | Link to the recipe |
 | ---------------- | ---------------- | --------- | ------------------- | ------------ | ------------------ |
+| **Reflection Beam 501B** | [G4 (NVIDIA RTX PRO 6000 Blackwell)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#g4-series) | llm-d + vLLM | Inference | GKE | [Link](./inference/g4/aggregated-serving/llm-d/README.md) |
 | **Qwen3 8B**     | [G4 (NVIDIA RTX PRO 6000 Blackwell)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#g4-series)    | vLLM  | Inference   | GCE          | [Link](./inference/g4/qwen-8b/single-host-serving/vllm/README.md)
 | **Qwen3 30B A3B**| [G4 (NVIDIA RTX PRO 6000 Blackwell)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#g4-series)    | TensorRT-LLM  | Inference   | GCE          | [Link](./inference/g4/qwen3_30b_a3b/single-host-serving/tensorrt-llm/README.md)
 | **Qwen3 4B**     | [G4 (NVIDIA RTX PRO 6000 Blackwell)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#g4-series)    | TensorRT-LLM  | Inference   | GCE          | [Link](./inference/g4/qwen3_4b/single-host-serving/tensorrt-llm/README.md)

@@ -1,0 +1,151 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+llmd:
+  router:
+    enabled: true
+    replicas: 1
+    serviceAccount:
+      create: true
+      name: ""
+    rbac:
+      create: true
+    eppImage: ghcr.io/llm-d/llm-d-router-endpoint-picker:main
+    envoyImage: docker.io/envoyproxy/envoy:distroless-v1.33.2
+    verbosity: "3"
+    queueDepthThreshold: 6
+    kvCacheUtilThreshold: 0.80
+    nodeSelector: {}
+    tolerations: []
+    resources:
+      epp:
+        requests:
+          cpu: "2"
+          memory: "4Gi"
+        limits:
+          cpu: "8"
+          memory: "16Gi"
+      envoy:
+        requests:
+          cpu: "2"
+          memory: "4Gi"
+        limits:
+          cpu: "8"
+          memory: "16Gi"
+
+workload:
+  model:
+    name: reflection/Beam-1.0-501B-A23B-NVFP4
+    drafterName: reflection/Beam-1.0-501B-A23B-DFlash2
+    servedModelName: ""
+    maxModelLen: 1048576
+  image: vllm/vllm-openai:reflection-beam
+  framework: vllm
+  replicas: 2
+  gpusPerReplica: 4
+  pinSingleNode: true
+  nodeSelector:
+    cloud.google.com/gke-accelerator: nvidia-rtx-pro-6000
+  # Pin each 4-GPU TP4 replica to its local PCIe/CPU NUMA node:
+  #   - Replica 0: GPUs 0,1,2,3 -> numactl --cpunodebind=0 --membind=0
+  #   - Replica 1: GPUs 4,5,6,7 -> numactl --cpunodebind=1 --membind=1
+  cudaVisibleDevices:
+    - "0,1,2,3"
+    - "4,5,6,7"
+  numaNodes:
+    - "0"
+    - "1"
+  shmSize: "256Gi"
+  configPath: /workload/configs
+  configFile: serving-configuration
+  resources:
+    requests:
+      cpu: "64"
+      memory: "512Gi"
+      nvidia.com/gpu: "4"
+    limits:
+      cpu: "160"
+      memory: "1200Gi"
+      nvidia.com/gpu: "4"
+  envs:
+    - name: HF_HUB_ENABLE_HF_TRANSFER
+      value: "1"
+    - name: VLLM_ENGINE_READY_TIMEOUT_S
+      value: "3600"
+    - name: VLLM_RPC_TIMEOUT
+      value: "600000"
+    - name: VLLM_HTTP_TIMEOUT_KEEP_ALIVE
+      value: "900"
+    - name: VLLM_CHAT_TEMPLATE_RENDER_TIMEOUT
+      value: "300"
+    - name: VLLM_USE_V2_MODEL_RUNNER
+      value: "1"
+    - name: VLLM_FUSED_MOE_CHUNK_SIZE
+      value: "32768"
+    - name: VLLM_SWA_DECODER_REPLAY_MAX_BS
+      value: "4096"
+    - name: VLLM_ENFORCE_STRICT_TOOL_CALLING
+      value: "0"
+    - name: VLLM_BEAM_ALWAYS_CONSTRAIN_OUTPUT
+      value: "0"
+    - name: NCCL_IB_DISABLE
+      value: "1"
+    - name: NCCL_P2P_LEVEL
+      value: "NVL"
+    - name: NCCL_NET_GDR_LEVEL
+      value: "0"
+    - name: PYTHONUNBUFFERED
+      value: "1"
+  readinessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 5
+    timeoutSeconds: 5
+    failureThreshold: 60
+  livenessProbe:
+    initialDelaySeconds: 300
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 10
+
+secrets:
+  huggingface:
+    secretName: hf-token-secret
+    secretKey: HF_TOKEN
+
+volumes:
+  hfHome: /ssd
+  ssdMountPath: /ssd
+  useHostPathSsd: false
+  useGcs: false
+  gcsfuse:
+    bucketName: ""
+    mountPath: /data/model
+  pvc:
+    enabled: false
+    claimName: ""
+    mountPath: /models
+
+service:
+  type: ClusterIP
+  ports:
+    frontend: 8000
+    envoyHttp: 8081
+    eppGrpc: 9002
+    eppMetrics: 9090
+    tokenProducer: 6100
+    zmqPub: 5556
+    zmqRouter: 5559
+    vllmHttp: 8000
+    vllmZmq: 5556
+    vllmZmqReplay: 5559
