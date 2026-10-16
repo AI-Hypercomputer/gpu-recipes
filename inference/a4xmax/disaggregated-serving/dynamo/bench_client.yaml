@@ -20,9 +20,19 @@ metadata:
     app: bench-client
 spec:
   restartPolicy: Never
+  nodeSelector:
+    kubernetes.io/arch: arm64
+  tolerations:
+  - key: "kubernetes.io/arch"
+    operator: "Equal"
+    value: "arm64"
+    effect: "NoSchedule"
+  - key: "nvidia.com/gpu"
+    operator: "Exists"
+    effect: "NoSchedule"
   containers:
   - name: benchmark
-    image: python:3.10
+    image: python:3.12
     workingDir: /workspace
     command: ["/bin/bash", "-c"]
     # This script runs ONCE when the pod starts to set everything up.
@@ -34,7 +44,7 @@ spec:
       # 1. Install System Dependencies
       apt-get update && apt-get install -y git curl jq
 
-      # 2. Install Python Dependencies (including AIPerf for AgentX profiling and synthetic benchmark deps)
+      # 2. Install Python Dependencies (including AIPerf >=0.12.0 for AgentX profiling and synthetic benchmark deps)
       pip install -q --upgrade pip
       pip install -q aiperf transformers aiohttp numpy requests tqdm pandas datasets Pillow huggingface_hub hf_transfer
 
@@ -58,3 +68,15 @@ spec:
           optional: true
     - name: HF_HUB_ENABLE_HF_TRANSFER
       value: "1"
+    - name: AIPERF_DATASET_WEKA_LIVE_ASSISTANT_RESPONSES
+      value: "0"
+    - name: AIPERF_DATASET_CONFIGURATION_TIMEOUT
+      value: "1800"
+    - name: AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT
+      value: "1800"
+    resources:
+      requests:
+        cpu: "4"
+        memory: "20Gi"
+      limits:
+        memory: "300Gi"

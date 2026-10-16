@@ -210,8 +210,8 @@ This recipe is organized into deployment categories that pair a Helm topology (`
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **DeepSeek-R1 671B (FP8)** | `deepseek-ai/DeepSeek-R1` | Low-Latency / without DeepEP | 1P1D (2 nodes / 8 GPUs) | `values_wo_deepep.yaml` | `deepseek-r1-fp8-1p1d-prefill.yaml` | `deepseekr1-fp8-1p1d-decode.yaml` |
 | **DeepSeek-R1 671B (FP8)** | `deepseek-ai/DeepSeek-R1` | High-Throughput / with DeepEP | 10P8D (18 nodes / 72 GPUs) | `values_deepep.yaml` | `deepseekr1-fp8-10p8d-prefill.yaml` | `deepseekr1-fp8-10p8d-decode.yaml` |
-| **LASER_BEAM** | `<LASER_BEAM_HF_MODEL_ID>` | High Interactivity | 1P1D (2 nodes / 8 GPUs) | `laser_beam_high_int.yaml` | `laser_beam_high_int_prefill.yaml` | `laser_beam_high_int_decode.yaml` |
-| **LASER_BEAM** | `<LASER_BEAM_HF_MODEL_ID>` | High Throughput | Multi-Node (32–72 GPUs) | `laser_beam_high_throughput.yaml` | `laser_beam_high_throughput_prefill.yaml` | `laser_beam_high_throughput_decode.yaml` |
+| **LASER_BEAM** | `reflection/Beam-1.0-501B-A23B-NVFP4` | High Interactivity (DFlash2) | 8x Aggregated (8 nodes / 32 GPUs) | `laser_beam_high_int.yaml` | `laser_beam_high_int_prefill.yaml` | `laser_beam_high_int_decode.yaml` |
+| **LASER_BEAM** | `reflection/Beam-1.0-501B-A23B-NVFP4` | High Throughput (Disaggregated) | 4P4D (8 nodes / 32 GPUs) | `laser_beam_high_throughput.yaml` | `laser_beam_high_throughput_prefill.yaml` | `laser_beam_high_throughput_decode.yaml` |
 
 > [!TIP]
 > To add or deploy another model, stage its weights in `gs://${GCS_BUCKET}`, add its prefill and decode YAML files under `$REPO_ROOT/src/frameworks/a4xmax/dynamo-configs/`, and pass `--set workload.model=${HF_MODEL_ID}` along with `--set-file prefill_serving_config=...` and `--set-file decode_serving_config=...` to `helm install`.
@@ -252,7 +252,8 @@ helm install -f ${VALUES_FILE} \
 1. Set the model and configuration variables:
 
 ```bash
-export HF_MODEL_ID="<LASER_BEAM_HF_MODEL_ID>"
+export HF_MODEL_ID="reflection/Beam-1.0-501B-A23B-NVFP4"
+export DYNAMO_IMAGE="us-central1-docker.pkg.dev/supercomputer-testing/pirillo-gcr/sglang-beam:dev-cu13-d4be2f8c-arm64"
 export VALUES_FILE="laser_beam_high_int.yaml"
 export PREFILL_CONFIG="laser_beam_high_int_prefill.yaml"
 export DECODE_CONFIG="laser_beam_high_int_decode.yaml"
@@ -309,7 +310,8 @@ helm install -f ${VALUES_FILE} \
 1. Set the model and configuration variables:
 
 ```bash
-export HF_MODEL_ID="<LASER_BEAM_HF_MODEL_ID>"
+export HF_MODEL_ID="reflection/Beam-1.0-501B-A23B-NVFP4"
+export DYNAMO_IMAGE="us-central1-docker.pkg.dev/supercomputer-testing/pirillo-gcr/sglang-beam:dev-cu13-d4be2f8c-arm64"
 export VALUES_FILE="laser_beam_high_throughput.yaml"
 export PREFILL_CONFIG="laser_beam_high_throughput_prefill.yaml"
 export DECODE_CONFIG="laser_beam_high_throughput_decode.yaml"
@@ -391,11 +393,12 @@ Proceed once you see `--- SETUP COMPLETE. POD IS READY. ---`.
 
 Use [`aiperf`](https://github.com/ai-dynamo/aiperf) with the public SemiAnalysis AgentX coding trajectory dataset (`semianalysis_cc_traces_weka_062126`) to evaluate long-context, multi-turn prefix caching and decode interactivity.
 
-1. Configure target service, model, and concurrency variables for the benchmark client (defaults to `CONCURRENCY=32`):
+1. Configure target service, worker metrics endpoints, model, and concurrency variables for the benchmark client (for example `CONCURRENCY=32`, `96`, or `192`):
 
 ```bash
 # Replace FRONTEND_HOST with your Dynamo frontend service or pod IP
-export FRONTEND_HOST="${RELEASE_NAME}-frontend"
+export FRONTEND_HOST="$(kubectl get svc -n ${NAMESPACE} -o name | grep frontend | head -n1 | cut -d/ -f2)"
+export WORKER_METRICS="$(kubectl get pods -n ${NAMESPACE} -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.podIP}{"\n"}{end}' | awk '/-decode-|-prefill-/ && $2 != "" {printf "%s:9090/metrics ", $2}')"
 export MODEL_NAME="${HF_MODEL_ID}"
 export TOKENIZER_PATH="${HF_MODEL_ID}"
 export CONCURRENCY=32
@@ -405,22 +408,23 @@ export CONCURRENCY=32
 
 ```bash
 kubectl exec -it bench-client -n ${NAMESPACE} -- bash -c "
+  export AIPERF_DATASET_WEKA_LIVE_ASSISTANT_RESPONSES=0
+  export AIPERF_DATASET_CONFIGURATION_TIMEOUT=1800
+  export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800
   aiperf profile \
-    --scenario agentx \
+    --scenario inferencex-agentx-mvp \
     --url http://${FRONTEND_HOST}:8000 \
     --endpoint /v1/chat/completions \
     --model ${MODEL_NAME} \
     --tokenizer ${TOKENIZER_PATH} \
     --concurrency ${CONCURRENCY} \
     --benchmark-duration 3600 \
-    --benchmark-grace-period inf \
     --failed-request-threshold 0.10 \
     --warmup-requests-per-lane 10 \
     --trace-idle-gap-cap-seconds 300 \
     --warmup-grace-period 1800 \
-    --agentic-warmup-grace-period 1800 \
     --tokenizer-trust-remote-code \
-    --server-metrics http://${FRONTEND_HOST}:6100/metrics \
+    --server-metrics ${WORKER_METRICS} \
     --output-artifact-dir /logs/agentic/aiperf_artifacts/stage_${CONCURRENCY} \
     --public-dataset semianalysis_cc_traces_weka_062126
 "
