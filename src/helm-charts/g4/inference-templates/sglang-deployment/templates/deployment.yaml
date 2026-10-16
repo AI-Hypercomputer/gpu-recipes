@@ -1,0 +1,182 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+{{- $cfg := fromYaml (required "serving_config is required: --set-file serving_config=<src/frameworks/g4/sglang-configs/*.yaml>" .Values.serving_config) }}
+{{- if hasKey $cfg "Error" }}
+{{- fail (printf "serving_config is not valid YAML: %v" (get $cfg "Error")) }}
+{{- end }}
+{{- range $reserved := list "model-path" "speculative-draft-model-path" "host" "port" }}
+{{- if hasKey $cfg $reserved }}
+{{- fail (printf "serving_config must not set %q: the chart sets it from the values file" $reserved) }}
+{{- end }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.workload.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Values.workload.name }}
+spec:
+  replicas: 1
+  # A surge pod can never fit next to a running one (all 8 GPUs and most of the host memory).
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ .Values.workload.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.workload.name }}
+    spec:
+      {{- with .Values.targetNodes }}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                {{- toYaml . | nindent 16 }}
+      {{- end }}
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      # Keep Service env vars out of the SGLANG_* namespace.
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: sglang
+        image: {{ required "workload.image is required" .Values.workload.image | quote }}
+        imagePullPolicy: {{ .Values.workload.imagePullPolicy }}
+        # args only (no command), so the image entrypoint (/opt/nvidia/nvidia_entrypoint.sh) still runs.
+        args:
+        - bash
+        - -c
+        - |
+          set -e
+          {{- if .Values.patch.content }}
+          {{- if .Values.patch.targetDir }}
+          PATCH_DIR={{ .Values.patch.targetDir | squote }}
+          {{- else }}
+          # Patch the SGLang package that the image's Python actually imports.
+          PATCH_DIR=$(python3 -c 'import importlib.util, os; print(os.path.dirname(list(importlib.util.find_spec("sglang").submodule_search_locations)[0]))')
+          {{- end }}
+          echo "Applying source patch in $PATCH_DIR"
+          patch -d "$PATCH_DIR" -p1 < /patches/local.patch
+          {{- end }}
+          exec sglang serve \
+            --model-path {{ required "workload.modelPath is required" .Values.workload.modelPath }} \
+            {{- with .Values.workload.drafterPath }}
+            --speculative-draft-model-path {{ . }} \
+            {{- end }}
+            {{- range $key, $value := $cfg }}
+            {{- if kindIs "bool" $value }}
+            {{- if $value }}
+            --{{ $key }} \
+            {{- end }}
+            {{- else if kindIs "slice" $value }}
+            --{{ $key }}{{ range $value }} {{ include "g4-sglang.flagValue" . }}{{ end }} \
+            {{- else if not (kindIs "invalid" $value) }}
+            --{{ $key }} {{ include "g4-sglang.flagValue" $value }} \
+            {{- end }}
+            {{- end }}
+            --host 0.0.0.0 \
+            --port {{ .Values.service.port }}
+        {{- if or .Values.huggingface.secretName .Values.workload.envs }}
+        env:
+        {{- if .Values.huggingface.secretName }}
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.huggingface.secretName | quote }}
+              key: {{ .Values.huggingface.secretData.token | quote }}
+              optional: true
+        {{- end }}
+        {{- with .Values.workload.envs }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- end }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.service.port }}
+        resources:
+          {{- toYaml .Values.workload.resources | nindent 10 }}
+        # /ready answers instantly; /health runs a 1-token generation that can exceed the probe timeout.
+        startupProbe:
+          httpGet:
+            path: /ready
+            port: http
+          periodSeconds: 30
+          timeoutSeconds: 5
+          # Weight download on launch, JIT compilation, weight loading, CUDA graph capture and host-pool pinning: up to 90 min.
+          failureThreshold: 180
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        {{- if .Values.volumes.ssdMountPath }}
+        - name: local-ssd
+          mountPath: {{ .Values.volumes.ssdMountPath }}
+        {{- end }}
+        {{- if .Values.patch.content }}
+        - name: patch
+          mountPath: /patches
+          readOnly: true
+        {{- end }}
+        # FlashInfer/Triton JIT and autotune results survive pod restarts.
+        - name: sglang-cache
+          mountPath: /root/.cache/sglang
+        - name: dshm
+          mountPath: /dev/shm
+      volumes:
+      {{- if .Values.volumes.ssdMountPath }}
+      - name: local-ssd
+        {{- if .Values.volumes.ephemeralScratchSize }}
+        ephemeral:
+          volumeClaimTemplate:
+            spec:
+              accessModes: ["ReadWriteOnce"]
+              {{- if .Values.volumes.ephemeralStorageClass }}
+              storageClassName: {{ .Values.volumes.ephemeralStorageClass | quote }}
+              {{- end }}
+              resources:
+                requests:
+                  storage: {{ .Values.volumes.ephemeralScratchSize }}
+        {{- else }}
+        hostPath:
+          path: /mnt/stateful_partition/kube-ephemeral-ssd
+          type: DirectoryOrCreate
+        {{- end }}
+      {{- end }}
+      {{- if .Values.patch.content }}
+      - name: patch
+        configMap:
+          name: {{ .Values.workload.name }}-patch
+      {{- end }}
+      - name: sglang-cache
+        hostPath:
+          path: {{ .Values.volumes.hostCachePath }}
+          type: DirectoryOrCreate
+      # Pods otherwise get a 64 MiB /dev/shm.
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: {{ .Values.volumes.shmSize }}

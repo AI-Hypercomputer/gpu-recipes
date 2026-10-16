@@ -1,0 +1,152 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# In-cluster SemiAnalysis AgentX benchmark client for the Beam-1.0-501B G4 recipe.
+# TARGET_HOST must match the Service created by the chart: <workload.name>.<namespace>.svc.
+# Results stay in the pod for 2 hours after the run; see the README for `kubectl cp`.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: beam-agentx-bench
+  namespace: default
+spec:
+  activeDeadlineSeconds: 28800
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: beam-agentx-bench
+    spec:
+      restartPolicy: Never
+      enableServiceLinks: false
+      # The client only needs CPU; the toleration lets it schedule on a G4 node.
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: agentx
+        image: python:3.12-slim
+        resources:
+          requests:
+            cpu: "32"
+            memory: 96Gi
+        env:
+        - name: RUN_NAME
+          value: agentx-hicache-dflash
+        - name: TARGET_HOST
+          value: reflection-beam-nvfp4-g4-hicache.default.svc.cluster.local
+        - name: TARGET_PORT
+          value: "30080"
+        # Must match served-model-name in the SGLang config.
+        - name: SERVED_MODEL
+          value: beam
+        # Downloaded from Hugging Face into HF_HOME, so the client does not mount the model volume.
+        - name: TOKENIZER
+          value: reflection/Beam-1.0-501B-A23B-NVFP4
+        - name: CONCURRENCIES
+          value: "16 32 64 128"
+        - name: BENCH_DURATION
+          value: "1800"
+        - name: DATASET
+          value: semianalysis_cc_traces_weka_062126_256k
+        - name: MAX_CONTEXT
+          value: "262144"
+        - name: SEED
+          value: "20260707"
+        - name: AGENTX_VERSION
+          value: "1.0.7"
+        - name: SMOKE
+          value: "0"
+        - name: HF_HOME
+          value: /work/hf
+        - name: AIPERF_DATASET_CONFIGURATION_TIMEOUT
+          value: "3600"
+        - name: AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT
+          value: "3600"
+        - name: AIPERF_HTTP_TCP_USER_TIMEOUT
+          value: "900000"
+        volumeMounts:
+        - name: results
+          mountPath: /results
+        - name: work
+          mountPath: /work
+        args:
+        - bash
+        - -c
+        - |
+          set -u
+          mkdir -p /results /work/hf
+          echo "$RUN_NAME" > /results/RUN_NAME
+          apt-get update -qq >/dev/null && apt-get install -y -qq curl >/dev/null 2>&1
+          python3 -m venv /work/venv && . /work/venv/bin/activate
+          pip install -q --upgrade pip && pip install -q "agentx-harness==${AGENTX_VERSION}" 2>&1 | tail -2
+          agentx --version 2>/dev/null || aiperf --version
+          # Wait for the server. The first start can take much longer than 10 minutes
+          # (JIT compilation, weight loading, CUDA graphs, pinning the HiCache host pool).
+          for i in $(seq 1 540); do
+            curl -sf "http://$TARGET_HOST:$TARGET_PORT/ready" >/dev/null && break
+            sleep 10
+          done
+          # Record the exact server arguments next to the results.
+          curl -s "http://$TARGET_HOST:$TARGET_PORT/server_info" > /results/server_info.json || true
+          EXTRA=""; [ "$SMOKE" = "1" ] && EXTRA="--unsafe-override"
+          for C in $CONCURRENCIES; do
+            # Each concurrency level starts from an empty radix cache.
+            curl -s -X POST "http://$TARGET_HOST:$TARGET_PORT/flush_cache" >/dev/null || true
+            echo "=== AgentX: target=$TARGET_HOST concurrency=$C duration=${BENCH_DURATION}s dataset=$DATASET run=${RUN_NAME}-c${C}"
+            agentx profile \
+              --scenario inferencex-agentx-mvp \
+              --url "http://$TARGET_HOST:$TARGET_PORT" \
+              --endpoint-type chat --streaming \
+              --model "$SERVED_MODEL" \
+              --tokenizer "$TOKENIZER" --tokenizer-trust-remote-code \
+              --public-dataset "$DATASET" \
+              --max-context-length "$MAX_CONTEXT" \
+              --concurrency "$C" \
+              --benchmark-duration "$BENCH_DURATION" \
+              --use-server-token-count \
+              --extra-inputs ignore_eos:true \
+              --cache-bust first_turn_prefix \
+              --system-idle-gap-cap-seconds 10 \
+              --trajectory-start-min-ratio 0.0 --trajectory-start-max-ratio 1.0 \
+              --random-seed "$SEED" \
+              --ui simple $EXTRA \
+              --artifact-dir "/results/artifacts-c${C}" 2>&1 | tee "/results/agentx-c${C}.log" | grep -vE "^\s*$"
+          done
+          # Print the headline numbers (and submission_valid) for `kubectl logs`.
+          python3 - <<'EOF'
+          import glob, json
+          for p in sorted(glob.glob("/results/artifacts-c*/**/profile_export_aiperf.json", recursive=True)):
+              r = json.load(open(p))
+              md = r.get("metadata", {})
+              print(f"### AGENTX_RESULT {p}")
+              print("submission_valid:", md.get("submission_valid"), md.get("submission_invalid_reasons"))
+              for k in ("request_throughput", "output_token_throughput", "time_to_first_token",
+                        "inter_token_latency", "request_latency", "request_count", "error_request_count",
+                        "context_overflow_count", "input_sequence_length", "output_sequence_length"):
+                  v = r.get(k)
+                  if isinstance(v, dict):
+                      print(f"{k:28s} avg={v.get('avg')} p50={v.get('p50')} p90={v.get('p90')} p99={v.get('p99')} unit={v.get('unit')}")
+                  elif v is not None:
+                      print(f"{k:28s} {v}")
+          EOF
+          echo "DONE. Copy within 2 h: kubectl cp $HOSTNAME:/results ./results/$RUN_NAME"
+          sleep 7200
+      volumes:
+      - name: results
+        emptyDir: {}
+      - name: work
+        emptyDir:
+          sizeLimit: 100Gi

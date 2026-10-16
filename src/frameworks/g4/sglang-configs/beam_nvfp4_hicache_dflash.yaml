@@ -1,0 +1,41 @@
+# SGLang server arguments for reflection/Beam-1.0-501B-A23B-NVFP4 on one G4 node
+# (8x RTX PRO 6000): TP8/EP8, DFlash2 speculative decoding, HiCache host-memory KV tier.
+# Image: lmsysorg/sglang:beam.
+#
+# Rendered by src/helm-charts/g4/inference-templates/sglang-deployment as `--<key> <value>`;
+# `true` renders a bare flag. --model-path, --speculative-draft-model-path, --host and --port
+# are set by the chart from the recipe values file.
+#
+# Flags that also appear in the DFlash2 recipes of the SGLang Beam 1.0 cookbook
+# (https://docs.sglang.io/cookbook/autoregressive/Reflection/Beam-1_0) use the cookbook's values.
+served-model-name: beam
+tp-size: 8
+ep-size: 8
+attention-backend: trtllm_mha
+page-size: 64
+# NVFP4 MoE on SM120 runs on flashinfer_cutlass; the recipe's sm120-beam-moe.patch allows it for Beam.
+moe-runner-backend: flashinfer_cutlass
+speculative-algorithm: DFLASH
+# Verify window of 8 tokens (alias of --speculative-num-draft-tokens for DFLASH).
+speculative-dflash-block-size: 8
+context-length: 262144
+max-running-requests: 192
+cuda-graph-max-bs-decode: 192
+mem-fraction-static: 0.76
+enable-unified-memory: true
+# DFlash does not support mixed prefill/decode batches; run one decode round after every
+# prefill batch so long prefills do not starve decode.
+prefill-decode-interval: 1
+enable-hierarchical-cache: true
+# Host (L2) pool per rank = 2x the device KV pool.
+hicache-ratio: 2.0
+hicache-write-policy: write_back
+hicache-mem-layout: page_first
+hicache-io-backend: kernel
+# Returns cached_tokens in usage so the benchmark can report the prefix-cache hit rate.
+enable-cache-report: true
+reasoning-parser: beam
+tool-call-parser: beam
+enable-metrics: true
+revision: "3bd1dccf13c8f7aa3d6732c5aaa48ba107a2c086"
+speculative-draft-model-revision: "163b276be744c8ce2b8385ea85de54edb3088211"

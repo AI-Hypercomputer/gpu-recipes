@@ -1,0 +1,7 @@
+--- a/sglang/srt/models/beam.py
++++ b/sglang/srt/models/beam.py
+@@ -1303,3 +1303,3 @@
+         "fp8": ("auto", "triton"),
+-        "nvfp4": ("flashinfer_trtllm",),
++        "nvfp4": ("flashinfer_trtllm", "flashinfer_cutlass"),
+     }.get(quant_scheme, ())
