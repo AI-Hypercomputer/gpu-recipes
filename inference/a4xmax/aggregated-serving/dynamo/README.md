@@ -66,6 +66,7 @@ export NGC_API_KEY=<YOUR_NGC_API_KEY>
 export HF_TOKEN=<YOUR_HF_TOKEN>
 export RELEASE_VERSION=1.0.1
 export GCS_BUCKET=<YOUR_GCS_BUCKET>
+export NODE_POOL=<YOUR_GB300_NODE_POOL>
 
 # Set the project for gcloud commands
 gcloud config set project $PROJECT_ID
@@ -81,6 +82,9 @@ Replace the following values:
 | `NGC_API_KEY` | Your NVIDIA NGC API key (get from [NGC](https://ngc.nvidia.com)) | `nvapi-xxx...` |
 | `HF_TOKEN` | Your Hugging Face access token | `hf_xxx...` |
 | `GCS_BUCKET` | Your GCS bucket name (without `gs://` prefix for Helm `bucketName`) | `my-model-bucket` |
+| `NODE_POOL` | The GB300 node pool to run every worker in. All workers must share one NVLink domain | `a4xmax-np-1` |
+
+The Helm chart deploys into `dynamo.namespace` from the values file (`dynamo-cloud`). The install commands below pass `--set dynamo.namespace=${NAMESPACE}` so the release follows `NAMESPACE`. Resource names (ComputeDomain, deployment, `bench-client`) are fixed, so use a separate namespace for each release that runs at the same time.
 
 <a name="connect-cluster"></a>
 ### 2.3. Connect to your GKE Cluster
@@ -117,7 +121,7 @@ kubectl create secret generic hf-token-secret \
 <a name="install-platform"></a>
 ### 2.5. Install Dynamo Platform (One-Time Setup)
 
-Skip this step if the Dynamo Platform is already installed in `${NAMESPACE}`.
+Skip this step if the Dynamo Platform is already installed in the cluster. The operator watches all namespaces, and its CRDs are cluster-scoped, so don't install a second, older platform release on a shared cluster. This recipe was reproduced on an existing `dynamo-platform` `1.4.2` install.
 
 Add the NVIDIA Helm repository:
 ```bash
@@ -181,11 +185,13 @@ The workers load the target model from `/data/model/<HF_MODEL_ID>`. If you stage
 <a name="configure-dynamo-image"></a>
 ### 2.7. Configure Dynamo Image
 
-This recipe uses a model-specific SGLang runtime image that includes Dynamo `1.0.1` and SGLang support for the model:
+This recipe uses a model-specific SGLang runtime image with SGLang support for the model. The `beam` tag is mutable, so pin the digest that this recipe was validated with:
 
 ```bash
-export DYNAMO_IMAGE="lmsysorg/sglang:beam"
+export DYNAMO_IMAGE="lmsysorg/sglang:beam@sha256:0ea912aadc3d7827858de9aa5a312c4d51c254e7dbe670dbbe8181895b92071d"
 ```
+
+This digest contains SGLang `f7473673dd` and `ai-dynamo` `1.5.1`. In this SGLang build, `ServerArgs.get_model_config()` was replaced by `sglang.srt.server_args.model_config_of()`, which `ai-dynamo` `1.5.1` still calls. The chart's worker launch script patches that one call at startup, and only when the old method is missing.
 
 The chart sets `runtimeVersionOverride` to `dynamo.releaseVersion` (`1.0.1`) because the Dynamo operator can't infer the runtime version from a custom image tag.
 
@@ -227,6 +233,8 @@ helm install -f ${VALUES_FILE} \
   --set workload.model=${HF_MODEL_ID} \
   --set workload.image=${DYNAMO_IMAGE} \
   --set volumes.gcsfuse.bucketName=${GCS_BUCKET} \
+  --set dynamo.namespace=${NAMESPACE} \
+  --set dynamo.nodeSelector."cloud\.google\.com/gke-nodepool"=${NODE_POOL} \
   --set-file decode_serving_config=$REPO_ROOT/src/frameworks/a4xmax/dynamo-configs/${SERVING_CONFIG} \
   ${RELEASE_NAME} \
   $REPO_ROOT/src/helm-charts/a4xmax/inference-templates/dynamo-deployment
@@ -304,6 +312,16 @@ kubectl exec -it bench-client -n ${NAMESPACE} -- bash -c "
 "
 ```
 
+#### Expected Results
+
+Measured on 8 `a4x-maxgpu-4g-metal` nodes in one node pool, with the image digest and AIPerf command above, one 3600 s run per concurrency. Your numbers will vary with cluster state and image version.
+
+| Concurrency | Total tok/s (per GPU) | Output tok/s | TTFT p50 / p90 / p99 (s) | ITL p50 / p90 / p99 (ms) | Prefix cache read | Errors |
+| --- | --- | --- | --- | --- | --- | --- |
+| 32 | 228,630 (7,145) | 1,384 | 0.80 / 2.61 / 6.07 | 2.41 / 4.28 / 16.41 | 93.0% | 0 of 4,788 |
+| 96 | TBD | TBD | TBD | TBD | TBD | TBD |
+| 192 | TBD | TBD | TBD | TBD | TBD | TBD |
+
 <a name="monitoring"></a>
 ## 5. Monitoring and Troubleshooting
 
@@ -328,6 +346,7 @@ Common issues:
 
 * **Pods stuck in Pending**: Check that 8 `a4x-maxgpu-4g-metal` nodes are free in the same NVL72 domain.
 * **Worker fails to load the drafter**: Check that the drafter checkpoint is staged at the `speculative-draft-model-path` in `beam_high_int_agg.yaml`.
+* **Worker exits with `AttributeError: 'ServerArgs' object has no attribute 'get_model_config'`**: The image's `ai-dynamo` and SGLang versions don't match. Use the chart in this repo, whose launch script patches the call, or pin the image digest from section 2.7.
 * **Slow first startup**: The first load reads the checkpoint through GCS FUSE into the local SSD file cache. Later restarts on the same node read from the cache.
 
 <a name="cleanup"></a>

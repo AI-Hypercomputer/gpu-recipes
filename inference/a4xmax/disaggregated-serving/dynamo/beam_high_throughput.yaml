@@ -23,8 +23,12 @@ dynamo:
   rdma:
     claimTemplateName:
   serviceAccountName:
+  # Extra node labels for every Dynamo pod. Set this to one GB300 node pool
+  # (for example `cloud.google.com/gke-nodepool: <pool>`) so all workers share
+  # one NVLink domain when the cluster has more than one GB300 node pool.
+  nodeSelector: {}
   frontend:
-    image: lmsysorg/sglang:beam
+    image: lmsysorg/sglang:beam@sha256:0ea912aadc3d7827858de9aa5a312c4d51c254e7dbe670dbbe8181895b92071d
     replicas: 1
     envs:
       - name: DYN_DISCOVERY_BACKEND
@@ -326,7 +330,7 @@ service:
 
 workload:
   model: reflection/Beam-1.0-501B-A23B-NVFP4
-  image: lmsysorg/sglang:beam
+  image: lmsysorg/sglang:beam@sha256:0ea912aadc3d7827858de9aa5a312c4d51c254e7dbe670dbbe8181895b92071d
   framework: sglang
   configFile: serving-args.yaml
   configPath: /workload/configs

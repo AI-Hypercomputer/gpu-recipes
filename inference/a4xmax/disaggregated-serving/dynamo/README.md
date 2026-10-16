@@ -69,6 +69,7 @@ export NGC_API_KEY=<YOUR_NGC_API_KEY>
 export HF_TOKEN=<YOUR_HF_TOKEN>
 export RELEASE_VERSION=1.0.1
 export GCS_BUCKET=<YOUR_GCS_BUCKET>
+export NODE_POOL=<YOUR_GB300_NODE_POOL>
 
 # Set the project for gcloud commands
 gcloud config set project $PROJECT_ID
@@ -84,6 +85,9 @@ Replace the following values:
 | `NGC_API_KEY` | Your NVIDIA NGC API key (get from [NGC](https://ngc.nvidia.com)) | `nvapi-xxx...` |
 | `HF_TOKEN` | Your Hugging Face access token | `hf_xxx...` |
 | `GCS_BUCKET` | Your GCS bucket name (without `gs://` prefix for Helm `bucketName`) | `my-model-bucket` |
+| `NODE_POOL` | The GB300 node pool to run every worker in. All workers must share one NVLink domain | `a4xmax-np-1` |
+
+The Helm chart deploys into `dynamo.namespace` from the values file (`dynamo-cloud`). The install commands below pass `--set dynamo.namespace=${NAMESPACE}` so the release follows `NAMESPACE`. Resource names (ComputeDomain, deployment, `bench-client`) are fixed, so use a separate namespace for each release that runs at the same time.
 
 <a name="connect-cluster"></a>
 ### 2.3. Connect to your GKE Cluster
@@ -119,6 +123,8 @@ kubectl create secret generic hf-token-secret \
 
 <a name="install-platform"></a>
 ### 2.5. Install Dynamo Platform (One-Time Setup)
+
+Skip this step if the Dynamo Platform is already installed in the cluster. The operator watches all namespaces, and its CRDs are cluster-scoped, so don't install a second, older platform release on a shared cluster. The Reflection Beam recipe was reproduced on an existing `dynamo-platform` `1.4.2` install.
 
 Add the NVIDIA Helm repository:
 ```bash
@@ -253,6 +259,7 @@ helm install -f ${VALUES_FILE} \
   --set workload.model=${HF_MODEL_ID} \
   --set workload.image=${DYNAMO_IMAGE} \
   --set volumes.gcsfuse.bucketName=${GCS_BUCKET} \
+  --set dynamo.namespace=${NAMESPACE} \
   --set-file prefill_serving_config=$REPO_ROOT/src/frameworks/a4xmax/dynamo-configs/${PREFILL_CONFIG} \
   --set-file decode_serving_config=$REPO_ROOT/src/frameworks/a4xmax/dynamo-configs/${DECODE_CONFIG} \
   ${RELEASE_NAME} \
@@ -284,6 +291,7 @@ helm install -f ${VALUES_FILE} \
   --set workload.model=${HF_MODEL_ID} \
   --set workload.image=${DYNAMO_IMAGE} \
   --set volumes.gcsfuse.bucketName=${GCS_BUCKET} \
+  --set dynamo.namespace=${NAMESPACE} \
   --set-file prefill_serving_config=$REPO_ROOT/src/frameworks/a4xmax/dynamo-configs/${PREFILL_CONFIG} \
   --set-file decode_serving_config=$REPO_ROOT/src/frameworks/a4xmax/dynamo-configs/${DECODE_CONFIG} \
   ${RELEASE_NAME} \
@@ -296,7 +304,7 @@ helm install -f ${VALUES_FILE} \
 
 ```bash
 export HF_MODEL_ID="reflection/Beam-1.0-501B-A23B-NVFP4"
-export DYNAMO_IMAGE="lmsysorg/sglang:beam"
+export DYNAMO_IMAGE="lmsysorg/sglang:beam@sha256:0ea912aadc3d7827858de9aa5a312c4d51c254e7dbe670dbbe8181895b92071d"
 export VALUES_FILE="beam_high_throughput.yaml"
 export PREFILL_CONFIG="beam_high_throughput_prefill.yaml"
 export DECODE_CONFIG="beam_high_throughput_decode.yaml"
@@ -311,11 +319,15 @@ helm install -f ${VALUES_FILE} \
   --set workload.model=${HF_MODEL_ID} \
   --set workload.image=${DYNAMO_IMAGE} \
   --set volumes.gcsfuse.bucketName=${GCS_BUCKET} \
+  --set dynamo.namespace=${NAMESPACE} \
+  --set dynamo.nodeSelector."cloud\.google\.com/gke-nodepool"=${NODE_POOL} \
   --set-file prefill_serving_config=$REPO_ROOT/src/frameworks/a4xmax/dynamo-configs/${PREFILL_CONFIG} \
   --set-file decode_serving_config=$REPO_ROOT/src/frameworks/a4xmax/dynamo-configs/${DECODE_CONFIG} \
   ${RELEASE_NAME} \
   $REPO_ROOT/src/helm-charts/a4xmax/inference-templates/dynamo-deployment
 ```
+
+The `lmsysorg/sglang:beam` tag is mutable. The digest above contains SGLang `f7473673dd` and `ai-dynamo` `1.5.1`. The chart's worker launch script patches the one `ServerArgs.get_model_config()` call that this SGLang build removed, and only when the method is missing.
 
 <a name="inference-request"></a>
 ## 4. Inference Request and Benchmarking
@@ -412,6 +424,16 @@ kubectl exec -it bench-client -n ${NAMESPACE} -- bash -c "
 "
 ```
 
+#### Expected Results: Reflection Beam High Throughput (4P4D)
+
+Measured on 8 `a4x-maxgpu-4g-metal` nodes in one node pool, with the image digest and AIPerf command above, one 3600 s run per concurrency. Your numbers will vary with cluster state and image version.
+
+| Concurrency | Total tok/s (per GPU) | Output tok/s | TTFT p50 / p90 / p99 (s) | ITL p50 / p90 / p99 (ms) | Prefix cache read | Errors |
+| --- | --- | --- | --- | --- | --- | --- |
+| 32 | 194,144 (6,067) | 1,332 | 0.68 / 1.93 / 4.04 | 4.81 / 6.53 / 15.14 | 96.6% | 0 of 4,750 |
+| 96 | TBD | TBD | TBD | TBD | TBD | TBD |
+| 192 | TBD | TBD | TBD | TBD | TBD | TBD |
+
 <a name="benchmark-synthetic"></a>
 ### 4.4. Category 2: Synthetic Random-Dataset Benchmarking
 
@@ -473,17 +495,17 @@ kubectl get pods -n ${NAMESPACE}
 
 Frontend logs:
 ```bash
-kubectl logs -f deployment/$USER-dynamo-multi-node-serving-frontend -n ${NAMESPACE}
+kubectl logs -f <frontend-pod-name> -c main -n ${NAMESPACE}
 ```
 
 Decode worker logs:
 ```bash
-kubectl logs -f deployment/$USER-dynamo-multi-node-serving-decode-worker -n ${NAMESPACE}
+kubectl logs -f <decode-worker-pod-name> -c main -n ${NAMESPACE}
 ```
 
 Prefill worker logs:
 ```bash
-kubectl logs -f deployment/$USER-dynamo-multi-node-serving-prefill-worker -n ${NAMESPACE}
+kubectl logs -f <prefill-worker-pod-name> -c main -n ${NAMESPACE}
 ```
 
 Common issues:
