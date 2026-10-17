@@ -1,4 +1,4 @@
-# Copyright 2025 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,28 +13,33 @@
 # limitations under the License.
 
 enable-metrics: true
-served-model-name: deepseek-ai/DeepSeek-R1
+served-model-name: "nvidia/DeepSeek-R1-0528-NVFP4-v2"
+disaggregation-transfer-backend: "mooncake"
 disaggregation-bootstrap-port: "30001"
-disaggregation-mode: decode
+disaggregation-mode: "decode"
 host: "0.0.0.0"
 port: "9090"
-disable-radix-cache: true
-tensor-parallel-size: 4
-data-parallel-size: 1
-expert-parallel-size: 1
+discovery-backend: "kubernetes"
+event-plane: "zmq"
+request-plane: "tcp"
+context-length: 9600
+decode-log-interval: 1000
+prefill-round-robin-balance: true
 trust-remote-code: true
+disable-radix-cache: true
 kv-cache-dtype: "fp8_e4m3"
 attention-backend: "trtllm_mla"
-quantization: "fp8"
+quantization: "modelopt_fp4"
 moe-runner-backend: "flashinfer_trtllm"
-watchdog-timeout: "1000000"
-context-length: "9600"
-mem-fraction-static: "0.95"
-chunked-prefill-size: "8192"
-cuda-graph-max-bs: "512"
-max-running-requests: "512"
-scheduler-recv-interval: "10"
-enable-flashinfer-allreduce-fusion: true
+fp4-gemm-backend: "flashinfer_trtllm"
+stream-interval: 50
+watchdog-timeout: 1000000
+mem-fraction-static: 0.95
+chunked-prefill-size: 8192
+cuda-graph-max-bs: 256
+scheduler-recv-interval: 10
 enable-symm-mem: true
-moe-dense-tp-size: "1"
-prefill-round-robin-balance: true
+tp: 4
+ep-size: 1
+max-total-tokens: 131072
+disaggregation-ib-device: "mlx5_0,mlx5_1,mlx5_2,mlx5_3"
