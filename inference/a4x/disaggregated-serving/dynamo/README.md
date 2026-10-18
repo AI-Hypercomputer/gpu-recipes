@@ -135,7 +135,7 @@ Install the Dynamo CRDs:
 helm install dynamo-crds dynamo-crds-${RELEASE_VERSION}.tgz \
   --namespace default \
   --wait \
-  --atomic
+  --rollback-on-failure
 ```
 
 Install the Dynamo Platform with Grove & Kai scheduler enabled:
@@ -158,7 +158,7 @@ It is recommended to utilize [gcsfuse](https://docs.cloud.google.com/kubernetes-
 
 Find the service account (usually annotated to default):
 ```bash
-kubectl get serviceaccounts ${NAMESPACE} -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.annotations.iam\.gke\.io/gcp-service-account}{"\n"}{end}'
+kubectl get serviceaccounts -n ${NAMESPACE} -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.annotations.iam\.gke\.io/gcp-service-account}{"\n"}{end}'
 ```
 
 Config the service account email:
