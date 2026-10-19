@@ -38,17 +38,18 @@ volumes:
   gcsMounts:
     - bucketName:
       mountPath: "/gcs"
+      mountOptions: "implicit-dirs,file-cache:max-size-mb:0,file-cache:cache-file-for-range-read:false"
 
 gpuPlatformSettings:
   useHostPlugin: false
-  ncclPluginImage: "us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/nccl-plugin-gpudirecttcpx-dev:v1.0.8-1"
-  rxdmImage: "us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/tcpgpudmarxd-dev:v1.0.14"
-  ncclBuildType: 223
+  ncclPluginImage: "us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/nccl-plugin-gpudirecttcpx-dev:v1.0.18"
+  rxdmImage: "us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/tcpgpudmarxd-dev:v1.0.24"
+  ncclBuildType: 228
 
 network:
   ncclSettings:
   - name: NCCL_DEBUG
-    value: "VERSION"
+    value: "WARN"
   subnetworks[]:
 
 vllm:

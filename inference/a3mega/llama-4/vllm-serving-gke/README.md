@@ -140,7 +140,7 @@ Llama 4 models are offered in various sizes and precision and have 17B tokens wh
 | [Llama-4-Scout-17B-16E](https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E) | 109B | BF16 | 1M |
 | [Llama-4-Scout-17B-16E-Instruct](https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct) | 109B | BF16 | 1M |
 | [Llama-4-Maverick-17B-128E](https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E) | 400B | FP8 | 430k |
-| [Llama-4-Maverick-17B-128E-Instruct](https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct) | 400B | FP8 | 430k|
+| [Llama-4-Maverick-17B-128E-Instruct-FP8](https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8) | 400B | FP8 | 430k|
 
 
 To start the serving, the recipe does the following steps:
@@ -177,7 +177,7 @@ The recipe uses the helm chart to run the above steps.
         $REPO_ROOT/src/helm-charts/a3mega/vllm-inference/single-host
       ```
 
-      b. To serve the `Llama-4-Scout-17B-128E-Instruct-FP8` model, run
+      b. To serve the `Llama-4-Maverick-17B-128E-Instruct-FP8` model, run
       ```bash
         cd $RECIPE_ROOT
         helm install -f values.yaml \
@@ -236,7 +236,7 @@ The recipe uses the helm chart to run the above steps.
     kubectl port-forward svc/$USER-serving-llama-4-svc 8000:8000
     ```
 
-7. Make the API requests to the service.
+7. Make the API requests to the service (ensure the `model` field matches the model deployed in step 2, e.g., `meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8` or `meta-llama/Llama-4-Scout-17B-16E-Instruct`).
 
     ```bash
     curl http://localhost:8000/v1/chat/completions \

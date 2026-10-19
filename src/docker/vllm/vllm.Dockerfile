@@ -19,6 +19,7 @@ ARG VLLM_VERSION
 
 WORKDIR /workspace
 COPY ray_init.sh /workspace/ray_init.sh
+RUN chmod +x /workspace/ray_init.sh && mkdir -p /vllm-workspace && cp -p /workspace/ray_init.sh /vllm-workspace/ray_init.sh
 
 RUN apt-get update && apt-get install -y --no-install-recommends pciutils
 

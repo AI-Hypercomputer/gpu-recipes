@@ -17,8 +17,6 @@ kind: Service
 metadata:
   name: {{ .Release.Name }}-svc
 spec:
-  selector:
-    app: {{ .Release.Name }}-serving
   ports:
     - name: http
       port: {{ .Values.vllm.service.ports.http }}
