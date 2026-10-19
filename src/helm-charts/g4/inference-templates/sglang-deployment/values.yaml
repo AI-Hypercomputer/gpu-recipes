@@ -1,0 +1,64 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Defaults for the G4 single-host SGLang chart. A recipe overrides these with its own values
+# file and passes the SGLang server arguments with:
+#   --set-file serving_config=$REPO_ROOT/src/frameworks/g4/sglang-configs/<config>.yaml
+# Each serving_config key renders as `--<key> <value>`; `true` renders a bare flag, and
+# `false` or null omit the flag. The chart sets --model-path, --speculative-draft-model-path,
+# --host and --port itself, so serving_config must not contain them.
+
+workload:
+  name: sglang-g4
+  image: ""                     # Required.
+  imagePullPolicy: IfNotPresent
+  modelPath: ""                 # Required. Hugging Face model ID (downloaded on launch to volumes.ssdMountPath).
+  drafterPath: ""               # Optional. Speculative-decoding draft model Hugging Face ID.
+  envs: []                      # List of container env entries (name/value or valueFrom).
+  resources:
+    requests:
+      nvidia.com/gpu: "8"
+    limits:
+      nvidia.com/gpu: "8"
+
+# Optional Hugging Face token secret (recommended to avoid rate limits during weight download on launch).
+huggingface:
+  secretName: hf-secret
+  secretData:
+    token: hf_api_token
+
+# Optional list of node hostnames to pin the pod to.
+targetNodes: []
+
+service:
+  port: 30080
+
+volumes:
+  ssdMountPath: /ssd            # Mount path for HF_HOME weight downloads.
+  # When ephemeralScratchSize is set, mounts a pod-scoped ephemeral volumeClaimTemplate at ssdMountPath
+  # (works on G4 node pools without Local SSDs). When empty, mounts /mnt/stateful_partition/kube-ephemeral-ssd.
+  ephemeralScratchSize: 500Gi
+  ephemeralStorageClass: dynamic-rwo
+  hostCachePath: /var/lib/sglang-cache
+  shmSize: 32Gi
+
+# Optional source patch applied to the SGLang installation before the server starts:
+#   --set-file patch.content=<path to .patch file>
+# The patch is applied with -p1 in targetDir; empty means the directory that contains the
+# sglang package the image imports.
+patch:
+  content: ""
+  targetDir: ""
+
+serving_config: ""
