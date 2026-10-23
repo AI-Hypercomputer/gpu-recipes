@@ -1,0 +1,54 @@
+"client":
+  "bash_command": |-
+    while ! curl http://${SERVER_HOSTNAME}:8000/ping; do sleep 30 && echo 'Waiting for server...'; done
+
+    vllm bench serve \
+    --dataset-name=random \
+    --random-input-len=1024 \
+    --random-output-len=128 \
+    --host=${SERVER_HOSTNAME} \
+    --port=8000 \
+    --model=meta-llama/Llama-3.1-8B-Instruct \
+    --tokenizer=meta-llama/Llama-3.1-8B-Instruct \
+    --num-prompts=100
+  "client_type": |-
+    VLLM_BENCH
+  "image": |-
+    vllm/vllm-openai:latest
+"gcp_service_account": !!null |-
+  null
+"hf_token": !!null |-
+  null
+"is_multi_host": !!bool |-
+  false
+"kueue_local_queue": !!null |-
+  null
+"kueue_priority_class": |-
+  medium
+"server":
+  "bash_command": |-
+    VLLM_CUSTOM_ALL_REDUCE=0 NCCL_DEBUG=INFO python3 -m vllm.entrypoints.openai.api_server \
+    --host=0.0.0.0 \
+    --port=8000 \
+    --download-dir=/data \
+    --tensor-parallel-size=8 \
+    --max-model-len=8192 \
+    --gpu-memory-utilization=0.95 \
+    --max-num-batched-tokens=8192 \
+    --max-num-seqs=256 \
+    --model=meta-llama/Llama-3.1-8B-Instruct \
+    --tokenizer=meta-llama/Llama-3.1-8B-Instruct \
+    --no-enable-prefix-caching \
+    --additional_config='--enforce-eager --disable-custom-all-reduce'
+  "data_disk_size": |-
+    100Gi
+  "image": |-
+    vllm/vllm-openai:latest
+  "num_chips_per_node": !!int |-
+    8
+  "num_nodes": !!int |-
+    1
+  "profile": !!bool |-
+    false
+  "worker_bash_command": !!null |-
+    null
