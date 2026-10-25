@@ -1,5 +1,12 @@
 # Disaggregated Multi-Node Inference with NVIDIA Dynamo on A4X-MAX GKE
 
+For **Nemotron-3-Ultra NVFP4 with 8 prefill + 8 decode workers (64 GPUs)**, see
+the [Dynamo KV-aware versus round-robin benchmark](sglang/README.md).
+It includes a separate [disagg recipe](sglang/n3u-kv-vs-rr/recipe.json),
+[deployment steps](sglang/n3u-kv-vs-rr/deploy.sh), and
+[sweep script](sglang/n3u-kv-vs-rr/sweep.sh). The DeepSeek recipes below
+use different models, parallelism, and workloads.
+
 This document outlines the steps to deploy and serve Large Language Models (LLMs) using [NVIDIA Dynamo](https://github.com/ai-dynamo/dynamo) disaggregated inference platform on [A4X-MAX (GB300) GKE Node pools](https://cloud.google.com/kubernetes-engine).
 
 Dynamo provides a disaggregated architecture that separates prefill and decode operations for optimized inference performance, supporting both single-node (4 GPUs) and multi-node NVL72 (72 GPUs) configurations. Dynamo also supports various inference framework backends like [vLLM](https://docs.nvidia.com/dynamo/latest/components/backends/vllm/README.html) and [SGLang](https://docs.nvidia.com/dynamo/latest/components/backends/sglang/README.html). In this recipe, we will focus on serving using the SGLang backend. 

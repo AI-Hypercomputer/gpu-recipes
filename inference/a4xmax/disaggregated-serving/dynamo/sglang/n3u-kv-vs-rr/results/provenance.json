@@ -1,0 +1,12 @@
+{
+  "snapshot_utc": "2026-09-20T02:53:46.351745+00:00",
+  "source_commit": "74b0e3a6c376a089d9ad030aba95d4f629757752",
+  "source_report": "https://github.com/alisachen-google/gcp-dynamo-cuj/blob/74b0e3a6c376a089d9ad030aba95d4f629757752/kv-cache-aware-bench/nemotron-3-ultra-550b-nvfp4/reports/agentx-serving-perf-report.md",
+  "source_csv_sha256": "6f12e306f58e4eb62047e9799b4374d7675f1a48274c6bb202599ee91f534922",
+  "files": {
+    "agg-curves.png": "c360a2d56719c914cb9dfbd6978ca5a8e069427d26244b2512caf0113858a47c",
+    "disagg-curves.png": "2f12723e9f115b0aca35a7258a41417fd1fd468e97acc25f7a697a1a384a273b",
+    "measured.csv": "c3ef8c3576134dfc12c7db4556db27f0888d2d2d583a725f0a4b8163a7d9e566"
+  },
+  "notes": "37 hardware runs, including tuned settings and repeats. Curves connect original default KV and RR ladders only. New scripts have not been run on hardware."
+}
