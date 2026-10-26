@@ -1,0 +1,48 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# DeepSeek-R1-0528 FP8 | point ll (Low latency) | srt-slurm recipe `gb300-fp8/8k1k/stp/low-latency` | PREFILL worker
+#
+# Each `key: value` line becomes `--key value` on the dynamo.sglang command line;
+# `key: true` becomes a bare `--key` flag. Multi-node rendezvous flags
+# (--dist-init-addr/--nnodes/--node-rank) and --model-path are injected by the
+# Dynamo operator and the Helm chart launcher, so they are not listed here.
+
+served-model-name: "deepseek-ai/DeepSeek-R1"
+disaggregation-mode: "prefill"
+disaggregation-transfer-backend: "nixl"
+disaggregation-bootstrap-port: "30001"
+host: "0.0.0.0"
+port: "9090"
+trust-remote-code: true
+kv-cache-dtype: "fp8_e4m3"
+attention-backend: "trtllm_mla"
+disable-radix-cache: true
+watchdog-timeout: "1000000"
+context-length: "9300"
+quantization: "fp8"
+moe-runner-backend: "flashinfer_trtllm"
+fp8-gemm-backend: "flashinfer_trtllm"
+tensor-parallel-size: "4"
+data-parallel-size: "1"
+expert-parallel-size: "1"
+stream-interval: "10"
+mem-fraction-static: "0.95"
+max-total-tokens: "32768"
+chunked-prefill-size: "32768"
+max-prefill-tokens: "32768"
+cuda-graph-max-bs: "128"
+max-running-requests: "128"
+load-balance-method: "round_robin"
+scheduler-recv-interval: "10"
