@@ -19,6 +19,7 @@ In aggregated mode, every Dynamo worker runs both prefill and decode for its req
 * [3. Deploy with SGLang Backend](#deploy-sglang)
   * [3.1. Supported Models and Deployment Categories](#supported-models)
   * [3.2. High Interactivity Deployment](#sglang-high-interactivity)
+  * [3.3. KV-Aware vs. Round-Robin Routing for Coding Agents (Nemotron-3-Ultra, 6 workers)](#sglang-nemotron3-ultra-agg)
 * [4. Inference Request and Benchmarking](#inference-request)
   * [4.1. Verify Deployment Readiness](#verify-readiness)
   * [4.2. Deploy the Benchmark Client](#deploy-bench-client)
@@ -36,6 +37,7 @@ This recipe has been tested with the following configuration:
 * **GKE Cluster**:
     * GPU node pools with [a4x-maxgpu-4g-metal](https://docs.cloud.google.com/compute/docs/gpus#gb300-gpus) machines:
       * 8 machines with 4 GPUs each (32 GPUs total), one Dynamo worker per machine
+      * For the Nemotron-3-Ultra deployment: 6 machines with 4 GPUs each (24 GPUs total), one Dynamo worker per machine
     * [Workload Identity Federation for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity) enabled
     * [Cloud Storage FUSE CSI driver for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/cloud-storage-fuse-csi-driver) enabled
 
@@ -189,6 +191,7 @@ The runtime image comes from the Helm values file (`workload.image` and `dynamo.
 
 The chart sets `runtimeVersionOverride` to `dynamo.releaseVersion` (`1.0.1`) because the Dynamo operator can't infer the runtime version from a custom image tag.
 
+
 <a name="deploy-sglang"></a>
 ## 3. Deploy with SGLang Backend
 
@@ -202,6 +205,7 @@ This recipe reuses the Dynamo Helm chart at `$REPO_ROOT/src/helm-charts/a4xmax/i
 | Model Name | Hugging Face ID / Path (`HF_MODEL_ID`) | Deployment Category | Topology & GPUs | Helm Values File (`VALUES_FILE`) | Serving Config (`SERVING_CONFIG`) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Reflection Beam 501B (NVFP4)** | [`reflection/Beam-1.0-501B-A23B-NVFP4`](https://huggingface.co/reflection/Beam-1.0-501B-A23B-NVFP4) | High Interactivity (DFlash2) | 8 aggregated workers (8 nodes / 32 GPUs) | `beam_high_int.yaml` | `beam_high_int_agg.yaml` |
+| **NVIDIA Nemotron-3-Ultra 550B (NVFP4)** | [`nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4`](https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4) | KV-Aware vs. Round-Robin Routing | 6 aggregated workers (6 nodes / 24 GPUs) | [`nemotron3-ultra-kv-vs-rr/nemotron3_ultra_agg_kv.yaml`](nemotron3-ultra-kv-vs-rr/nemotron3_ultra_agg_kv.yaml) (KV-aware) or [`nemotron3-ultra-kv-vs-rr/nemotron3_ultra_agg_rr.yaml`](nemotron3-ultra-kv-vs-rr/nemotron3_ultra_agg_rr.yaml) (round-robin) | `nemotron3-ultra-nvfp4-agg.yaml` |
 
 <a name="sglang-high-interactivity"></a>
 ### 3.2. High Interactivity Deployment
@@ -232,6 +236,15 @@ helm install -f ${VALUES_FILE} \
   ${RELEASE_NAME} \
   $REPO_ROOT/src/helm-charts/a4xmax/inference-templates/dynamo-deployment
 ```
+
+<a name="sglang-nemotron3-ultra-agg"></a>
+### 3.3. KV-Aware vs. Round-Robin Routing for Coding Agents (Nemotron-3-Ultra, 6 workers / 24 GPUs)
+
+[Back to Top](#table-of-contents)
+
+This category serves [NVIDIA Nemotron-3-Ultra 550B-A55B (NVFP4)](https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4) to coding agents, whose long multi-turn prompts resend the same prefix on every turn. It runs 6 aggregated workers (TP4/EP4) in one 6-node NVL72 domain, and compares the Dynamo KV-aware router with round-robin routing on the same workers.
+
+Everything for this category lives in [`nemotron3-ultra-kv-vs-rr/`](nemotron3-ultra-kv-vs-rr/README.md): the KV-aware and round-robin values files, image build, deployment of both arms, the A/B benchmark, router tuning and troubleshooting.
 
 <a name="inference-request"></a>
 ## 4. Inference Request and Benchmarking
