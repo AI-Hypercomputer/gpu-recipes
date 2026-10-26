@@ -1,0 +1,241 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# DeepSeek-V4-Pro (MXFP4) + EAGLE MTP — operating point `p4` (Mid-curve)
+# Topology: 1 prefill worker(s) x 1 node(s) + 1 decode worker(s) x 4 node(s)
+#           = 5 nodes / 20 GB300 GPUs inside one NVL72 ComputeDomain
+# Source recipe: NVIDIA srt-slurm `disagg-mid-curve-1p1d-dep4-dep16-mtp`
+# Pair with: src/frameworks/a4xmax/dynamo-configs/dsv4-p4-mid-curve-1p1d-dep4-dep16-prefill.yaml
+#            src/frameworks/a4xmax/dynamo-configs/dsv4-p4-mid-curve-1p1d-dep4-dep16-decode.yaml
+
+dynamo:
+  namespace: dynamo-cloud
+  releaseVersion: "1.0.1"
+  deploymentName: dsv4-p4
+  computeDomain:
+    name: dsv4-p4-domain
+    numNodes: 5
+    resourceClaimTemplateName: dsv4-p4-compute-domain-channel
+  # KV transfer rides the NVL72 fabric (MNNVL); no RDMA NIC resource claim is requested.
+  serviceAccountName:
+  frontend:
+    image: nvcr.io/nvidia/ai-dynamo/dynamo-frontend:1.0.1
+    replicas: 9
+    livenessProbe:
+      initialDelaySeconds: 3000
+      periodSeconds: 60
+      timeoutSeconds: 150
+      failureThreshold: 100
+    readinessProbe:
+      initialDelaySeconds: 3000
+      periodSeconds: 60
+      timeoutSeconds: 300
+      failureThreshold: 100
+  decodeWorker:
+    nodeCount: 4
+    replicas: 1
+    envs:
+    - name: HF_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: hf-token-secret
+          key: HF_TOKEN
+    - name: HF_HUB_ENABLE_HF_TRANSFER
+      value: "1"
+    - name: LD_LIBRARY_PATH
+      value: "/usr/local/ucx/lib:/usr/local/ucx/lib/ucx:/opt/nvidia/nvda_nixl/lib/aarch64-linux-gnu:/opt/nvidia/nvda_nixl/lib/aarch64-linux-gnu/plugins:/usr/local/nvidia/lib64"
+    - name: PYTHONUNBUFFERED
+      value: "1"
+    - name: GLOO_SOCKET_IFNAME
+      value: "eth0"
+    - name: TP_SOCKET_IFNAME
+      value: "eth0"
+    - name: UCX_TLS
+      value: "cuda_copy,cuda_ipc,tcp"
+    - name: UCX_CUDA_IPC_ENABLE_MNNVL
+      value: "y"
+    - name: UCX_MEMTYPE_CACHE
+      value: "n"
+    - name: UCX_MEMTYPE_REG_WHOLE
+      value: "n"
+    - name: MC_FORCE_MNNVL
+      value: "1"
+    - name: MC_TE_METRIC
+      value: "true"
+    - name: NCCL_MNNVL_ENABLE
+      value: "1"
+    - name: NCCL_CUMEM_ENABLE
+      value: "1"
+    - name: SGLANG_MOONCAKE_CUSTOM_MEM_POOL
+      value: "True"
+    - name: SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE
+      value: "100000"
+    - name: SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT
+      value: "100000"
+    - name: SGLANG_DISAGGREGATION_WAITING_TIMEOUT
+      value: "100000"
+    - name: SGLANG_RADIX_DISABLE_REUSE
+      value: "1"
+    - name: SGLANG_JIT_DEEPGEMM_FAST_WARMUP
+      value: "1"
+    - name: SGLANG_DEFAULT_THINKING
+      value: "1"
+    - name: SGLANG_DSV4_REASONING_EFFORT
+      value: "max"
+    - name: SGLANG_OPT_SWA_SPLIT_LEAF_ON_INSERT
+      value: "1"
+    - name: SGLANG_OPT_SWA_RELEASE_LEAF_LOCK_AFTER_WINDOW
+      value: "1"
+    - name: SGLANG_OPT_SWA_EVICT_DROP_PAGE_MARGIN
+      value: "1"
+    - name: SGLANG_OPT_DEEPGEMM_MEGA_MOE_USE_FP4_ACTS
+      value: "1"
+    - name: SGLANG_OPT_DEEPGEMM_MEGA_MOE_USE_MXF4_KIND
+      value: "1"
+    - name: SGLANG_OPT_DEEPGEMM_MEGA_MOE_NUM_MAX_TOKENS_PER_RANK
+      value: "2048"
+    livenessProbe:
+      initialDelaySeconds: 600
+      periodSeconds: 60
+      timeoutSeconds: 30
+      failureThreshold: 60
+    readinessProbe:
+      initialDelaySeconds: 60
+      periodSeconds: 60
+      timeoutSeconds: 30
+      failureThreshold: 60
+    startupProbe:
+      initialDelaySeconds: 3000
+      periodSeconds: 60
+      timeoutSeconds: 30
+      failureThreshold: 1800
+  prefillWorker:
+    nodeCount: 1
+    replicas: 1
+    envs:
+    - name: HF_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: hf-token-secret
+          key: HF_TOKEN
+    - name: HF_HUB_ENABLE_HF_TRANSFER
+      value: "1"
+    - name: LD_LIBRARY_PATH
+      value: "/usr/local/ucx/lib:/usr/local/ucx/lib/ucx:/opt/nvidia/nvda_nixl/lib/aarch64-linux-gnu:/opt/nvidia/nvda_nixl/lib/aarch64-linux-gnu/plugins:/usr/local/nvidia/lib64"
+    - name: PYTHONUNBUFFERED
+      value: "1"
+    - name: GLOO_SOCKET_IFNAME
+      value: "eth0"
+    - name: TP_SOCKET_IFNAME
+      value: "eth0"
+    - name: UCX_TLS
+      value: "cuda_copy,cuda_ipc,tcp"
+    - name: UCX_CUDA_IPC_ENABLE_MNNVL
+      value: "y"
+    - name: UCX_MEMTYPE_CACHE
+      value: "n"
+    - name: UCX_MEMTYPE_REG_WHOLE
+      value: "n"
+    - name: MC_FORCE_MNNVL
+      value: "1"
+    - name: MC_TE_METRIC
+      value: "true"
+    - name: NCCL_MNNVL_ENABLE
+      value: "1"
+    - name: NCCL_CUMEM_ENABLE
+      value: "1"
+    - name: SGLANG_MOONCAKE_CUSTOM_MEM_POOL
+      value: "True"
+    - name: SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE
+      value: "100000"
+    - name: SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT
+      value: "100000"
+    - name: SGLANG_DISAGGREGATION_WAITING_TIMEOUT
+      value: "100000"
+    - name: SGLANG_RADIX_DISABLE_REUSE
+      value: "1"
+    - name: SGLANG_JIT_DEEPGEMM_FAST_WARMUP
+      value: "1"
+    - name: SGLANG_DEFAULT_THINKING
+      value: "1"
+    - name: SGLANG_DSV4_REASONING_EFFORT
+      value: "max"
+    - name: SGLANG_OPT_SWA_SPLIT_LEAF_ON_INSERT
+      value: "1"
+    - name: SGLANG_OPT_SWA_RELEASE_LEAF_LOCK_AFTER_WINDOW
+      value: "1"
+    - name: SGLANG_OPT_SWA_EVICT_DROP_PAGE_MARGIN
+      value: "1"
+    - name: SGLANG_OPT_USE_CUSTOM_ALL_REDUCE_V2
+      value: "1"
+    - name: SGLANG_OPT_DEEPGEMM_MEGA_MOE_USE_FP4_ACTS
+      value: "1"
+    - name: SGLANG_OPT_DEEPGEMM_MEGA_MOE_USE_MXF4_KIND
+      value: "1"
+    - name: SGLANG_OPT_DEEPGEMM_MEGA_MOE_NUM_MAX_TOKENS_PER_RANK
+      value: "9216"
+    livenessProbe:
+      initialDelaySeconds: 3000
+      periodSeconds: 60
+      timeoutSeconds: 30
+      failureThreshold: 60
+    readinessProbe:
+      initialDelaySeconds: 3000
+      periodSeconds: 60
+      timeoutSeconds: 30
+      failureThreshold: 60
+    startupProbe:
+      initialDelaySeconds: 3000
+      periodSeconds: 60
+      timeoutSeconds: 30
+      failureThreshold: 1800
+
+secrets:
+  ngc:
+    secretName: nvcr-secret
+  huggingface:
+    secretName: hf-token-secret
+    secretData:
+      token: "hf_api_token"
+
+volumes:
+  useGcs: true
+  gcsfuse:
+    bucketName:
+  ssdMountPath: "/ssd"
+  gcsMounts:
+    mountPath: "/data/model"
+
+service:
+  type: ClusterIP
+  ports:
+    frontend: 8000
+    worker: 9090
+
+workload:
+  model: deepseek-ai/DeepSeek-V4-Pro
+  image:
+  framework: sglang
+  configFile: serving-args.yaml
+  configPath: /workload/configs
+
+network:
+  subnetworks: []
+  gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib-diagnostic-arm64:v1.0.7
+  ncclSettings:
+    - name: NCCL_DEBUG
+      value: "VERSION"
+
+quantizations:
+  - "fp4"

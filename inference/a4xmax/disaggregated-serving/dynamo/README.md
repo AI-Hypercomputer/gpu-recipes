@@ -20,6 +20,7 @@ Dynamo provides a disaggregated architecture that separates prefill and decode o
   * [3.1. Supported Models and Deployment Categories](#supported-models)
   * [3.2. Category 1: High Interactivity / Low Latency Deployment](#sglang-high-interactivity)
   * [3.3. Category 2: High Throughput Multi-Node Deployment](#sglang-high-throughput)
+  * [3.4. Category 3: InferenceX Pareto-Sweep Operating Points (DeepSeek-V4-Pro, DeepSeek-R1)](#sglang-pareto-sweep)
 * [4. Inference Request and Benchmarking](#inference-request)
   * [4.1. Verify Deployment Readiness](#verify-readiness)
   * [4.2. Deploy the Benchmark Client](#deploy-bench-client)
@@ -324,6 +325,17 @@ helm install -f ${VALUES_FILE} \
   ${RELEASE_NAME} \
   $REPO_ROOT/src/helm-charts/a4xmax/inference-templates/dynamo-deployment
 ```
+
+<a name="sglang-pareto-sweep"></a>
+### 3.4. Category 3: InferenceX Pareto-Sweep Operating Points (DeepSeek-V4-Pro, DeepSeek-R1)
+
+The [`pareto-sweep/`](./pareto-sweep/README.md) sub-recipe packages every operating point of the public InferenceX GB300 Pareto curves for **DeepSeek-V4-Pro (MXFP4 + EAGLE MTP)**, **DeepSeek-R1 (NVFP4)** and **DeepSeek-R1 (FP8)** as a values file plus a prefill/decode serving-config pair for this chart. Each point is labelled by its position on the curve (low latency, mid-curve, max throughput) and comes with its topology, GPU count and benchmark concurrencies, so you can deploy a specific point from 2 to 18 nodes and reproduce it with the InferenceX 8k/1k methodology.
+
+| Model | Points | Topologies | Recipe |
+| :--- | :--- | :--- | :--- |
+| **DeepSeek-V4-Pro (MXFP4 + MTP)** | p1 to p8 | 1P1D TP4 (8 GPUs) up to 8P1D DEP4/DEP8 (40 GPUs) | [pareto-sweep/README.md#points-dsv4](./pareto-sweep/README.md#points-dsv4) |
+| **DeepSeek-R1 671B (NVFP4)** | low_latency, mid_curve, max_tpt | 1P4D TP4 (20 GPUs), 6P1D TP4/DEP48 and 10P1D TP4/DEP32 (72 GPUs) | [pareto-sweep/README.md#points-dsr1-fp4](./pareto-sweep/README.md#points-dsr1-fp4) |
+| **DeepSeek-R1 671B (FP8)** | low-latency, mid, max | 1P1D TP4 (8 GPUs), 5P1D DEP8/DEP32 and 6P1D DEP8/DEP24 (72 GPUs) | [pareto-sweep/README.md#points-dsr1-fp8](./pareto-sweep/README.md#points-dsr1-fp8) |
 
 <a name="inference-request"></a>
 ## 4. Inference Request and Benchmarking

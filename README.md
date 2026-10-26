@@ -183,6 +183,8 @@ Models             | GPU Machine Type                                           
 | **Reflection Beam 501B** | [A4X MAX (NVIDIA GB300)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Dynamo + SGLang | Aggregated Inference | GKE | [Link](./inference/a4xmax/aggregated-serving/dynamo/README.md) |
 | **Reflection Beam 501B** | [A4X MAX (NVIDIA GB300)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Dynamo + SGLang | Disaggregated Inference | GKE | [Link](./inference/a4xmax/disaggregated-serving/dynamo/README.md) |
 | **DeepSeek R1 671B** | [A4X MAX (NVIDIA GB300)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Dynamo + SGLang | Disaggregated Inference | GKE | [Link](./inference/a4xmax/disaggregated-serving/dynamo/README.md) |
+| **DeepSeek V4 Pro (MXFP4 + MTP)** | [A4X MAX (NVIDIA GB300)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Dynamo + SGLang | Disaggregated Inference (InferenceX Pareto sweep) | GKE | [Link](./inference/a4xmax/disaggregated-serving/dynamo/pareto-sweep/README.md) |
+| **DeepSeek R1 671B (NVFP4 / FP8)** | [A4X MAX (NVIDIA GB300)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Dynamo + SGLang | Disaggregated Inference (InferenceX Pareto sweep) | GKE | [Link](./inference/a4xmax/disaggregated-serving/dynamo/pareto-sweep/README.md) |
 
 
 ### Inference benchmarks G4
