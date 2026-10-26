@@ -21,6 +21,7 @@ Dynamo provides a disaggregated architecture that separates prefill and decode o
   * [3.2. Category 1: High Interactivity / Low Latency Deployment](#sglang-high-interactivity)
   * [3.3. Category 2: High Throughput Multi-Node Deployment](#sglang-high-throughput)
   * [3.4. Category 3: InferenceX Pareto-Sweep Operating Points (DeepSeek-V4-Pro, DeepSeek-R1)](#sglang-pareto-sweep)
+  * [3.5. Category 4: KV-Aware vs. Round-Robin Routing for Coding Agents (Nemotron-3-Ultra 8P8D)](#sglang-nemotron3-ultra-8p8d)
 * [4. Inference Request and Benchmarking](#inference-request)
   * [4.1. Verify Deployment Readiness](#verify-readiness)
   * [4.2. Deploy the Benchmark Client](#deploy-bench-client)
@@ -40,6 +41,7 @@ This recipe has been tested with the following configuration:
     * GPU node pools with [a4x-maxgpu-4g-metal](https://docs.cloud.google.com/compute/docs/gpus#gb300-gpus) machines:
       * For 1P1D low-latency deployment: 2 machines with 4 GPUs each (8 GPUs total)
       * For multi-node high-throughput deployment (e.g., 4P4D / 3P5D on 32 GPUs, or 10P8D on 72 GPUs): 8 to 18 machines with 4 GPUs each (32 to 72 GPUs total)
+      * For the Nemotron-3-Ultra 8P8D agentic deployment: 16 machines with 4 GPUs each (64 GPUs total) in one NVL72 domain
     * [Workload Identity Federation for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/workload-identity) enabled
     * [Cloud Storage FUSE CSI driver for GKE](https://cloud.google.com/kubernetes-engine/docs/concepts/cloud-storage-fuse-csi-driver) enabled
 
@@ -213,6 +215,7 @@ Set your environment to use the runtime image:
 export DYNAMO_IMAGE="nvcr.io/nvidia/ai-dynamo/sglang-runtime:1.0.1-cuda13"
 ```
 
+
 <a name="deploy-sglang"></a>
 ## 3. Deploy with SGLang Backend
 
@@ -228,9 +231,10 @@ This recipe is organized into deployment categories that pair a Helm topology (`
 | **DeepSeek-R1 671B (FP8)** | `deepseek-ai/DeepSeek-R1` | Low-Latency / without DeepEP | 1P1D (2 nodes / 8 GPUs) | `values_wo_deepep.yaml` | `deepseek-r1-fp8-1p1d-prefill.yaml` | `deepseekr1-fp8-1p1d-decode.yaml` |
 | **DeepSeek-R1 671B (FP8)** | `deepseek-ai/DeepSeek-R1` | High-Throughput / with DeepEP | 10P8D (18 nodes / 72 GPUs) | `values_deepep.yaml` | `deepseekr1-fp8-10p8d-prefill.yaml` | `deepseekr1-fp8-10p8d-decode.yaml` |
 | **Reflection Beam 501B (NVFP4)** | [`reflection/Beam-1.0-501B-A23B-NVFP4`](https://huggingface.co/reflection/Beam-1.0-501B-A23B-NVFP4) | High Throughput | 4P4D (8 nodes / 32 GPUs) | `beam_high_throughput.yaml` | `beam_high_throughput_prefill.yaml` | `beam_high_throughput_decode.yaml` |
+| **NVIDIA Nemotron-3-Ultra 550B (NVFP4)** | [`nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4`](https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4) | KV-Aware vs. Round-Robin Routing | 8P8D (16 nodes / 64 GPUs) | [`nemotron3-ultra-kv-vs-rr/nemotron3_ultra_8p8d_kv.yaml`](nemotron3-ultra-kv-vs-rr/nemotron3_ultra_8p8d_kv.yaml) (KV-aware) or [`nemotron3-ultra-kv-vs-rr/nemotron3_ultra_8p8d_rr.yaml`](nemotron3-ultra-kv-vs-rr/nemotron3_ultra_8p8d_rr.yaml) (round-robin) | `nemotron3-ultra-nvfp4-8p8d-prefill.yaml` | `nemotron3-ultra-nvfp4-8p8d-decode.yaml` |
 
 > [!NOTE]
-> The Reflection Beam High Interactivity recipe runs 8 aggregated workers, so it lives in the [aggregated Dynamo recipe](../../aggregated-serving/dynamo/README.md).
+> The Reflection Beam High Interactivity recipe runs 8 aggregated workers, so it lives in the [aggregated Dynamo recipe](../../aggregated-serving/dynamo/README.md). The Nemotron-3-Ultra routing comparison also has a 6-worker aggregated variant there.
 
 > [!TIP]
 > To add or deploy another model, stage its weights in `gs://${GCS_BUCKET}`, add its prefill and decode YAML files under `$REPO_ROOT/src/frameworks/a4xmax/dynamo-configs/`, and pass `--set workload.model=${HF_MODEL_ID}` along with `--set-file prefill_serving_config=...` and `--set-file decode_serving_config=...` to `helm install`.
@@ -336,6 +340,15 @@ The [`pareto-sweep/`](./pareto-sweep/README.md) sub-recipe packages every operat
 | **DeepSeek-V4-Pro (MXFP4 + MTP)** | p1 to p8 | 1P1D TP4 (8 GPUs) up to 8P1D DEP4/DEP8 (40 GPUs) | [pareto-sweep/README.md#points-dsv4](./pareto-sweep/README.md#points-dsv4) |
 | **DeepSeek-R1 671B (NVFP4)** | low_latency, mid_curve, max_tpt | 1P4D TP4 (20 GPUs), 6P1D TP4/DEP48 and 10P1D TP4/DEP32 (72 GPUs) | [pareto-sweep/README.md#points-dsr1-fp4](./pareto-sweep/README.md#points-dsr1-fp4) |
 | **DeepSeek-R1 671B (FP8)** | low-latency, mid, max | 1P1D TP4 (8 GPUs), 5P1D DEP8/DEP32 and 6P1D DEP8/DEP24 (72 GPUs) | [pareto-sweep/README.md#points-dsr1-fp8](./pareto-sweep/README.md#points-dsr1-fp8) |
+
+<a name="sglang-nemotron3-ultra-8p8d"></a>
+### 3.5. Category 4: KV-Aware vs. Round-Robin Routing for Coding Agents (Nemotron-3-Ultra 8P8D, 64 GPUs)
+
+[Back to Top](#table-of-contents)
+
+This category serves [NVIDIA Nemotron-3-Ultra 550B-A55B (NVFP4)](https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4) to coding agents, whose long multi-turn prompts resend the same prefix on every turn. It runs 8 prefill and 8 decode workers (TP4/EP4) in one 16-node NVL72 domain, and compares the Dynamo KV-aware router with round-robin routing on the same workers.
+
+Everything for this category lives in [`nemotron3-ultra-kv-vs-rr/`](nemotron3-ultra-kv-vs-rr/README.md): the KV-aware and round-robin values files, image build, deployment of both arms, the A/B benchmark, router tuning and troubleshooting.
 
 <a name="inference-request"></a>
 ## 4. Inference Request and Benchmarking

@@ -1,0 +1,270 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# NVIDIA Nemotron-3-Ultra 550B-A55B (NVFP4), disaggregated serving on A4X-MAX:
+#   8 prefill workers + 8 decode workers, TP4/EP4 each, one worker per GB300 node,
+#   16 nodes / 64 GPUs in a single NVL72 ComputeDomain. Prefill -> decode KV
+#   transfer runs over NVLink (mooncake, MC_FORCE_MNNVL=1).
+# Serving arguments: src/frameworks/a4xmax/dynamo-configs/nemotron3-ultra-nvfp4-8p8d-{prefill,decode}.yaml
+# Routing: round-robin baseline. The KV-aware variant is nemotron3_ultra_8p8d_kv.yaml.
+
+dynamo:
+  namespace: dynamo-cloud
+  # Runtime version carried by the serving image (ai-dynamo 1.4.2).
+  releaseVersion: "1.4.2"
+  deploymentName: dynamo-n3u-8p8d-rr
+  computeDomain:
+    name: a4x-max-domain-n3u
+    numNodes: 16
+    resourceClaimTemplateName: a4x-max-n3u-compute-domain-channel
+  rdma:
+    claimTemplateName:
+  serviceAccountName:
+  # Pin every pod to one GB300 node pool so all 16 workers share one NVLink
+  # domain. The README sets this with --set dynamo.nodeSelector.
+  nodeSelector: {}
+  frontend:
+    # Same image as the workers; override with --set dynamo.frontend.image=${DYNAMO_IMAGE}.
+    image: <ARTIFACT_REGISTRY>/dynamo-sglang-n3u:1.4.2
+    replicas: 1
+    envs:
+      - name: DYN_DISCOVERY_BACKEND
+        value: kubernetes
+      - name: DYN_EVENT_PLANE
+        value: zmq
+      - name: DYN_REQUEST_PLANE
+        value: tcp
+      - name: POD_UID
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.uid
+      # --- Round-robin routing: the A/B baseline for the KV-aware file ---
+      # Requests go to workers in turn, ignoring cached prefixes. The KV-router
+      # tuning variables are omitted because round-robin does not read them.
+      - name: DYN_ROUTER_MODE
+        value: round-robin
+    livenessProbe:
+      initialDelaySeconds: 10
+      periodSeconds: 60
+      timeoutSeconds: 150
+      failureThreshold: 100
+    readinessProbe:
+      initialDelaySeconds: 10
+      periodSeconds: 60
+      timeoutSeconds: 300
+      failureThreshold: 100
+  decodeWorker:
+    nodeCount: 1
+    replicas: 8
+    envs:
+      - name: HF_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: hf-token-secret
+            key: HF_TOKEN
+      - name: HF_HUB_OFFLINE
+        value: "1"
+      - name: HF_MODULES_CACHE
+        value: /tmp/hf_modules
+      - name: PYTHONUNBUFFERED
+        value: "1"
+      - name: DYN_SYSTEM_PORT
+        value: "9090"
+      - name: DYN_DISCOVERY_BACKEND
+        value: kubernetes
+      - name: DYN_EVENT_PLANE
+        value: zmq
+      - name: DYN_REQUEST_PLANE
+        value: tcp
+      # --- NVLink (MNNVL) KV transfer and collectives inside the GB300 NVL72 domain ---
+      - name: UCX_TLS
+        value: cuda_copy,cuda_ipc,tcp
+      - name: UCX_CUDA_IPC_ENABLE_MNNVL
+        value: "y"
+      - name: UCX_MEMTYPE_CACHE
+        value: "n"
+      - name: UCX_MEMTYPE_REG_WHOLE
+        value: "n"
+      - name: UCX_LOG_LEVEL
+        value: info
+      - name: MC_FORCE_MNNVL
+        value: "1"
+      - name: MC_TE_METRIC
+        value: "true"
+      - name: MOONCAKE_PROTOCOL
+        value: tcp
+      - name: SGLANG_MOONCAKE_CUSTOM_MEM_POOL
+        value: "True"
+      - name: NCCL_MNNVL_ENABLE
+        value: "1"
+      - name: NCCL_CUMEM_ENABLE
+        value: "1"
+      - name: NCCL_IB_DISABLE
+        value: "1"
+      - name: NCCL_NET
+        value: Socket
+      - name: NCCL_SOCKET_IFNAME
+        value: eth0
+      - name: GLOO_SOCKET_IFNAME
+        value: eth0
+      - name: TP_SOCKET_IFNAME
+        value: eth0
+      - name: NCCL_DEBUG
+        value: VERSION
+      # --- SGLang / PyTorch tuning for the NVFP4 checkpoint ---
+      - name: PYTORCH_CUDA_ALLOC_CONF
+        value: expandable_segments:True
+      - name: SGLANG_NVFP4_CKPT_FP8_GEMM_IN_ATTN
+        value: "1"
+      - name: SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK
+        value: "1"
+      - name: SGLANG_DISABLE_REQUEST_LOGGING
+        value: "1"
+    livenessProbe:
+      initialDelaySeconds: 10
+      periodSeconds: 60
+      timeoutSeconds: 30
+      failureThreshold: 60
+    readinessProbe:
+      initialDelaySeconds: 10
+      periodSeconds: 60
+      timeoutSeconds: 30
+      failureThreshold: 60
+    startupProbe:
+      initialDelaySeconds: 10
+      periodSeconds: 60
+      timeoutSeconds: 30
+      failureThreshold: 1800
+  prefillWorker:
+    nodeCount: 1
+    replicas: 8
+    envs:
+      - name: HF_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: hf-token-secret
+            key: HF_TOKEN
+      - name: HF_HUB_OFFLINE
+        value: "1"
+      - name: HF_MODULES_CACHE
+        value: /tmp/hf_modules
+      - name: PYTHONUNBUFFERED
+        value: "1"
+      - name: DYN_SYSTEM_PORT
+        value: "9090"
+      - name: DYN_DISCOVERY_BACKEND
+        value: kubernetes
+      - name: DYN_EVENT_PLANE
+        value: zmq
+      - name: DYN_REQUEST_PLANE
+        value: tcp
+      # --- NVLink (MNNVL) KV transfer and collectives inside the GB300 NVL72 domain ---
+      - name: UCX_TLS
+        value: cuda_copy,cuda_ipc,tcp
+      - name: UCX_CUDA_IPC_ENABLE_MNNVL
+        value: "y"
+      - name: UCX_MEMTYPE_CACHE
+        value: "n"
+      - name: UCX_MEMTYPE_REG_WHOLE
+        value: "n"
+      - name: UCX_LOG_LEVEL
+        value: info
+      - name: MC_FORCE_MNNVL
+        value: "1"
+      - name: MC_TE_METRIC
+        value: "true"
+      - name: MOONCAKE_PROTOCOL
+        value: tcp
+      - name: SGLANG_MOONCAKE_CUSTOM_MEM_POOL
+        value: "True"
+      - name: NCCL_MNNVL_ENABLE
+        value: "1"
+      - name: NCCL_CUMEM_ENABLE
+        value: "1"
+      - name: NCCL_IB_DISABLE
+        value: "1"
+      - name: NCCL_NET
+        value: Socket
+      - name: NCCL_SOCKET_IFNAME
+        value: eth0
+      - name: GLOO_SOCKET_IFNAME
+        value: eth0
+      - name: TP_SOCKET_IFNAME
+        value: eth0
+      - name: NCCL_DEBUG
+        value: VERSION
+      # --- SGLang / PyTorch tuning for the NVFP4 checkpoint ---
+      - name: PYTORCH_CUDA_ALLOC_CONF
+        value: expandable_segments:True
+      - name: SGLANG_NVFP4_CKPT_FP8_GEMM_IN_ATTN
+        value: "1"
+      - name: SGLANG_DISABLE_TP_MEMORY_INBALANCE_CHECK
+        value: "1"
+      - name: SGLANG_DISABLE_REQUEST_LOGGING
+        value: "1"
+    livenessProbe:
+      initialDelaySeconds: 10
+      periodSeconds: 60
+      timeoutSeconds: 30
+      failureThreshold: 60
+    readinessProbe:
+      initialDelaySeconds: 10
+      periodSeconds: 60
+      timeoutSeconds: 30
+      failureThreshold: 60
+    startupProbe:
+      initialDelaySeconds: 10
+      periodSeconds: 60
+      timeoutSeconds: 30
+      failureThreshold: 1800
+
+secrets:
+  ngc:
+    secretName: nvcr-secret
+  huggingface:
+    secretName: hf-token-secret
+    secretData:
+      token: "hf_api_token"
+
+volumes:
+  useGcs: true
+  gcsfuse:
+    bucketName:
+  ssdMountPath: "/ssd"
+  gcsMounts:
+    mountPath: "/data/model"
+
+service:
+  type: ClusterIP
+  ports:
+    frontend: 8000
+    worker: 9090
+
+workload:
+  model: nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4
+  # Override with --set workload.image=${DYNAMO_IMAGE} (built in section 4.1 of README.md in this folder).
+  image: <ARTIFACT_REGISTRY>/dynamo-sglang-n3u:1.4.2
+  framework: sglang
+  configFile: serving-args.yaml
+  configPath: /workload/configs
+
+network:
+  subnetworks: []
+  gibVersion: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib-diagnostic-arm64:v1.0.7
+  ncclSettings:
+    - name: NCCL_DEBUG
+      value: "VERSION"
+
+quantizations:
+  - "nvfp4"
