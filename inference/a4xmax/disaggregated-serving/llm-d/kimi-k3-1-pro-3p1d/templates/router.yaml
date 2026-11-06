@@ -1,0 +1,244 @@
+{{- $name := .Release.Name }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}-epp-config
+  labels:
+    {{- include "pd.labels" . | nindent 4 }}
+data:
+  plugins-config.yaml: |
+    {{- tpl (.Files.Get "files/epp-config.yaml") . | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}-envoy-config
+  labels:
+    {{- include "pd.labels" . | nindent 4 }}
+data:
+  envoy.yaml: |
+    {{- tpl (.Files.Get "files/envoy.yaml") . | nindent 4 }}
+{{- if .Values.router.rbac.create }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}-epp
+  labels:
+    {{- include "pd.labels" . | nindent 4 }}
+---
+# Namespace-scoped. In standalone mode the EPP only reads pods.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}-epp
+  labels:
+    {{- include "pd.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}-epp
+  labels:
+    {{- include "pd.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $name }}-epp
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}-epp
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}-epp
+  labels:
+    {{- include "pd.labels" . | nindent 4 }}
+    app.kubernetes.io/name: llm-d-router
+    app.kubernetes.io/component: router
+    {{- include "pd.kueueLabel" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "pd.labels" . | nindent 6 }}
+      app.kubernetes.io/name: llm-d-router
+  template:
+    metadata:
+      labels:
+        {{- include "pd.labels" . | nindent 8 }}
+        app.kubernetes.io/name: llm-d-router
+        app.kubernetes.io/component: router
+        {{- include "pd.kueueLabel" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ printf "%s%s" (tpl (.Files.Get "files/epp-config.yaml") .) (tpl (.Files.Get "files/envoy.yaml") .) | sha256sum }}
+    spec:
+      {{- include "pd.priorityClass" . | nindent 6 }}
+      {{- if .Values.router.rbac.create }}
+      serviceAccountName: {{ $name }}-epp
+      {{- else if .Values.service_account }}
+      serviceAccountName: {{ .Values.service_account | quote }}
+      {{- end }}
+      {{- with .Values.router.node_selector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: envoy-proxy
+          image: {{ .Values.router.envoy_image }}
+          imagePullPolicy: IfNotPresent
+          command: ["envoy"]
+          args:
+            - --service-node
+            - envoy-proxy
+            - --log-level
+            - warn
+            - -c
+            - /etc/envoy/envoy.yaml
+          ports:
+            - name: http-8081
+              containerPort: 8081
+              protocol: TCP
+            - name: ready-19001
+              containerPort: 19001
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 19001
+              scheme: HTTP
+            periodSeconds: 5
+            timeoutSeconds: 1
+          resources:
+            requests:
+              cpu: "1"
+              memory: 2Gi
+            limits:
+              cpu: "4"
+              memory: 8Gi
+          volumeMounts:
+            - name: envoy-config
+              mountPath: /etc/envoy
+              readOnly: true
+        - name: router
+          image: {{ .Values.router.epp_image }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+          ports:
+            - name: grpc
+              containerPort: 9002
+              protocol: TCP
+            - name: grpc-health
+              containerPort: 9003
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          args:
+            - --endpoint-selector=app.kubernetes.io/instance={{ $name }},app.kubernetes.io/name=llm-d-model-server
+            - --endpoint-target-ports=8000
+            - --config-file=/etc/epp/plugins-config.yaml
+            - --grpc-health-port=9003
+            - --grpc-max-recv-msg-size=32MiB
+            - --grpc-max-send-msg-size=32MiB
+            - --tracing=false
+            - --metrics-endpoint-auth=false
+            - --allow-experimental-plugins=true
+          readinessProbe:
+            grpc:
+              port: 9003
+              service: inference-extension
+            periodSeconds: 5
+            timeoutSeconds: 1
+          resources:
+            requests:
+              cpu: "1"
+              memory: 2Gi
+            limits:
+              cpu: "12"
+              memory: 24Gi
+          volumeMounts:
+            - name: epp-config
+              mountPath: /etc/epp
+              readOnly: true
+      volumes:
+        - name: envoy-config
+          configMap:
+            name: {{ $name }}-envoy-config
+        - name: epp-config
+          configMap:
+            name: {{ $name }}-epp-config
+---
+# Primary OpenAI-compatible router Service: http://<release>-epp:8000 (and :80).
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "pd.endpoint" . }}
+  labels:
+    {{- include "pd.labels" . | nindent 4 }}
+    app.kubernetes.io/name: llm-d-router
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8081
+      protocol: TCP
+    - name: http-8000
+      port: 8000
+      targetPort: 8081
+      protocol: TCP
+    - name: grpc-ext-proc
+      port: 9002
+      targetPort: 9002
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+  selector:
+    {{- include "pd.labels" . | nindent 4 }}
+    app.kubernetes.io/name: llm-d-router
+---
+# Internal Service selecting prefill leader pods (:8000 for /health & /v1/models
+# passthrough, and :8089 for the EPP token-producer render servers).
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}-model-server-svc
+  labels:
+    {{- include "pd.labels" . | nindent 4 }}
+    app.kubernetes.io/name: llm-d-model-server
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+    - name: render
+      port: {{ .Values.prefill.render_port }}
+      targetPort: {{ .Values.prefill.render_port }}
+      protocol: TCP
+  selector:
+    {{- include "pd.labels" . | nindent 4 }}
+    app.kubernetes.io/name: llm-d-model-server
+    llm-d.ai/role: prefill

@@ -180,6 +180,7 @@ Models             | GPU Machine Type                                           
 
 | Models           | GPU Machine Type | Framework | Workload Type       | Orchestrator | Link to the recipe |
 | ---------------- | ---------------- | --------- | ------------------- | ------------ | ------------------ |
+| **Kimi-K3.1-Pro (1M AgentX, 3P1D + Mooncake RDMA)** | [A4X MAX (NVIDIA GB300)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | llm-d + vLLM | Disaggregated Inference | GKE | [Link](./inference/a4xmax/disaggregated-serving/llm-d/kimi-k3-1-pro-3p1d/README.md) |
 | **Reflection Beam 501B** | [A4X MAX (NVIDIA GB300)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Dynamo + SGLang | Aggregated Inference | GKE | [Link](./inference/a4xmax/aggregated-serving/dynamo/README.md) |
 | **Reflection Beam 501B** | [A4X MAX (NVIDIA GB300)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Dynamo + SGLang | Disaggregated Inference | GKE | [Link](./inference/a4xmax/disaggregated-serving/dynamo/README.md) |
 | **DeepSeek R1 671B** | [A4X MAX (NVIDIA GB300)](https://cloud.google.com/compute/docs/accelerator-optimized-machines#a4x-vms) | Dynamo + SGLang | Disaggregated Inference | GKE | [Link](./inference/a4xmax/disaggregated-serving/dynamo/README.md) |

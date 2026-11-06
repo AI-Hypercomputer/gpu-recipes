@@ -1,0 +1,580 @@
+{{- $name := .Release.Name }}
+{{- $modelRef := .Values.model_path | default .Values.model }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}-hf-secret
+  labels:
+    {{- include "pd.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  hf_api_token: {{ .Values.hf_token | default "" | quote }}
+{{- if .Values.compute_domain.enabled }}
+---
+apiVersion: resource.nvidia.com/v1beta1
+kind: ComputeDomain
+metadata:
+  name: {{ $name }}-compute-domain
+  labels:
+    {{- include "pd.labels" . | nindent 4 }}
+spec:
+  numNodes: {{ .Values.compute_domain.num_nodes }}
+  channel:
+    allocationMode: Single
+    resourceClaimTemplate:
+      name: {{ $name }}-compute-domain
+{{- end }}
+{{- if .Values.rdma.enabled }}
+---
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: {{ $name }}-gke-rdma-claim-gb300
+  labels:
+    {{- include "pd.labels" . | nindent 4 }}
+spec:
+  spec:
+    devices:
+      requests:
+        - name: nic
+          firstAvailable:
+            - name: nic-group-0
+              deviceClassName: {{ .Values.rdma.device_class_name }}
+              count: 2
+              allocationMode: ExactCount
+              selectors:
+                - cel:
+                    expression: device.attributes["dra.net"].ifName.startsWith("gpu0")
+            - name: nic-group-1
+              deviceClassName: {{ .Values.rdma.device_class_name }}
+              count: 2
+              allocationMode: ExactCount
+              selectors:
+                - cel:
+                    expression: device.attributes["dra.net"].ifName.startsWith("gpu1")
+            - name: nic-group-2
+              deviceClassName: {{ .Values.rdma.device_class_name }}
+              count: 2
+              allocationMode: ExactCount
+              selectors:
+                - cel:
+                    expression: device.attributes["dra.net"].ifName.startsWith("gpu2")
+            - name: nic-group-3
+              deviceClassName: {{ .Values.rdma.device_class_name }}
+              count: 2
+              allocationMode: ExactCount
+              selectors:
+                - cel:
+                    expression: device.attributes["dra.net"].ifName.startsWith("gpu3")
+{{- end }}
+{{- range $role := list "prefill" "decode" }}
+{{- $roleValues := index $.Values $role }}
+{{- $env := merge (deepCopy $roleValues.env) $.Values.engine.env }}
+{{- $leaderPort := ternary 8000 8001 (eq $role "prefill") }}
+---
+apiVersion: leaderworkerset.x-k8s.io/v1
+kind: LeaderWorkerSet
+metadata:
+  name: {{ $name }}-llm-d-{{ $role }}
+  labels:
+    app.kubernetes.io/name: llm-d-model-server
+    {{- include "pd.labels" $ | nindent 4 }}
+    llm-d.ai/role: {{ $role }}
+    {{- include "pd.kueueLabel" $ | nindent 4 }}
+spec:
+  replicas: {{ $roleValues.replicas }}
+  rolloutStrategy:
+    type: RollingUpdate
+  leaderWorkerTemplate:
+    size: {{ $roleValues.num_nodes }}
+    restartPolicy: RecreateGroupOnPodRestart
+    leaderTemplate:
+      metadata:
+        labels:
+          app.kubernetes.io/name: llm-d-model-server
+          {{- include "pd.labels" $ | nindent 10 }}
+          llm-d.ai/role: {{ $role }}
+          llm-d.ai/lws-role: leader
+          {{- include "pd.kueueLabel" $ | nindent 10 }}
+        annotations:
+          kueue.x-k8s.io/podset-unconstrained-topology: "true"
+      spec:
+        {{- include "pd.priorityClass" $ | nindent 8 }}
+        {{- include "pd.serviceAccountName" $ | nindent 8 }}
+        hostIPC: true
+        nodeSelector:
+          cloud.google.com/gke-accelerator: {{ $.Values.engine.accelerator }}
+          {{- with $.Values.reservation }}
+          cloud.google.com/reservation-name: {{ . | quote }}
+          {{- end }}
+          {{- with $.Values.node_selector }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+        tolerations:
+          - key: nvidia.com/gpu
+            operator: Exists
+          - key: cloud.google.com/impending-node-termination
+            operator: Exists
+          - key: kubernetes.io/arch
+            operator: Equal
+            value: arm64
+            effect: NoSchedule
+        affinity:
+          nodeAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                preference:
+                  matchExpressions:
+                    - key: llm-d.ai/mooncake-donor
+                      operator: DoesNotExist
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - llm-d-mooncake-donor
+                        - llm-d-model-server
+                topologyKey: kubernetes.io/hostname
+        containers:
+          - name: vllm
+            image: {{ $.Values.engine.image }}
+            command: ["/bin/bash", "-c"]
+            args:
+              - |
+                export PYTHONHASHSEED=42
+                export HF_HOME=/data/hf_hub
+                export HF_HUB_CACHE=/data/hf_hub/hub
+                {{- if $.Values.data_volume.hf_hub_offline }}
+                export HF_HUB_OFFLINE=1
+                {{- end }}
+                export TMPDIR=/tmp
+                mkdir -p /data/hf_hub/hub /data/torch_compile_cache /tmp/vllm /tmp/deepgemm /tmp/flashinfer /tmp/triton /tmp/cuda
+
+                echo "Prewarming trust_remote_code module cache (single process)..."
+                python3 -c '
+                import sys, transformers
+                model_id = {{ $modelRef | quote }}
+                for cls in (transformers.AutoConfig, transformers.AutoTokenizer, transformers.AutoProcessor):
+                    try:
+                        cls.from_pretrained(model_id, trust_remote_code=True)
+                    except Exception as e:
+                        print("prewarm skipped:", e, file=sys.stderr)
+                ' || true
+
+                {{- if eq $role "prefill" }}
+                vllm launch render {{ $modelRef | quote }} \
+                  --served-model-name={{ $.Values.model | quote }} \
+                  --download-dir=/data/hf_hub/hub \
+                  --trust-remote-code \
+                  --language-model-only \
+                  --disable-access-log-for-endpoints=/health,/metrics,/v1/models,/v1/chat/completions/render,/v1/completions/render \
+                  --api-server-count=32 \
+                  --host=0.0.0.0 \
+                  --port={{ $.Values.prefill.render_port }} >/tmp/vllm-render.log 2>&1 &
+                {{- end }}
+
+                exec vllm serve \
+                  --host=0.0.0.0 \
+                  --port={{ $leaderPort }} \
+                  --nnodes=$(LWS_GROUP_SIZE) \
+                  --node-rank=0 \
+                  --master-addr=$(LWS_LEADER_ADDRESS) \
+                  --master-port=29501 \
+                  --download-dir=/data/hf_hub/hub \
+                  {{- range $.Values.engine.args }}
+                  {{ . | quote }} \
+                  {{- end }}
+                  {{- range $roleValues.args }}
+                  {{ . | quote }} \
+                  {{- end }}
+                  --model={{ $modelRef | quote }} \
+                  --tokenizer={{ $modelRef | quote }} \
+                  --served-model-name={{ $.Values.model | quote }}
+            ports:
+              - name: http
+                containerPort: {{ $leaderPort }}
+                protocol: TCP
+              - name: nixl
+                containerPort: 5600
+                protocol: TCP
+              {{- if eq $role "prefill" }}
+              - name: kv-events
+                containerPort: 5557
+                protocol: TCP
+              - name: render
+                containerPort: {{ $.Values.prefill.render_port }}
+                protocol: TCP
+              {{- end }}
+            env:
+              - name: HUGGING_FACE_HUB_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ $name }}-hf-secret
+                    key: hf_api_token
+                    optional: true
+              - name: HF_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ $name }}-hf-secret
+                    key: hf_api_token
+                    optional: true
+              - name: POD_IP
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: status.podIP
+              - name: VLLM_HOST_IP
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: status.podIP
+              - name: VLLM_NIXL_SIDE_CHANNEL_HOST
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: status.podIP
+              - name: POD_NAME
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.name
+              {{- if $.Values.data_volume.hf_hub_offline }}
+              - name: HF_HUB_OFFLINE
+                value: "1"
+              {{- end }}
+              {{- range $k, $v := $env }}
+              - name: {{ $k }}
+                value: {{ $v | toString | quote }}
+              {{- end }}
+            readinessProbe:
+              httpGet:
+                path: /health
+                port: {{ $leaderPort }}
+              initialDelaySeconds: 30
+              periodSeconds: 10
+              timeoutSeconds: 10
+            resources:
+              requests:
+                cpu: {{ $.Values.engine.cpu_request | quote }}
+                memory: {{ $.Values.engine.memory_request }}
+                nvidia.com/gpu: {{ $.Values.engine.gpus_per_node }}
+              limits:
+                cpu: {{ $.Values.engine.cpu_limit | quote }}
+                memory: {{ $.Values.engine.memory_limit }}
+                nvidia.com/gpu: {{ $.Values.engine.gpus_per_node }}
+              {{- if or $.Values.rdma.enabled $.Values.compute_domain.enabled }}
+              claims:
+                {{- if $.Values.rdma.enabled }}
+                - name: gke-rdma-claim-0
+                - name: gke-rdma-claim-1
+                - name: gke-rdma-claim-2
+                - name: gke-rdma-claim-3
+                {{- end }}
+                {{- if $.Values.compute_domain.enabled }}
+                - name: compute-domain-channel
+                {{- end }}
+              {{- end }}
+            volumeMounts:
+              - name: dshm
+                mountPath: /dev/shm
+              - name: data
+                mountPath: /data
+              {{- if $.Values.mooncake.enabled }}
+              - name: mooncake-config
+                mountPath: /etc/mooncake
+                readOnly: true
+              {{- end }}
+            securityContext:
+              capabilities:
+                add:
+                  - IPC_LOCK
+                  - NET_ADMIN
+                  - SYS_RAWIO
+                  - SYS_PTRACE
+          {{- if eq $role "decode" }}
+          # llm-d disaggregated routing sidecar: receives requests from Envoy
+          # on port 8000 with the EPP's chosen prefill endpoint in a header,
+          # executes the prefill pass on the prefill engine, and forwards the
+          # request with NIXL/Mooncake KV transfer parameters to local vLLM
+          # decode on port 8001.
+          - name: routing-proxy
+            image: {{ $.Values.decode.sidecar_image }}
+            imagePullPolicy: IfNotPresent
+            args:
+              - --port=8000
+              - --model-server-port=8001
+              - --kv-connector=nixlv2
+              - --zap-log-level=1
+              - --secure-proxy=false
+            env:
+              - name: POD_IP
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: status.podIP
+            ports:
+              - name: proxy-http
+                containerPort: 8000
+                protocol: TCP
+            readinessProbe:
+              httpGet:
+                path: /health
+                port: 8000
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              timeoutSeconds: 2
+            resources:
+              requests:
+                cpu: "1"
+                memory: 2Gi
+              limits:
+                cpu: "4"
+                memory: 4Gi
+          {{- end }}
+        volumes:
+          - name: dshm
+            emptyDir:
+              medium: Memory
+              sizeLimit: {{ $.Values.engine.dshm_size_limit }}
+          - name: data
+            {{- if $.Values.data_volume.host_path }}
+            hostPath:
+              path: {{ $.Values.data_volume.host_path }}
+              type: DirectoryOrCreate
+            {{- else }}
+            emptyDir:
+              sizeLimit: {{ $.Values.data_volume.size_limit }}
+            {{- end }}
+          {{- if $.Values.mooncake.enabled }}
+          - name: mooncake-config
+            configMap:
+              name: {{ $name }}-llm-d-mooncake-config
+          {{- end }}
+        {{- if or $.Values.rdma.enabled $.Values.compute_domain.enabled }}
+        resourceClaims:
+          {{- if $.Values.rdma.enabled }}
+          - name: gke-rdma-claim-0
+            resourceClaimTemplateName: {{ $name }}-gke-rdma-claim-gb300
+          - name: gke-rdma-claim-1
+            resourceClaimTemplateName: {{ $name }}-gke-rdma-claim-gb300
+          - name: gke-rdma-claim-2
+            resourceClaimTemplateName: {{ $name }}-gke-rdma-claim-gb300
+          - name: gke-rdma-claim-3
+            resourceClaimTemplateName: {{ $name }}-gke-rdma-claim-gb300
+          {{- end }}
+          {{- if $.Values.compute_domain.enabled }}
+          - name: compute-domain-channel
+            resourceClaimTemplateName: {{ $name }}-compute-domain
+          {{- end }}
+        {{- end }}
+    workerTemplate:
+      metadata:
+        labels:
+          app.kubernetes.io/name: llm-d-model-server-worker
+          {{- include "pd.labels" $ | nindent 10 }}
+          llm-d.ai/role: {{ $role }}
+          llm-d.ai/lws-role: worker
+          {{- include "pd.kueueLabel" $ | nindent 10 }}
+        annotations:
+          kueue.x-k8s.io/podset-unconstrained-topology: "true"
+      spec:
+        {{- include "pd.priorityClass" $ | nindent 8 }}
+        {{- include "pd.serviceAccountName" $ | nindent 8 }}
+        hostIPC: true
+        nodeSelector:
+          cloud.google.com/gke-accelerator: {{ $.Values.engine.accelerator }}
+          {{- with $.Values.reservation }}
+          cloud.google.com/reservation-name: {{ . | quote }}
+          {{- end }}
+          {{- with $.Values.node_selector }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+        tolerations:
+          - key: nvidia.com/gpu
+            operator: Exists
+          - key: cloud.google.com/impending-node-termination
+            operator: Exists
+          - key: kubernetes.io/arch
+            operator: Equal
+            value: arm64
+            effect: NoSchedule
+        affinity:
+          nodeAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                preference:
+                  matchExpressions:
+                    - key: llm-d.ai/mooncake-donor
+                      operator: DoesNotExist
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - llm-d-mooncake-donor
+                        - llm-d-model-server
+                topologyKey: kubernetes.io/hostname
+        containers:
+          - name: vllm
+            image: {{ $.Values.engine.image }}
+            command: ["/bin/bash", "-c"]
+            args:
+              - |
+                export PYTHONHASHSEED=42
+                export HF_HOME=/data/hf_hub
+                export HF_HUB_CACHE=/data/hf_hub/hub
+                {{- if $.Values.data_volume.hf_hub_offline }}
+                export HF_HUB_OFFLINE=1
+                {{- end }}
+                export TMPDIR=/tmp
+                mkdir -p /data/hf_hub/hub /data/torch_compile_cache /tmp/vllm /tmp/deepgemm /tmp/flashinfer /tmp/triton /tmp/cuda
+
+                echo "Prewarming trust_remote_code module cache (single process)..."
+                python3 -c '
+                import sys, transformers
+                model_id = {{ $modelRef | quote }}
+                for cls in (transformers.AutoConfig, transformers.AutoTokenizer, transformers.AutoProcessor):
+                    try:
+                        cls.from_pretrained(model_id, trust_remote_code=True)
+                    except Exception as e:
+                        print("prewarm skipped:", e, file=sys.stderr)
+                ' || true
+
+                exec vllm serve \
+                  --host=0.0.0.0 \
+                  --port=8000 \
+                  --headless \
+                  --nnodes=$(LWS_GROUP_SIZE) \
+                  --node-rank=$(LWS_WORKER_INDEX) \
+                  --master-addr=$(LWS_LEADER_ADDRESS) \
+                  --master-port=29501 \
+                  --download-dir=/data/hf_hub/hub \
+                  {{- range $.Values.engine.args }}
+                  {{ . | quote }} \
+                  {{- end }}
+                  {{- range $roleValues.args }}
+                  {{ . | quote }} \
+                  {{- end }}
+                  --model={{ $modelRef | quote }} \
+                  --tokenizer={{ $modelRef | quote }} \
+                  --served-model-name={{ $.Values.model | quote }}
+            env:
+              - name: HUGGING_FACE_HUB_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ $name }}-hf-secret
+                    key: hf_api_token
+                    optional: true
+              - name: HF_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: {{ $name }}-hf-secret
+                    key: hf_api_token
+                    optional: true
+              - name: POD_IP
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: status.podIP
+              - name: VLLM_HOST_IP
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: status.podIP
+              - name: VLLM_NIXL_SIDE_CHANNEL_HOST
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: status.podIP
+              - name: POD_NAME
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.name
+              {{- if $.Values.data_volume.hf_hub_offline }}
+              - name: HF_HUB_OFFLINE
+                value: "1"
+              {{- end }}
+              {{- range $k, $v := $env }}
+              - name: {{ $k }}
+                value: {{ $v | toString | quote }}
+              {{- end }}
+            resources:
+              requests:
+                cpu: {{ $.Values.engine.cpu_request | quote }}
+                memory: {{ $.Values.engine.memory_request }}
+                nvidia.com/gpu: {{ $.Values.engine.gpus_per_node }}
+              limits:
+                cpu: {{ $.Values.engine.cpu_limit | quote }}
+                memory: {{ $.Values.engine.memory_limit }}
+                nvidia.com/gpu: {{ $.Values.engine.gpus_per_node }}
+              {{- if or $.Values.rdma.enabled $.Values.compute_domain.enabled }}
+              claims:
+                {{- if $.Values.rdma.enabled }}
+                - name: gke-rdma-claim-0
+                - name: gke-rdma-claim-1
+                - name: gke-rdma-claim-2
+                - name: gke-rdma-claim-3
+                {{- end }}
+                {{- if $.Values.compute_domain.enabled }}
+                - name: compute-domain-channel
+                {{- end }}
+              {{- end }}
+            volumeMounts:
+              - name: dshm
+                mountPath: /dev/shm
+              - name: data
+                mountPath: /data
+              {{- if $.Values.mooncake.enabled }}
+              - name: mooncake-config
+                mountPath: /etc/mooncake
+                readOnly: true
+              {{- end }}
+            securityContext:
+              capabilities:
+                add:
+                  - IPC_LOCK
+                  - NET_ADMIN
+                  - SYS_RAWIO
+                  - SYS_PTRACE
+        volumes:
+          - name: dshm
+            emptyDir:
+              medium: Memory
+              sizeLimit: {{ $.Values.engine.dshm_size_limit }}
+          - name: data
+            {{- if $.Values.data_volume.host_path }}
+            hostPath:
+              path: {{ $.Values.data_volume.host_path }}
+              type: DirectoryOrCreate
+            {{- else }}
+            emptyDir:
+              sizeLimit: {{ $.Values.data_volume.size_limit }}
+            {{- end }}
+          {{- if $.Values.mooncake.enabled }}
+          - name: mooncake-config
+            configMap:
+              name: {{ $name }}-llm-d-mooncake-config
+          {{- end }}
+        {{- if or $.Values.rdma.enabled $.Values.compute_domain.enabled }}
+        resourceClaims:
+          {{- if $.Values.rdma.enabled }}
+          - name: gke-rdma-claim-0
+            resourceClaimTemplateName: {{ $name }}-gke-rdma-claim-gb300
+          - name: gke-rdma-claim-1
+            resourceClaimTemplateName: {{ $name }}-gke-rdma-claim-gb300
+          - name: gke-rdma-claim-2
+            resourceClaimTemplateName: {{ $name }}-gke-rdma-claim-gb300
+          - name: gke-rdma-claim-3
+            resourceClaimTemplateName: {{ $name }}-gke-rdma-claim-gb300
+          {{- end }}
+          {{- if $.Values.compute_domain.enabled }}
+          - name: compute-domain-channel
+            resourceClaimTemplateName: {{ $name }}-compute-domain
+          {{- end }}
+        {{- end }}
+{{- end }}

@@ -1,0 +1,292 @@
+{{- if .Values.mooncake.enabled }}
+{{- $name := .Release.Name }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}-llm-d-mooncake-config
+  labels:
+    {{- include "pd.labels" . | nindent 4 }}
+data:
+  mooncake_config.json: |
+    {
+      "metadata_server": "P2PHANDSHAKE",
+      "global_segment_size": {{ .Values.mooncake.global_segment_size | quote }},
+      "local_buffer_size": {{ .Values.mooncake.local_buffer_size | quote }},
+      "protocol": {{ .Values.mooncake.protocol | quote }},
+      "device_name": "",
+      "mode": "embedded",
+      "enable_offload": false,
+      "master_server_address": "{{ $name }}-llm-d-mooncake-master:8700"
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}-llm-d-mooncake-master
+  labels:
+    {{- include "pd.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: llm-d-mooncake-master
+    {{- include "pd.labels" . | nindent 4 }}
+  ports:
+    - name: rpc
+      port: 8700
+      targetPort: 8700
+      protocol: TCP
+    - name: http-meta
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+    - name: metrics
+      port: 8702
+      targetPort: 8702
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}-llm-d-mooncake-master
+  labels:
+    {{- include "pd.labels" . | nindent 4 }}
+    {{- include "pd.kueueLabel" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: llm-d-mooncake-master
+      {{- include "pd.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: llm-d-mooncake-master
+        {{- include "pd.labels" . | nindent 8 }}
+        {{- include "pd.kueueLabel" . | nindent 8 }}
+    spec:
+      {{- include "pd.priorityClass" . | nindent 6 }}
+      {{- include "pd.serviceAccountName" . | nindent 6 }}
+      enableServiceLinks: false
+      nodeSelector:
+        cloud.google.com/gke-accelerator: {{ .Values.engine.accelerator }}
+        {{- with .Values.reservation }}
+        cloud.google.com/reservation-name: {{ . | quote }}
+        {{- end }}
+        {{- with .Values.node_selector }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - llm-d-model-server
+                        - llm-d-mooncake-donor
+                topologyKey: kubernetes.io/hostname
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+        - key: cloud.google.com/impending-node-termination
+          operator: Exists
+        - key: kubernetes.io/arch
+          operator: Equal
+          value: arm64
+          effect: NoSchedule
+      containers:
+        - name: mooncake-master
+          image: {{ .Values.engine.image }}
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/bash", "-c"]
+          args:
+            - >-
+              export LD_LIBRARY_PATH=/usr/local/cuda/compat:/usr/local/cuda-13.0/compat:${LD_LIBRARY_PATH:-}
+              && exec mooncake_master
+              --port=8700
+              --enable_http_metadata_server=true
+              --http_metadata_server_port=8080
+              --rpc_thread_num=32
+              --enable_metric_reporting=true
+              --metrics_port=8702
+              --default_kv_lease_ttl=60000
+              --eviction_high_watermark_ratio=0.95
+              --eviction_ratio=0.10
+          ports:
+            - name: rpc
+              containerPort: 8700
+              protocol: TCP
+            - name: http-meta
+              containerPort: 8080
+              protocol: TCP
+            - name: metrics
+              containerPort: 8702
+              protocol: TCP
+          resources:
+            requests:
+              cpu: "8"
+              memory: 8Gi
+            limits:
+              cpu: "16"
+              memory: 16Gi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+{{- if gt (int .Values.mooncake.donor_replicas) 0 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}-llm-d-mooncake-donor
+  labels:
+    {{- include "pd.labels" . | nindent 4 }}
+    {{- include "pd.kueueLabel" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.mooncake.donor_replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: llm-d-mooncake-donor
+      {{- include "pd.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: llm-d-mooncake-donor
+        {{- include "pd.labels" . | nindent 8 }}
+        {{- include "pd.kueueLabel" . | nindent 8 }}
+    spec:
+      {{- include "pd.priorityClass" . | nindent 6 }}
+      {{- include "pd.serviceAccountName" . | nindent 6 }}
+      enableServiceLinks: false
+      nodeSelector:
+        cloud.google.com/gke-accelerator: {{ .Values.engine.accelerator }}
+        {{- with .Values.reservation }}
+        cloud.google.com/reservation-name: {{ . | quote }}
+        {{- end }}
+        {{- with .Values.node_selector }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: llm-d.ai/mooncake-donor
+                    operator: In
+                    values:
+                      - "true"
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values:
+                      - llm-d-model-server
+                      - llm-d-mooncake-donor
+              topologyKey: kubernetes.io/hostname
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+        - key: cloud.google.com/impending-node-termination
+          operator: Exists
+        - key: kubernetes.io/arch
+          operator: Equal
+          value: arm64
+          effect: NoSchedule
+      containers:
+        - name: mooncake-donor
+          image: {{ .Values.engine.image }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              add:
+                - IPC_LOCK
+                - SYS_RAWIO
+                - NET_RAW
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              export LD_LIBRARY_PATH=/usr/local/cuda/compat:/usr/local/cuda-13.0/compat:${LD_LIBRARY_PATH:-}
+              exec mooncake_client \
+                --host="${POD_IP}" \
+                --port=50052 \
+                --global_segment_size=500GB \
+                --local_buffer_size={{ .Values.mooncake.local_buffer_size }} \
+                --protocol={{ .Values.mooncake.protocol }} \
+                --master_server_address={{ $name }}-llm-d-mooncake-master:8700 \
+                --metadata_server=P2PHANDSHAKE \
+                --enable_offload=false \
+                --enable_http_server=true \
+                --http_port=9300
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            - name: MC_ENABLE_DEST_DEVICE_AFFINITY
+              value: "1"
+            - name: UCX_IB_ROCE_REACHABILITY_MODE
+              value: all
+            - name: UCX_IB_GID_INDEX
+              value: "3"
+            - name: UCX_IB_PCI_RELAXED_ORDERING
+              value: y
+            - name: UCX_CUDA_COPY_DMABUF
+              value: y
+            - name: UCX_MAX_RNDV_LANES
+              value: "8"
+            - name: UCX_MAX_EAGER_LANES
+              value: "8"
+            - name: UCX_WARN_UNUSED_ENV_VARS
+              value: n
+          ports:
+            - name: rpc
+              containerPort: 50052
+              protocol: TCP
+            - name: http
+              containerPort: 9300
+              protocol: TCP
+          resources:
+            requests:
+              cpu: "16"
+              memory: 520Gi
+            limits:
+              cpu: "32"
+              memory: 560Gi
+            {{- if .Values.rdma.enabled }}
+            claims:
+              - name: gke-rdma-claim-0
+              - name: gke-rdma-claim-1
+              - name: gke-rdma-claim-2
+              - name: gke-rdma-claim-3
+            {{- end }}
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Gi
+      {{- if .Values.rdma.enabled }}
+      resourceClaims:
+        - name: gke-rdma-claim-0
+          resourceClaimTemplateName: {{ $name }}-gke-rdma-claim-gb300
+        - name: gke-rdma-claim-1
+          resourceClaimTemplateName: {{ $name }}-gke-rdma-claim-gb300
+        - name: gke-rdma-claim-2
+          resourceClaimTemplateName: {{ $name }}-gke-rdma-claim-gb300
+        - name: gke-rdma-claim-3
+          resourceClaimTemplateName: {{ $name }}-gke-rdma-claim-gb300
+      {{- end }}
+{{- end }}
+{{- end }}

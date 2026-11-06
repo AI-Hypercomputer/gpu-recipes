@@ -1,0 +1,208 @@
+{{- if .Values.client.enabled }}
+{{- $name := .Release.Name }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}-client
+  labels:
+    {{- include "pd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: client
+    {{- include "pd.kueueLabel" . | nindent 4 }}
+spec:
+  backoffLimit: 0
+  {{- if .Values.kueue.queue_name }}
+  suspend: true
+  {{- end }}
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: "agentx"
+      labels:
+        {{- include "pd.labels" . | nindent 8 }}
+        app.kubernetes.io/component: client
+        {{- include "pd.kueueLabel" . | nindent 8 }}
+    spec:
+      {{- include "pd.priorityClass" . | nindent 6 }}
+      {{- include "pd.serviceAccountName" . | nindent 6 }}
+      restartPolicy: Never
+      terminationGracePeriodSeconds: 60
+      # Keep the client off GPU engine nodes so it does not compete with vLLM
+      # or Mooncake for host CPU and DRAM.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - llm-d-model-server
+                        - llm-d-model-server-worker
+                        - llm-d-mooncake-donor
+                topologyKey: kubernetes.io/hostname
+      tolerations:
+        - key: kubernetes.io/arch
+          operator: Equal
+          value: arm64
+          effect: NoSchedule
+      {{- with .Values.client.node_selector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: agentx
+          image: {{ .Values.client.image }}
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: "12"
+              memory: 32Gi
+            limits:
+              cpu: "32"
+              memory: 128Gi
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              AIPERF_BIN=/root/aiperf-venv/bin/aiperf
+              HF_CLI=/root/aiperf-venv/bin/hf
+              AIPERF_PYTHON=/root/aiperf-venv/bin/python
+              [ -x "${HF_CLI}" ] || HF_CLI=hf
+              [ -x "${AIPERF_PYTHON}" ] || AIPERF_PYTHON=python3
+              export VLLM_PLUGINS=""
+              export VLLM_TARGET_DEVICE="empty"
+              export JAX_PLATFORMS="cpu"
+              export TPU_PJRT_EVENT_TRACE_ENABLE="0"
+              export AIPERF_DATASET_WEKA_LIVE_ASSISTANT_RESPONSES=0
+              export AIPERF_DATASET_CONFIGURATION_TIMEOUT=1800
+              export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800
+              export AIPERF_UI_REALTIME_METRICS_ENABLED=true
+              export UBENCH_CLIENT_CONCURRENCY={{ .Values.client.concurrency }}
+              if [ -n "${HF_TOKEN:-}" ]; then
+                export HUGGING_FACE_HUB_TOKEN="${HF_TOKEN}"
+              fi
+              unset HF_HUB_OFFLINE TRANSFORMERS_OFFLINE
+              "${AIPERF_PYTHON}" -c 'import importlib.metadata as m; print("aiperf", m.version("aiperf"))' || true
+
+              echo "--- DOWNLOADING TOKENIZER ---"
+              "${HF_CLI}" download "${MODEL}" --include "tokenizer*" || true
+              "${HF_CLI}" download "${MODEL}" config.json || true
+
+              echo "--- WAITING FOR THE ENDPOINT TO SERVE A CHAT COMPLETION ---"
+              until "${AIPERF_PYTHON}" - <<'PYEOF'
+              import json, os, sys, urllib.request
+              req = urllib.request.Request(
+                  f"http://{os.environ['SERVER_HOSTNAME']}:8000/v1/chat/completions",
+                  data=json.dumps({
+                      "model": os.environ["MODEL"],
+                      "messages": [{"role": "user", "content": "warmup"}],
+                      "max_tokens": 1,
+                  }).encode(),
+                  headers={"Content-Type": "application/json"})
+              try:
+                with urllib.request.urlopen(req, timeout=10) as r:
+                  sys.exit(0 if "choices" in json.loads(r.read()) else 1)
+              except Exception:
+                sys.exit(1)
+              PYEOF
+              do
+                echo "Waiting for http://${SERVER_HOSTNAME}:8000 ..."
+                sleep 10
+              done
+              sleep 10
+
+              echo "--- RUNNING AIPERF (InferenceX AgentX) ---"
+              "${AIPERF_BIN}" profile \
+                  --scenario inferencex-agentx-mvp \
+                  --url "http://${SERVER_HOSTNAME}:8000" \
+                  --endpoint /v1/chat/completions \
+                  --endpoint-type chat \
+                  --streaming \
+                  --model "${MODEL}" \
+                  --tokenizer "${MODEL}" \
+                  --concurrency {{ .Values.client.concurrency }} \
+                  --benchmark-duration {{ .Values.client.benchmark_duration_s }} \
+                  --stats-interval 30 \
+                  --random-seed 42 \
+                  --failed-request-threshold 0.25 \
+                  --trajectory-start-min-ratio 0.25 \
+                  --trajectory-start-max-ratio 0.75 \
+                  --warmup-requests-per-lane {{ .Values.client.warmup_requests_per_lane }} \
+                  --trace-idle-gap-cap-seconds 300 \
+                  --warmup-grace-period 1800 \
+                  --use-server-token-count \
+                  --no-gpu-telemetry \
+                  --tokenizer-trust-remote-code \
+                  --num-dataset-entries 393 \
+                  --slice-duration 1.0 \
+                  --output-artifact-dir /tmp/aiperf_results \
+                  --public-dataset {{ .Values.client.dataset }}
+              AIPERF_RC=$?
+              echo "aiperf exit code: ${AIPERF_RC}"
+
+              echo "--- AIPERF SUMMARY ---"
+              "${AIPERF_PYTHON}" - <<'PYEOF' || true
+              import glob, json
+              paths = sorted(glob.glob("/tmp/aiperf_results/profile_export_aiperf.json")
+                             + glob.glob("/tmp/aiperf_results/*/profile_export_aiperf.json"))
+              d = json.load(open(paths[0])) if paths else {}
+              def stat(key, s="avg"):
+                v = d.get(key)
+                return v.get(s) if isinstance(v, dict) else None
+              out = {
+                  "request_count": stat("request_count"),
+                  "error_request_count": stat("error_request_count") or 0,
+                  "benchmark_duration_s": stat("benchmark_duration"),
+                  "mean_input_tokens": stat("input_sequence_length"),
+                  "mean_output_tokens": stat("output_sequence_length"),
+                  "total_token_throughput": stat("total_token_throughput"),
+                  "output_token_throughput": stat("output_token_throughput"),
+                  "mean_ttft_ms": stat("time_to_first_token"),
+                  "median_ttft_ms": stat("time_to_first_token", "p50"),
+                  "p99_ttft_ms": stat("time_to_first_token", "p99"),
+                  "median_itl_ms": stat("inter_token_latency", "p50"),
+                  "p99_itl_ms": stat("inter_token_latency", "p99"),
+                  "median_request_latency_ms": stat("request_latency", "p50"),
+                  "effective_concurrency": stat("effective_concurrency"),
+              }
+              print(json.dumps(out, indent=2))
+              PYEOF
+              exit "${AIPERF_RC}"
+          env:
+            - name: JOB_NAME
+              value: {{ $name | quote }}
+            - name: SERVER_HOSTNAME
+              value: {{ include "pd.endpoint" . }}
+            - name: MODEL
+              value: {{ .Values.model | quote }}
+            - name: AIPERF_HTTP_CONNECTION_LIMIT
+              value: "2500"
+            - name: AIPERF_HTTP_TCP_KEEPIDLE
+              value: "1800"
+            - name: AIPERF_HTTP_TCP_KEEPINTVL
+              value: "60"
+            - name: AIPERF_HTTP_TCP_KEEPCNT
+              value: "10"
+            - name: AIPERF_HTTP_TCP_USER_TIMEOUT
+              value: "1000000"
+            - name: HUGGING_FACE_HUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $name }}-hf-secret
+                  key: hf_api_token
+                  optional: true
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $name }}-hf-secret
+                  key: hf_api_token
+                  optional: true
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+{{- end }}
