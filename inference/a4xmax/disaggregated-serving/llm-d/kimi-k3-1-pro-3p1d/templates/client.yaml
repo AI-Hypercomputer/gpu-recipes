@@ -65,11 +65,30 @@ spec:
           command: ["/bin/bash", "-c"]
           args:
             - |
-              AIPERF_BIN=/root/aiperf-venv/bin/aiperf
-              HF_CLI=/root/aiperf-venv/bin/hf
-              AIPERF_PYTHON=/root/aiperf-venv/bin/python
-              [ -x "${HF_CLI}" ] || HF_CLI=hf
-              [ -x "${AIPERF_PYTHON}" ] || AIPERF_PYTHON=python3
+              if [ -x /root/aiperf-venv/bin/aiperf ]; then
+                AIPERF_VENV=/root/aiperf-venv
+              elif command -v aiperf >/dev/null 2>&1; then
+                AIPERF_VENV=""
+              else
+                echo "--- INSTALLING AIPERF ---"
+                # AgentX profiling needs `--warmup-requests-per-lane`, which is not in the
+                # aiperf 0.13.0 PyPI release, so install aiperf from a pinned commit.
+                AIPERF_VENV=/tmp/aiperf-venv
+                python3 -m venv "${AIPERF_VENV}" &&
+                  "${AIPERF_VENV}/bin/pip" install -q --upgrade pip &&
+                  "${AIPERF_VENV}/bin/pip" install -q \
+                    "aiperf @ git+https://github.com/ai-dynamo/aiperf.git@1dfaea5fef059d32b7198b3da5325ae415be80c9" \
+                    hf_transfer || { echo "Failed to install aiperf" >&2; exit 1; }
+              fi
+              if [ -n "${AIPERF_VENV}" ]; then
+                AIPERF_BIN="${AIPERF_VENV}/bin/aiperf"
+                HF_CLI="${AIPERF_VENV}/bin/hf"
+                AIPERF_PYTHON="${AIPERF_VENV}/bin/python"
+              else
+                AIPERF_BIN="aiperf"
+                HF_CLI="hf"
+                AIPERF_PYTHON="python3"
+              fi
               export VLLM_PLUGINS=""
               export VLLM_TARGET_DEVICE="empty"
               export JAX_PLATFORMS="cpu"
@@ -78,7 +97,6 @@ spec:
               export AIPERF_DATASET_CONFIGURATION_TIMEOUT=1800
               export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800
               export AIPERF_UI_REALTIME_METRICS_ENABLED=true
-              export UBENCH_CLIENT_CONCURRENCY={{ .Values.client.concurrency }}
               if [ -n "${HF_TOKEN:-}" ]; then
                 export HUGGING_FACE_HUB_TOKEN="${HF_TOKEN}"
               fi
@@ -186,6 +204,10 @@ spec:
               value: "10"
             - name: AIPERF_HTTP_TCP_USER_TIMEOUT
               value: "1000000"
+            - name: AIPERF_HTTP_X_SESSION_ID_FROM_CORRELATION_ID
+              value: "true"
+            - name: HF_HUB_ENABLE_HF_TRANSFER
+              value: "1"
             - name: HUGGING_FACE_HUB_TOKEN
               valueFrom:
                 secretKeyRef:

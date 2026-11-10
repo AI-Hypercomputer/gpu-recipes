@@ -9,7 +9,7 @@ This recipe serves [`moonshotai/Kimi-K3.1-Pro`](https://huggingface.co/moonshota
   - `NixlConnector` (`kv_buffer_device: "cuda"`) transfers freshly computed KV blocks from prefill to decode over GPUDirect RDMA RoCE (`mrdma.google.com`).
   - `MooncakeStoreConnector` connects all 40 engine ranks to a distributed **Mooncake RDMA DRAM store** (`160 GB` host DRAM segment per GPU rank = **6.4 TB** cluster-wide Tier-2 KV store coordinated by `mooncake_master` on `:8700`) so evicted multi-turn prefixes are fetched asynchronously over RDMA instead of recomputed.
 - **Router**: the llm-d Endpoint Picker (EPP) in **standalone** mode paired with an Envoy proxy in the same pod. The EPP tokenizes incoming chat prompts via the prefill `vllm launch render` servers (`token-producer` on `:8089`), tracks live GPU and Mooncake DRAM KV block placement via ZMQ (`precise-prefix-cache-producer` on `:5557` with `blockSizeTokens: 2048`), and scores prefill and decode endpoints without requiring Gateway API CRDs or a cloud load balancer.
-- **Client**: the InferenceX AIPerf build running the `inferencex-agentx-mvp` scenario on the [`semianalysisai/cc-traces-weka-062126`](https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126) 1M-context traces (multi-turn coding sessions averaging ~116k input tokens and ~900 output tokens per request), streaming, at concurrency 336 for 3600 s after a per-lane warmup.
+- **Client**: [`aiperf`](https://github.com/ai-dynamo/aiperf) running the `inferencex-agentx-mvp` scenario on the [`semianalysisai/cc-traces-weka-062126`](https://huggingface.co/datasets/semianalysisai/cc-traces-weka-062126) 1M-context traces (multi-turn coding sessions averaging ~116k input tokens and ~900 output tokens per request), streaming, at concurrency 336 for 3600 s after a per-lane warmup.
 
 ```mermaid
 flowchart LR
@@ -48,14 +48,14 @@ This recipe was validated with:
 | llm-d Endpoint Picker (EPP v0.10.0) | `ghcr.io/llm-d/llm-d-router-endpoint-picker@sha256:2e516fa1310da7be59b82beb1445362139597d6d553ef04d546716abe3aaaa70` |
 | llm-d routing sidecar | `ghcr.io/llm-d/llm-d-router-disagg-sidecar:v0.10.0` |
 | Envoy | `docker.io/envoyproxy/envoy:distroless-v1.33.2` |
-| InferenceX AgentX client | `us-central1-docker.pkg.dev/supercomputer-testing/joeywan-ubench/inferencex-agentx@sha256:757399e68f02a3869d72138329287cec48353b01432a0053468fdbd133128896` |
+| Benchmark client (AIPerf AgentX) | `docker.io/library/python:3.12` (installs `aiperf` [`1dfaea5f`](https://github.com/ai-dynamo/aiperf/commit/1dfaea5fef059d32b7198b3da5325ae415be80c9) at startup) |
 
 ## Prerequisites
 
 - A GKE cluster with **10 `a4x-max-highgpu-4g` (NVIDIA GB300 NVL72) nodes** (40 GPUs total) in the same NVLink domain, plus a system/CPU node (or spare capacity) for the router and client pods.
 - [LeaderWorkerSet](https://lws.sigs.k8s.io/docs/installation/) controller installed on the cluster.
 - NVIDIA DRA driver (`resource.nvidia.com/v1beta1` `ComputeDomain` for MNNVL) and GKE DRANET RDMA driver (`mrdma.google.com` `ResourceClaimTemplate` for `gpu0`..`gpu3` RoCE NICs) installed on the cluster.
-- Egress from the cluster to Hugging Face, Docker Hub, and `ghcr.io`.
+- Egress from the cluster to Hugging Face, Docker Hub, `ghcr.io`, PyPI, and GitHub (unless weights and a pre-built `client.image` are pre-staged).
 - A Hugging Face token with read access to `moonshotai/Kimi-K3.1-Pro`, `Inferact/Kimi-K3.1-Pro-DSpark-preview`, and `semianalysisai/cc-traces-weka-062126`.
 
 Placeholders in `values.yaml`:
@@ -174,7 +174,7 @@ All settings live in [`values.yaml`](./values.yaml):
 | --- | --- |
 | Engine pods stay `Pending` with `untolerated taint` or node affinity mismatch | Verify that your GB300 node pool has 10 free nodes and pass `--set node_selector."cloud\.google\.com/gke-nodepool"=<POOL_NAME>` if needed. |
 | Engine pods stay `ContainerCreating` waiting on `ResourceClaim` | Check `kubectl get resourceclaims` and verify that the GKE DRANET (`mrdma.google.com`) and NVIDIA `ComputeDomain` drivers are healthy on all 10 nodes. |
-| `Couldn't instantiate the backend tokenizer` on startup | The leader startup script automatically installs `sentencepiece` and `tiktoken` if missing and prewarms `trust_remote_code` in a single process before launching `vllm serve`. Ensure cluster egress to PyPI/Hugging Face is available unless weights and wheels are pre-staged. |
+| `Couldn't instantiate the backend tokenizer` on startup | The leader and worker startup scripts prewarm `trust_remote_code` (`AutoConfig`, `AutoTokenizer`, `AutoProcessor`) in a single process before launching `vllm serve`. Ensure `engine.image` includes `sentencepiece` and `tiktoken` (pre-installed in the default image) and that cluster egress to Hugging Face is available unless weights and tokenizer files are pre-staged with `data_volume.hf_hub_offline=true`. |
 | High TTFT or low prefix-cache hit rate across prefill replicas | Check `kubectl logs deploy/${RUN_NAME}-epp -c router` to verify `token-producer` can reach `http://${RUN_NAME}-model-server-svc:8089` and `precise-prefix-cache-producer` has discovered all 3 prefill leader pods on ZMQ port `5557`. |
 
 ## Cleanup

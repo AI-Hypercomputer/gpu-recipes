@@ -34,6 +34,8 @@ plugins:
       mmTimeout: 60s
 - type: endpoint-notification-source
 # Track real-time GPU and Mooncake DRAM KV-cache block placement via ZMQ KV events (:5557).
+# `blockSizeTokens: 2048` matches `--block-size=2048` on the TP=8 prefill engines
+# (Kimi-K3.1-Pro's hybrid MLA + KDA cache page alignment).
 - type: precise-prefix-cache-producer
   parameters:
     tokenProcessorConfig:
