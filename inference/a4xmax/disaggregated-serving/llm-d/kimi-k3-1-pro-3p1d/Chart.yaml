@@ -1,0 +1,11 @@
+apiVersion: v2
+name: kimi-k3-1-pro-vllm-llm-d-pd-3p1d
+description: >-
+  Kimi-K3.1-Pro (moonshotai/Kimi-K3.1-Pro) with vLLM on GKE A4X-MAX (NVIDIA
+  GB300 NVL72), served with llm-d prefill/decode disaggregation (3 prefill
+  TP8 replicas + 1 decode DP16/EP16 replica across 10 nodes / 40 GPUs),
+  Mooncake RDMA KV store + NIXL KV transfer, DSpark K=5 block speculative
+  decoding, and precise prefix-cache routing behind a standalone llm-d
+  Endpoint Picker, plus an InferenceX AgentX benchmark client.
+type: application
+version: 0.1.0

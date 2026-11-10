@@ -1,0 +1,226 @@
+# Kimi-K3.1-Pro (moonshotai/Kimi-K3.1-Pro, 1T total / 32B active MoE) with vLLM
+# on GKE A4X-MAX (NVIDIA GB300 NVL72): llm-d prefill/decode (P/D)
+# disaggregation, 3 prefill replicas (2 nodes / 8 GPUs each = 24 GPUs, TP8/EP8)
+# + 1 decode replica (4 nodes / 16 GPUs = 16 GPUs, DP16/EP16/TP1) = 10 nodes
+# (40x GB300 GPUs total).
+#
+# - KV cache & transfer: MultiConnector combining NixlConnector (GPUDirect RDMA
+#   RoCE P/D KV transfer) and MooncakeStoreConnector (distributed host DRAM
+#   Tier-2 KV store over RDMA across all 10 GPU nodes).
+# - Speculative decoding: DSpark K=5 block rejection sampling
+#   (Inferact/Kimi-K3.1-Pro-DSpark-preview).
+# - Router: standalone llm-d Endpoint Picker (EPP) + Envoy proxy with ZMQ
+#   precise prefix-cache routing (:5557) and token-producer (:8089).
+# - Client: InferenceX AgentX 1M-context agentic-coding benchmark at
+#   concurrency 336 for 3600 s.
+
+# Hugging Face token with read access to moonshotai/Kimi-K3.1-Pro,
+# Inferact/Kimi-K3.1-Pro-DSpark-preview, and semianalysisai/cc-traces-weka-062126.
+# Pass it at install time: helm install <name> . --set hf_token=$HF_TOKEN
+hf_token: ""
+
+# Optional: name of an A4X-MAX GCE reservation. Leave empty to not pin one.
+reservation: ""
+
+# Optional: additional nodeSelector labels for GPU pods (for example,
+# cloud.google.com/gke-nodepool: np-3).
+node_selector: {}
+
+# Optional: Kubernetes ServiceAccount for pods. Leave empty to use the
+# namespace default ServiceAccount (and create a dedicated RBAC ServiceAccount
+# for the EPP router).
+service_account: ""
+
+# Optional: Kueue settings. Leave empty if your cluster does not use Kueue.
+kueue:
+  queue_name: ""
+  priority_class: ""
+
+# Hugging Face model ID and served model name.
+model: "moonshotai/Kimi-K3.1-Pro"
+
+# Optional local path if weights are pre-staged on the node data volume
+# (for example, "/data/models/Kimi-K3.1-Pro"). When empty, engines load
+# `model` via Hugging Face Hub into /data/hf_hub/hub.
+model_path: ""
+
+# Data volume configuration for model weights and Torch compile caches (/data).
+# By default, uses node-local ephemeral SSD emptyDir. Set `host_path` (e.g.,
+# "/mnt/stateful_partition/kube-ephemeral-ssd/llmd-k3-cache") to reuse cached
+# weights across restarts on node local SSDs.
+data_volume:
+  host_path: ""
+  size_limit: "1500Gi"
+  hf_hub_offline: false
+
+# Multi-Node NVLink (MNNVL) ComputeDomain across the 10 GB300 nodes
+# (3 prefill x 2 nodes + 1 decode x 4 nodes = 10 nodes).
+compute_domain:
+  enabled: true
+  num_nodes: 10
+
+# GKE Dynamic Resource Allocation (DRA) RoCE RDMA NIC claims (4 NIC groups per
+# GB300 node: gpu0..gpu3).
+rdma:
+  enabled: true
+  device_class_name: "mrdma.google.com"
+
+# Mooncake distributed DRAM KV store over RoCE RDMA. Each of the 40 vLLM engine
+# ranks exports a 160 GB host DRAM segment (6.4 TB total across 10 nodes) to
+# the Mooncake master coordinator.
+mooncake:
+  enabled: true
+  protocol: "rdma"
+  global_segment_size: "160GB"
+  local_buffer_size: "4GB"
+  # Set > 0 only if your node pool has extra idle nodes beyond the 10 engine
+  # nodes to run dedicated 500 GB Mooncake donor pods.
+  donor_replicas: 0
+
+# Settings shared by the prefill and decode engines.
+engine:
+  image: "docker.io/vllm/vllm-openai:kimi-k31@sha256:904520f3fefc32414abcedf6ba8dadc9c5978db1bcdaf40f58d6b9036ef30a99"
+  accelerator: "nvidia-gb300"
+  gpus_per_node: 4
+  cpu_request: "64"
+  cpu_limit: "128"
+  memory_request: "512Gi"
+  memory_limit: "768Gi"
+  dshm_size_limit: "250Gi"
+  # Environment shared by both prefill and decode engines.
+  env:
+    MODEL_IMPL_TYPE: "vllm"
+    VLLM_USE_V1: "1"
+    VLLM_LOGGING_LEVEL: "INFO"
+    VLLM_ENGINE_READY_TIMEOUT_S: "3600"
+    VLLM_HTTP_TIMEOUT_KEEP_ALIVE: "7200"
+    VLLM_SSM_CONV_STATE_LAYOUT: "DS"
+    VLLM_USE_RUST_FRONTEND: "1"
+    VLLM_ENABLE_GEMM_RS: "1"
+    VLLM_ALLREDUCE_USE_FLASHINFER: "1"
+    VLLM_NIXL_SIDE_CHANNEL_PORT: "5600"
+    GLOO_SOCKET_IFNAME: "eth0"
+    NCCL_SOCKET_IFNAME: "eth0"
+    PYTHONHASHSEED: "42"
+    MOONCAKE_CONFIG_PATH: "/etc/mooncake/mooncake_config.json"
+    MC_SLICE_SIZE: "1048576"
+    MC_MAX_MR_SIZE: "4294967296"
+    MC_ENABLE_DEST_DEVICE_AFFINITY: "1"
+    NCCL_CUMEM_ENABLE: "1"
+    NCCL_MNNVL_ENABLE: "1"
+    NCCL_NVLS_ENABLE: "1"
+    NCCL_TUNER_PLUGIN: "none"
+    UCX_NET_DEVICES: "all"
+    UCX_TLS: "rc_mlx5,rc,cuda_copy,cuda_ipc,sm,shm,self"
+    UCX_IB_ROCE_REACHABILITY_MODE: "all"
+    UCX_IB_GID_INDEX: "3"
+    UCX_IB_PCI_RELAXED_ORDERING: "y"
+    UCX_CUDA_COPY_DMABUF: "y"
+    UCX_CUDA_IPC_ENABLE_MNNVL: "n"
+    UCX_MAX_RNDV_LANES: "8"
+    UCX_MAX_EAGER_LANES: "8"
+    UCX_WARN_UNUSED_ENV_VARS: "n"
+    # Keep per-rank JIT and runtime caches on container-local /tmp to avoid
+    # cross-pod file races when /data is shared.
+    VLLM_CACHE_ROOT: "/tmp/vllm"
+    DG_JIT_CACHE_DIR: "/tmp/deepgemm"
+    FLASHINFER_WORKSPACE_BASE: "/tmp/flashinfer"
+    TRITON_CACHE_DIR: "/tmp/triton"
+    CUDA_CACHE_PATH: "/tmp/cuda"
+    HF_HOME: "/data/hf_hub"
+    HF_HUB_CACHE: "/data/hf_hub/hub"
+    TMPDIR: "/tmp"
+    VLLM_TORCH_COMPILE_CACHE_DIR: "/data/torch_compile_cache"
+  # `vllm serve` arguments shared by both prefill and decode engines.
+  args:
+    - "--enable-expert-parallel"
+    - "--enable-ep-weight-filter"
+    - "--distributed-executor-backend=mp"
+    - "--max-model-len=1048576"
+    - "--gpu-memory-utilization=0.95"
+    - "--max-num-seqs=32"
+    - "--kv-cache-dtype=nvfp4_ds_mla"
+    - "--enable-cumem-allocator"
+    - "--language-model-only"
+    - "--trust-remote-code"
+    - "--load-format=fastsafetensors"
+    - "--speculative-config={\"model\":\"Inferact/Kimi-K3.1-Pro-DSpark-preview\",\"method\":\"dspark\",\"num_speculative_tokens\":5,\"draft_sample_method\":\"probabilistic\",\"rejection_sample_method\":\"block\"}"
+
+# 3x Prefill replicas: each is a 2-node (8-GPU) LeaderWorkerSet running TP=8,
+# EP=8 with prefix caching enabled, ZMQ KV cache events on :5557, and a
+# co-located `vllm launch render` tokenizer server on :8089.
+prefill:
+  replicas: 3
+  num_nodes: 2
+  render_port: 8089
+  env:
+    ROLE: "prefill"
+    VLLM_KIMI_K3_SHARD_SP_SHARED_EXPERT: "0"
+    VLLM_HTTP_TIMEOUT_KEEP_ALIVE: "120"
+  args:
+    - "--tensor-parallel-size=8"
+    - "--data-parallel-size=1"
+    - "--max-num-batched-tokens=16384"
+    - "--max-cudagraph-capture-size=8192"
+    - "--compilation-config={\"cudagraph_mode\":\"FULL_AND_PIECEWISE\",\"cudagraph_capture_sizes\":[4,8,12,16,20,24,32,40,48,64,80,96,128,160,256,384,512,640,768,896,1024,1152,1280,1408,1536,1664,1792,1920,2048,2304,2560,2816,3072,3328,3584,3840,4096,4608,5120,5632,6144,6656,7168,7680,8192]}"
+    - "--enable-prefix-caching"
+    # Kimi-K3.1-Pro is a hybrid MLA + KDA linear-attention model whose TP=8
+    # prefill KV cache aligns to 2048-token blocks; keep in sync with
+    # `blockSizeTokens: 2048` in `files/epp-config.yaml` (TP=1/DP=16 decode has
+    # prefix caching disabled and auto-aligns its internal pages to 16384).
+    - "--block-size=2048"
+    - "--enable-scale-out"
+    - "--disable-access-log-for-endpoints=/health,/metrics,/v1/models,/v1/chat/completions/render,/v1/completions/render"
+    - "--quantization-config={\"targets\":{\"*.in_proj_qkvgfab\":\"mxfp8\",\"*.fused_qkv_a_g_proj\":\"mxfp8\",\"*.routed_expert_down_proj\":\"mxfp8\",\"*.routed_expert_up_proj\":\"mxfp8\"}}"
+    - "--kv-events-config={\"enable_kv_cache_events\":true,\"publisher\":\"zmq\",\"endpoint\":\"tcp://*:5557\",\"topic\":\"kv@$(POD_IP):8000@moonshotai/Kimi-K3.1-Pro\",\"buffer_steps\":10000}"
+    - "--kv-transfer-config={\"kv_connector\":\"MultiConnector\",\"kv_role\":\"kv_both\",\"kv_load_failure_policy\":\"recompute\",\"kv_connector_extra_config\":{\"connectors\":[{\"kv_connector\":\"NixlConnector\",\"kv_role\":\"kv_producer\",\"kv_load_failure_policy\":\"fail\",\"kv_buffer_device\":\"cuda\",\"kv_connector_extra_config\":{\"enforce_handshake_compat\":false,\"enable_cross_layers_blocks\":false}},{\"kv_connector\":\"MooncakeStoreConnector\",\"kv_role\":\"kv_both\",\"kv_load_failure_policy\":\"recompute\",\"kv_connector_extra_config\":{\"load_async\":true,\"lookup_async\":true,\"enable_cross_layers_blocks\":false,\"enable_offload\":false}}]}}"
+
+# 1x Decode replica: a 4-node (16-GPU) LeaderWorkerSet running TP=1, DP=16
+# (data_parallel_size_local=4), EP=16 with `use_replayssm` and the llm-d
+# routing sidecar on port 8000 forwarding to vLLM decode on port 8001.
+decode:
+  replicas: 1
+  num_nodes: 4
+  sidecar_image: "ghcr.io/llm-d/llm-d-router-disagg-sidecar:v0.10.0"
+  env:
+    ROLE: "decode"
+  args:
+    - "--tensor-parallel-size=1"
+    - "--data-parallel-size=16"
+    - "--data-parallel-size-local=4"
+    - "--data-parallel-rpc-port=13345"
+    - "--max-num-batched-tokens=512"
+    - "--max-cudagraph-capture-size=512"
+    - "--no-enable-prefix-caching"
+    - "--use-replayssm"
+    - "--disable-access-log-for-endpoints=/health,/metrics,/v1/models"
+    - "--quantization-config={\"targets\":{\"*.in_proj_qkvgfab\":\"mxfp8\",\"*.fused_qkv_a_g_proj\":\"mxfp8\",\"*.routed_expert_down_proj\":\"mxfp8\",\"*.routed_expert_up_proj\":\"mxfp8\",\"*.o_proj\":\"mxfp8\",\"*.shared_experts.gate_up_proj\":\"mxfp8\",\"*.shared_experts.down_proj\":\"mxfp8\"}}"
+    - "--kv-transfer-config={\"kv_connector\":\"MultiConnector\",\"kv_role\":\"kv_consumer\",\"kv_load_failure_policy\":\"recompute\",\"kv_connector_extra_config\":{\"connectors\":[{\"kv_connector\":\"NixlConnector\",\"kv_role\":\"kv_consumer\",\"kv_load_failure_policy\":\"fail\",\"kv_buffer_device\":\"cuda\",\"kv_connector_extra_config\":{\"enforce_handshake_compat\":false,\"enable_cross_layers_blocks\":false}},{\"kv_connector\":\"MooncakeStoreConnector\",\"kv_role\":\"kv_consumer\",\"kv_load_failure_policy\":\"recompute\",\"kv_connector_extra_config\":{\"load_async\":true,\"lookup_async\":true,\"enable_lookup\":false,\"save_decode_cache\":false,\"enable_cross_layers_blocks\":false,\"enable_offload\":false}}]}}"
+
+router:
+  # llm-d Endpoint Picker (EPP v0.10.0).
+  epp_image: "ghcr.io/llm-d/llm-d-router-endpoint-picker@sha256:2e516fa1310da7be59b82beb1445362139597d6d553ef04d546716abe3aaaa70"
+  # Envoy runs next to the EPP and is the data path in standalone mode.
+  envoy_image: "docker.io/envoyproxy/envoy:distroless-v1.33.2"
+  # Create a namespaced ServiceAccount, Role, and RoleBinding for the EPP to
+  # list and watch engine pods. Set to false if using a pre-bound `service_account`.
+  rbac:
+    create: true
+  # Optional: node selector for the router pod (it needs no accelerator).
+  node_selector: {}
+
+client:
+  # Set to false to deploy only the serving stack.
+  enabled: true
+  # Base image for the AgentX benchmark Job. When `aiperf` is not pre-installed
+  # in the image, the Job installs `aiperf` from pinned commit `1dfaea5f` at startup.
+  image: "docker.io/library/python:3.12"
+  # Concurrent agentic coding sessions.
+  concurrency: 336
+  # Measurement window in seconds, after the per-lane warmup.
+  benchmark_duration_s: 3600
+  warmup_requests_per_lane: 10
+  # Full 1M-context AgentX dataset.
+  dataset: "semianalysis_cc_traces_weka_062126"
+  # Optional: node selector for the client pod.
+  node_selector: {}

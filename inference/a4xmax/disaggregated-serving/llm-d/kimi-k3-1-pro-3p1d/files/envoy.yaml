@@ -1,0 +1,190 @@
+# Envoy bootstrap for the standalone llm-d router.
+#
+#   listener :8081   Data path. The ext_proc filter asks the EPP
+#                    (localhost:9002) for a prefill + decode endpoint pick;
+#                    the EPP writes the decode sidecar address into the
+#                    x-gateway-destination-endpoint header.
+#   listener :19001  /ready for the readiness probe.
+#   original_destination_cluster
+#                    ORIGINAL_DST cluster that sends each request to the
+#                    address in x-gateway-destination-endpoint.
+static_resources:
+  listeners:
+    - name: envoy-proxy-ready
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 19001
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: envoy-ready-http
+                route_config:
+                  name: local_route
+                  virtual_hosts:
+                    - name: ready_host
+                      domains: ["*"]
+                      routes:
+                        - match:
+                            prefix: "/ready"
+                          direct_response:
+                            status: 200
+                            body:
+                              inline_string: "OK"
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    - name: vllm
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 8081
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: http-8081
+                stream_idle_timeout: 86400s
+                request_timeout: 86400s
+                route_config:
+                  name: vllm
+                  virtual_hosts:
+                    - name: vllm-default
+                      domains: ["*"]
+                      routes:
+                        - match:
+                            prefix: "/metrics"
+                          direct_response:
+                            status: 200
+                            body:
+                              inline_string: "# EOF\n"
+                          typed_per_filter_config:
+                            envoy.filters.http.ext_proc:
+                              "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                              disabled: true
+                        - match:
+                            prefix: "/ping"
+                          route:
+                            cluster: model_server_service_cluster
+                          typed_per_filter_config:
+                            envoy.filters.http.ext_proc:
+                              "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                              disabled: true
+                        - match:
+                            prefix: "/health"
+                          route:
+                            cluster: model_server_service_cluster
+                          typed_per_filter_config:
+                            envoy.filters.http.ext_proc:
+                              "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                              disabled: true
+                        - match:
+                            prefix: "/v1/models"
+                          route:
+                            cluster: model_server_service_cluster
+                          typed_per_filter_config:
+                            envoy.filters.http.ext_proc:
+                              "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                              disabled: true
+                        - match:
+                            prefix: "/version"
+                          route:
+                            cluster: model_server_service_cluster
+                          typed_per_filter_config:
+                            envoy.filters.http.ext_proc:
+                              "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExtProcPerRoute
+                              disabled: true
+                        - match:
+                            prefix: "/"
+                          route:
+                            cluster: original_destination_cluster
+                            timeout: 86400s
+                            idle_timeout: 86400s
+                http_filters:
+                  - name: envoy.filters.http.ext_proc
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
+                      failure_mode_allow: false
+                      grpc_service:
+                        envoy_grpc:
+                          cluster_name: ext_proc
+                          authority: localhost:9002
+                        timeout: 3600s
+                      processing_mode:
+                        request_header_mode: SEND
+                        response_header_mode: SEND
+                        request_body_mode: FULL_DUPLEX_STREAMED
+                        response_body_mode: FULL_DUPLEX_STREAMED
+                        request_trailer_mode: SEND
+                        response_trailer_mode: SEND
+                      message_timeout: 3600s
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  clusters:
+    - name: model_server_service_cluster
+      type: STRICT_DNS
+      connect_timeout: 5s
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: model_server_service_cluster
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: "{{ .Release.Name }}-model-server-svc"
+                      port_value: 8000
+    - name: original_destination_cluster
+      type: ORIGINAL_DST
+      connect_timeout: 86400s
+      per_connection_buffer_limit_bytes: 67108864
+      lb_policy: CLUSTER_PROVIDED
+      upstream_connection_options:
+        tcp_keepalive:
+          keepalive_time: 120
+          keepalive_interval: 15
+          keepalive_probes: 5
+      circuit_breakers:
+        thresholds:
+          - max_connections: 65536
+            max_pending_requests: 65536
+            max_requests: 65536
+      original_dst_lb_config:
+        use_http_header: true
+        http_header_name: x-gateway-destination-endpoint
+    - name: ext_proc
+      type: STATIC
+      connect_timeout: 86400s
+      lb_policy: LEAST_REQUEST
+      circuit_breakers:
+        thresholds:
+          - max_connections: 65536
+            max_pending_requests: 65536
+            max_requests: 65536
+            max_retries: 1024
+      transport_socket:
+        name: "envoy.transport_sockets.tls"
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+          common_tls_context:
+            alpn_protocols: ["h2"]
+            validation_context: {}
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
+      load_assignment:
+        cluster_name: ext_proc
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 9002
