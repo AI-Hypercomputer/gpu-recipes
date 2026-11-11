@@ -1,0 +1,33 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: llm-d-inference-gateway
+spec:
+  gatewayClassName: gke-l7-regional-external-managed
+  listeners:
+  - allowedRoutes:
+      namespaces:
+        from: All
+    name: default
+    port: 80
+    protocol: HTTP
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: llm-d-route
+spec:
+  parentRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: llm-d-inference-gateway
+  rules:
+  - backendRefs:
+    - group: inference.networking.k8s.io
+      kind: InferencePool
+      name: llm-d-infpool
+      port: 8000
+    matches:
+    - path:
+        type: PathPrefix
+        value: /
