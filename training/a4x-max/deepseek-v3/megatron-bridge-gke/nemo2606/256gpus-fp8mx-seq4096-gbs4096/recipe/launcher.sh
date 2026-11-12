@@ -1,4 +1,3 @@
-export HF_TOKEN=<YOUR_HF_TOKEN>
 usage()
 {
 cat << EOF
@@ -85,36 +84,28 @@ kv="${kv}, \"nccl_version\": \"${nccl_v}\"}"
 echo "VERSION_DIAGNOSTICS: ${kv}"
 
 
+export HF_TOKEN=<YOUR_HF_TOKEN>
 export PYTHONUNBUFFERED=1
-export NCCL_IB_SPLIT_DATA_ON_QPS=0
-export NCCL_RAS_ENABLE=0
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,graph_capture_record_stream_reuse:True
-export NCCL_GRAPH_REGISTER=0
-export NVTE_FWD_LAYERNORM_SM_MARGIN=20
-export NVTE_BWD_LAYERNORM_SM_MARGIN=20
-export TORCH_NCCL_AVOID_RECORD_STREAMS=0
-export TRANSFORMERS_OFFLINE=0
-export TOKENIZERS_PARALLELISM=False
-export NCCL_NVLS_ENABLE=0
-export NVTE_NORM_FWD_USE_CUDNN=1
-export NVTE_NORM_BWD_USE_CUDNN=1
-export TORCH_NCCL_HIGH_PRIORITY=1
-export HF_HUB_OFFLINE=0
 export CUDA_DEVICE_MAX_CONNECTIONS=32
-export NVLINK_DOMAIN_SIZE=72
-export USE_MNNVL=1
-export NUM_OF_HYBRID_EP_RANKS_PER_NVLINK_DOMAIN=32
-export NUM_OF_TOKENS_PER_CHUNK_COMBINE_API=128
-export NVTE_ALLOW_NONDETERMINISTIC_ALGO=0
-export NVTE_CUTEDSL_FUSED_GROUPED_MLP=1
 export CUDNNFE_CLUSTER_OVERLAP_MARGIN=8
+export NCCL_IB_SPLIT_DATA_ON_QPS=1
+export NUM_OF_HYBRID_EP_RANKS_PER_NVLINK_DOMAIN=32
+export NVLINK_DOMAIN_SIZE=72
+export NVTE_ALLOW_NONDETERMINISTIC_ALGO=0
+export NVTE_BWD_LAYERNORM_SM_MARGIN=20
+export NVTE_CUTEDSL_FUSED_GROUPED_MLP=1
+export NVTE_FWD_LAYERNORM_SM_MARGIN=20
+export PYTORCH_CUDA_ALLOC_CONF=graph_capture_record_stream_reuse:True
+export TORCH_NCCL_AVOID_RECORD_STREAMS=0
+export USE_MNNVL=1
+export NCCL_RAS_ENABLE=0
 
 cd /opt
 rm -rf Megatron-Bridge
 git clone https://github.com/NVIDIA-NeMo/Megatron-Bridge.git
 cd Megatron-Bridge
-git checkout fcbb6031103d0ca845c1a54d4fee55ecfcca17b6
-git submodule update --init --recursive && sed -i 's/timeout=60/timeout=600/g' src/megatron/bridge/models/hf_pretrained/safe_config_loader.py
+git checkout 5cb3444c43f7499cf3872b2d46870cf8bc2e00ce
+git submodule update --init --recursive
 sed -i -e '/pretrain(config=recipe/i \    recipe.dist.distributed_timeout_minutes = 10' scripts/performance/run_script.py
 ls
 
@@ -130,61 +121,10 @@ worker_command=$(cat <<- EOM
     echo "Worker \$RANK is running" ;
   fi ;
 
-  echo "Collect nvidia-smi telemetry"
-  gpu_uuid=\$(nvidia-smi --id \$LOCAL_RANK --query-gpu uuid --format noheader)
-
-  echo "NODE_NAME=${NODE_NAME}"
-  echo "Rank \$RANK starting on GPU \$gpu_uuid"
-
-  echo "Runtime logging: "
-  echo "LOCAL_RANK: \$LOCAL_RANK"
-  echo "RANK: \$RANK"
-
-  telemetry_dir="/runtime-logs/${JOBSET_NAME}/nvidia-smi"
-  mkdir -p \$telemetry_dir
-  touch "\$telemetry_dir/\$RANK.csv"
-  #touch "\$telemetry_dir/\$RANK_custom.csv"
-  echo "Telemetry dir: \$telemetry_dir"
-  ls "\$telemetry_dir"
-
-  nv_smi_pid=\$!
-
-  #power_dir="/runtime-logs/${JOBSET_NAME}/power"
-  #mkdir -p \$power_dir
-  #touch "\$power_dir/\$RANK.csv"
-  #nvidia-smi --id \$gpu_uuid --query-gpu=index,timestamp,power.draw.average,power.draw.instant,module.power.draw.average,module.power.draw.instant --format=csv,noheader,nounits -lms 100 -f \$power_dir/\$RANK.csv &
-  #nv_power_pid=\$!
-
-  #cp /runtime-logs/custom_log_telemetry.sh .
-  #chmod +x ./custom_log_telemetry.sh
-  #./custom_log_telemetry.sh >> "\$telemetry_dir/\$RANK_custom.csv" &
-  #custom_log_telemetry_pid=\$!
-
-  if [ "\$LOCAL_RANK" -eq "0" ] || [ "\$LOCAL_RANK" -eq "2" ]; then
-    # get CPU usage
-    echo "Starting CPU usage capture"
-    cpu_usage_dir="/runtime-logs/${JOBSET_NAME}/cpu-usage"
-    mkdir -p \$cpu_usage_dir
-    touch "\$cpu_usage_dir/cpu_usage_\$RANK.out"
-
-    top -b -d 5 >> \$cpu_usage_dir/cpu_usage_\$RANK.out &
-    export cpu_usage_pid=\$!
-
-    # get NIC usage
-    echo "Starting NIC usage capture"
-    cp /runtime-logs/custom_log_nic.sh .
-    chmod +x ./custom_log_nic.sh
-
-    nic_usage_dir="/runtime-logs/${JOBSET_NAME}/nic-usage"
-    mkdir -p "\$nic_usage_dir"
-    touch "\$nic_usage_dir/nic_log_eth0_\$RANK.log"
-
-    ./custom_log_nic.sh "eth0" >> "\$nic_usage_dir/nic_log_eth0_\$RANK.log" &
-    nic_usage_pid_eth0=\$!
-    echo "NIC RUN ID: \$nic_usage_pid_eth0"
-  fi
-
   cd /opt/Megatron-Bridge ;
+
+  export MEGATRON_CONFIG_LOCK_DIR="/tmp/\$LOCAL_RANK"
+  mkdir -p "\$MEGATRON_CONFIG_LOCK_DIR"
 
   numactl \
     --cpunodebind=\$((LOCAL_RANK/2)) \
@@ -198,28 +138,29 @@ worker_command=$(cat <<- EOM
     --num_gpus 256 \
     --gpus_per_node 4 \
     --compute_dtype fp8_mx \
+    --seq_length 4096 \
+    --global_batch_size 4096 \
+    --micro_batch_size 1 \
+    --tensor_model_parallel_size 1 \
+    --pipeline_model_parallel_size 2 \
+    --pipeline_model_parallel_layout 'Et*4|(t*4|)*14tmL' \
+    --virtual_pipeline_model_parallel_size 8 \
+    --context_parallel_size 1 \
+    --expert_model_parallel_size 32 \
+    --expert_tensor_parallel_size 1 \
+    --cuda_graph_impl local \
+    --cuda_graph_scope full_iteration \
+    --moe_a2a_overlap true \
+    --moe_flex_dispatcher_backend hybridep \
     --max_step 50 \
     logger.log_throughput=True \
     train.manual_gc_interval=100
 
-
-  kill -9 \$nv_smi_pid
-  #kill -9 \$nv_power_pid
-  #kill -9 \$custom_log_telemetry_pid
-
-  if [ "\$LOCAL_RANK" -eq "0" ] || [ "\$LOCAL_RANK" -eq "2" ]; then
-    kill -9 \$cpu_usage_pid
-    kill -9 \$nic_usage_pid_eth0
-  fi
-  echo "Telemetry processes killed"
-  ps aux
 EOM
 )
 
 echo "$worker_command" > worker_command.sh
 chmod 777 worker_command.sh
-
-mkdir -p "/runtime-logs/${JOBSET_NAME}/logs"
 
 torchrun \
 --nproc-per-node="4" \
@@ -228,7 +169,8 @@ torchrun \
 --rdzv_id="${JOB_IDENTIFIER}" \
 --master_addr="${MASTER_ADDR}" \
 --master_port="${MASTER_PORT}" \
---no-python bash worker_command.sh 2>&1 | python3 -u -c "import sys, time; [sys.stdout.write('[{}] {}'.format(time.strftime('%Y-%m-%d %H:%M:%S'), line)) for line in iter(sys.stdin.readline, '')]" | tee "/runtime-logs/${JOBSET_NAME}/logs/nemo_mb_RANK_${JOB_COMPLETION_INDEX}.log"
+--no-python bash worker_command.sh 2>&1 | python3 -u -c "import sys, time; [sys.stdout.write('[{}] {}'.format(time.strftime('%Y-%m-%d %H:%M:%S'), line)) for line in iter(sys.stdin.readline, '')]"
+
 
 
 if [[ "$JOB_COMPLETION_INDEX" == "0" ]]; then
