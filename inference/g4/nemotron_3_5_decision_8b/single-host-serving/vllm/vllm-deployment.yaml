@@ -1,0 +1,148 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Single-GPU GKE Deployment and Service for NVIDIA Nemotron 3.5 Decision 8B on
+# G4 (NVIDIA RTX PRO 6000 Blackwell Server Edition).
+#
+# Before applying:
+# 1. Replace <VLLM_IMAGE> with the GA vLLM container image (pinned by tag or digest).
+# 2. Replace <MODEL_URI> with the public Hugging Face model ID or local staged path.
+# 3. Scale spec.replicas linearly (up to 8 per g4-standard-384 node) for higher
+#    aggregate throughput; bidirectional attention allocates no KV cache, so
+#    stateless load balancing scales without KV-aware routing.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nemotron-3-5-decision-vllm
+  labels:
+    app: nemotron-3-5-decision-vllm
+spec:
+  replicas: 1
+  # Prevent single-GPU g4-standard-48 deadlocks during in-place config updates.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: nemotron-3-5-decision-vllm
+  template:
+    metadata:
+      labels:
+        app: nemotron-3-5-decision-vllm
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-accelerator: nvidia-rtx-pro-6000
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: vllm
+        image: "<VLLM_IMAGE>"
+        env:
+        # Required on GKE 580.x host drivers when a CUDA 13.2+ vLLM container
+        # ships FlashAttention-2 PTX without native sm_120 cubins. Omit once
+        # the node driver is R595+ or FA2 includes sm_120 cubins, or replace
+        # with `--attention-backend TRITON_ATTN` in args below.
+        - name: LD_LIBRARY_PATH
+          value: "/usr/local/cuda/compat:/usr/local/nvidia/lib64:/usr/local/cuda/lib64"
+        - name: VLLM_ENABLE_CUDA_COMPATIBILITY
+          value: "1"
+        - name: HF_HOME
+          value: "/tmp/hf-cache"
+        - name: HUGGING_FACE_HUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: hf-secret
+              key: hf_api_token
+              optional: true
+        command: ["vllm", "serve", "<MODEL_URI>"]
+        args:
+        - "--served-model-name"
+        - "nemotron-decide"
+        - "--hf-overrides"
+        - "{\"ar_mode\": true, \"is_causal\": false}"
+        - "--dtype"
+        - "bfloat16"
+        - "--quantization"
+        - "fp8_per_tensor"
+        - "--max-model-len"
+        - "131072"
+        - "--max-num-batched-tokens"
+        - "131072"
+        - "--max-num-seqs"
+        - "1024"
+        - "--gpu-memory-utilization"
+        - "0.85"
+        - "--seed"
+        - "0"
+        - "--host"
+        - "0.0.0.0"
+        - "--port"
+        - "8000"
+        ports:
+        - containerPort: 8000
+          name: http
+        resources:
+          requests:
+            cpu: "12"
+            memory: "64Gi"
+            nvidia.com/gpu: "1"
+          limits:
+            cpu: "24"
+            memory: "128Gi"
+            nvidia.com/gpu: "1"
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          periodSeconds: 10
+          failureThreshold: 90
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          periodSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: model-cache
+          mountPath: /tmp/hf-cache
+        - name: dshm
+          mountPath: /dev/shm
+      volumes:
+      # Pod-scoped cache (~16 GiB per replica). For 8 replicas on one
+      # g4-standard-384 node, provision >= 300 GB boot disk (or Local SSD) or
+      # replace with a node-shared hostPath to download weights once per node.
+      - name: model-cache
+        emptyDir: {}
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 16Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nemotron-3-5-decision-vllm
+  labels:
+    app: nemotron-3-5-decision-vllm
+spec:
+  selector:
+    app: nemotron-3-5-decision-vllm
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
